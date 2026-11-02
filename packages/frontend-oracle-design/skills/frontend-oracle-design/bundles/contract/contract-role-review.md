@@ -186,9 +186,9 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
-review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass.
+Each authoring review kind (model analyst, translation, card reviews) gets at most 2 rounds; Delivery
+review keeps its own two-round limit. No role restart or regenerated packet resets either, and
+exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -445,7 +445,7 @@ not grounds for failure. Missing Contract runners/reporters are actual environme
 Approval precedes CHECKED and its whole-card hash. Preapproval strict checks leave DISCOVERING unchanged.
 After actual human confirmation: strict Space check → CHECKED → full unchanged-card lint → DRAFTED →
 immutable lock tool → ORACLE_READY. Only the lock tool writes ORACLE_READY. Never create MODELED or a
-fake package. Modified CHECKED bytes rewind for rechecking, changed meaning also requires reapproval.
+fake package. The next step checks modified card bytes again, changed meaning also requires reapproval.
 
 Delivery requires `contract-cases:reported` with actual reported case IDs covering every required
 executable frame/scenario, not labels or test counts. Under default t-way coverage these are the

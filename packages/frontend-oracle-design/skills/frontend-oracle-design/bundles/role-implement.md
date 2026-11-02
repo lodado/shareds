@@ -186,9 +186,9 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
-review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass.
+Each authoring review kind (model analyst, translation, card reviews) gets at most 2 rounds; Delivery
+review keeps its own two-round limit. No role restart or regenerated packet resets either, and
+exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -1507,8 +1507,8 @@ copies of the policy.
 4. Check the Bend laws, complete the bounded space and run the Adequacy check before confirmation
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
-   confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
-   `oracle-stage.mjs` runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
+   confirmed and locked together; PROOF remains a repairable proof candidate. The model check of
+   `oracle-step.mjs` and the lock runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
    `unsafe` proof (without PROOF.bend none is judged), a law the model breaks, a refuted check and a coordinate
    setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
    the same with `WORLD_SETTING_UNSATISFIABLE`): exclude that setting with a sourced assumption or fix the row

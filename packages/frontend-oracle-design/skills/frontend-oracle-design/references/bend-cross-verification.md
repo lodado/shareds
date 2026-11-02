@@ -97,7 +97,7 @@ one is pending; an unmount before the request settles. Each cell is one of `sour
 the seven keys `late-success-after-cancel`, `late-failure-after-success`, `older-response-after-newer`,
 `duplicate-completion`, `lost-response`, `retry-while-pending`, `unmount-before-settle`; each cell is
 `{decision: source | default | n/a, ref: S*}` or `{decision: question, ref: Q* | H*}`. When Async is in a version 2
-space, `oracle-stage.mjs advance --to MODELED` refuses a package that leaves any cell undecided. Questions that kill a model branch go out together as one A/B batch;
+space, the package check of `oracle-step.mjs` refuses a package that leaves any cell undecided. Questions that kill a model branch go out together as one A/B batch;
 the rest become holds ([author procedure](roles/author-formal.md#holds--a-question-that-blocks-only-part-of-the-scope)).
 A project default is a policy set the user approved once — for example newest request wins, no rollback after a
 newer completed mutation, one success notice per logical operation. Save the approved text verbatim as a source

@@ -186,9 +186,9 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
-review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass.
+Each authoring review kind (model analyst, translation, card reviews) gets at most 2 rounds; Delivery
+review keeps its own two-round limit. No role restart or regenerated packet resets either, and
+exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -585,8 +585,8 @@ copies of the policy.
 4. Check the Bend laws, complete the bounded space and run the Adequacy check before confirmation
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
-   confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
-   `oracle-stage.mjs` runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
+   confirmed and locked together; PROOF remains a repairable proof candidate. The model check of
+   `oracle-step.mjs` and the lock runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
    `unsafe` proof (without PROOF.bend none is judged), a law the model breaks, a refuted check and a coordinate
    setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
    the same with `WORLD_SETTING_UNSATISFIABLE`): exclude that setting with a sourced assumption or fix the row
@@ -773,7 +773,7 @@ one is pending; an unmount before the request settles. Each cell is one of `sour
 the seven keys `late-success-after-cancel`, `late-failure-after-success`, `older-response-after-newer`,
 `duplicate-completion`, `lost-response`, `retry-while-pending`, `unmount-before-settle`; each cell is
 `{decision: source | default | n/a, ref: S*}` or `{decision: question, ref: Q* | H*}`. When Async is in a version 2
-space, `oracle-stage.mjs advance --to MODELED` refuses a package that leaves any cell undecided. Questions that kill a model branch go out together as one A/B batch;
+space, the package check of `oracle-step.mjs` refuses a package that leaves any cell undecided. Questions that kill a model branch go out together as one A/B batch;
 the rest become holds ([author procedure](roles/author-formal.md#holds--a-question-that-blocks-only-part-of-the-scope)).
 A project default is a policy set the user approved once — for example newest request wins, no rollback after a
 newer completed mutation, one success notice per logical operation. Save the approved text verbatim as a source
@@ -1718,7 +1718,7 @@ unchanged inputs, not a smaller bound presented as the same workload.
   ordering obligations, not turn coupled axes into assumed-independent ones.
 - **Keep revision boundaries intact.** Imported files participate in source/input digests. An
   imported helper change still needs the applicable derivation, review and lock invalidation.
-  Use the shared authoring repair budget; a new module is not permission for another review round.
+  A new module is not permission for another review round.
 - **Do not trade coverage for speed.** Ordered prefixes and observations remain distinct. Adding
   branching choices or a larger bound can multiply traces; measure that separately from per-step
   copying. Do not drop events, merge histories by final state, reduce bounds or skip proofs to
@@ -2473,16 +2473,15 @@ whatever is already loaded.
    re-dumps the package costs a model turn per edit and is a defect.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
-   by repeatedly rewriting the proof. Begin the stage record before the first independent input.
+   by repeatedly rewriting the proof.
    Read [input families](case-space-inputs-formal.md) to decide all seven input families, inherited dispositions
    and possible cases. The full card case-space procedure is a Draft-completion read: load
    [`card/case-space.md`](../card/case-space.md) with `role-author-draft-formal` after `project-card`, not in
    this initial model-author context. Unknown combinations stay in.
 4. Use supported, authorized native delegation with capacity for an independent model analyst.
-   Dispatch it once the package registers the sources, before the model is written; keep writing while it
-   runs and join it at step 6, which needs its world model, goals and State Model.
-   Prepare `oracle-adequacy.mjs model-input --package` and pass only that path's permitted source-bound
-   inputs. Keep analyst input independence from the candidate model/author conclusions as adequacy
+   Dispatch it when `oracle-step.mjs` names it, once the package registers the sources and before the model
+   is written; keep writing while it runs and join it at step 6, which needs its world model, goals and State
+   Model. Pass only the model input step writes outside the repository. Keep analyst input independence from the candidate model/author conclusions as adequacy
    specifies. A same-context role switch does not create independence. Report a concrete reason for any
    sequential fallback. Later proof/behavior checks may run concurrently on stable isolated inputs when
    the host supports it. Approval, VALID_RED and final adjudication remain serial. This is not graph opt-in.
@@ -2492,17 +2491,16 @@ whatever is already loaded.
    and separate request/fetch/effect counts, not one collapsed event. For the machine reading, the
    requirement-to-law table and the cell, every-trace, witness and rank templates, invoke
    [`$bend-proof`](../../../bend-proof/SKILL.md), which reads [`bend-proof.md`](../bend-proof.md).
-   Check Bend with `scripts/oracle-model.mjs check --file <file>` before `prove`, or all folder and `repo:`
-   Bend files plus `validate --stage model` in about a second with `scripts/oracle-cycle.mjs fast --dir <dir>`
-   (`TODO` laws as `todo`). Grow a file one def or law group at a time, `fast` after each.
+   Check Bend with `scripts/oracle-model.mjs check --file <file>` before `prove`. Grow a file one def or law
+   group at a time, `check` after each.
 6. Continue the analyst for the translation review once `crossCheck` is written; run the checks below while
    it reads and collect it before `cross-check`.
    Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
-   counterexamples, and repair shared causes in one batch within the shared authoring iteration budget.
+   counterexamples, and repair shared causes in one batch, then rerun `oracle-step.mjs`.
    Unresolved policy becomes an Open question, never an unbounded fix/check loop. Read [`discovery.md`](../discovery.md) before
    `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview.
    New-axis/cross-term uses the A/B question and silent-decision uses the policy question.
-7. Run `oracle-package.mjs project-card`. Rows, axes and formal sections are projected, never
+7. `oracle-step.mjs` runs `oracle-package.mjs project-card` once the package and the model pass. Rows, axes and formal sections are projected, never
    hand-written a second time. The model package is the source of generated card regions, not vice versa.
    Tools prove the locked laws, enumerate model space and check product correspondence only at the
    applicable approved stage; plans/generated tests are not executed consumer evidence.
@@ -2513,18 +2511,14 @@ whatever is already loaded.
    Consumer test generation/writes belong to the explicitly invoked $test role only after approval/lock,
    not to this pre-lock authoring role; its temporary pre-lock sweep report is not a consumer test.
 
-The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
-once each gate passes, or in one `oracle-cycle.mjs walk --dir <dir>` call. Return artifacts and gate results.
-oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes and
-the Bend files and registered sources CHECKED judged, and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
+The controller runs `oracle-step.mjs --dir <dir>` and does what NEXT FOR YOU says: it checks the package,
+the model and the projected card on the files as they are, so editing is free and nothing rewinds. Return
+artifacts and check results. `oracle-lock.mjs create` judges every node again on the current bytes, and only
+the scripts write stage.json. The lock still runs card lint itself,
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
-`status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
-input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another
-fresh defect hunt. Changed inputs share one repair batch (a rewind spends none); a third
-batch requires an explicit user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
-Before every actual analyst dispatch or resumed analysis, register `review-input --kind model-analyst
---input <permitted-source-input> --attempt <dispatch-id>`. A transport retry reuses the same ID; a new
-analysis does not, even when its source bytes are unchanged.
+Each review kind gets at most 2 rounds: a return saved for a new input digest. The same input saved again
+adds none and is not permission for another fresh defect hunt. The same issues on a third edited state stop
+the step for the user. Do not rename the run, reset stage.json or restart the analyst to evade either.
 
 ## Model-package input dispositions
 

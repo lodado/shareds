@@ -9,7 +9,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest, stableStringify } from './oracle-fs.mjs'
-import { confirmClass, extendIterations, iterationBudget, repairHunks, ROUND_CEILING } from './oracle-iterations.mjs'
+import { confirmClass, repairHunks } from './oracle-iterations.mjs'
 import { emitWorld } from './oracle-projection.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
@@ -4781,18 +4781,6 @@ test('review iterations bind High reviewers to one round, require prior findings
     '--findings', followupPaths[0], '--intersect', followupPaths[1]])
   assert.match(refused.stderr, /^REVIEW_ROUNDS_CLOSED:/)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
-})
-
-// a unit case only: delivery review rounds are not in the Delivery Bend model
-test('delivery review approvals stop at the round ceiling: no approval opens round 7', () => {
-  const approval = (round) => ({ decision: 'approve-one-more-round', phase: 'delivery-review', round,
-    source: 'conversation: user approved one more round', reason: 'one more review lap' })
-  let budget = iterationBudget(undefined)
-  for (const round of [3, 4, 5, 6]) budget = extendIterations(budget, approval(round), 'delivery-review')
-  assert.equal(ROUND_CEILING, 6)
-  assert.equal(budget.limit, 6)
-  assert.throws(() => extendIterations(budget, approval(7), 'delivery-review'),
-    { code: 'ITERATION_CEILING_REACHED', message: /contract itself is wrong.*new run id starts at round 1/ })
 })
 
 /**

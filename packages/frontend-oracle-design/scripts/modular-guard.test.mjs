@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- plugin contracts run through node --test.
 import test from 'node:test'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
 
@@ -98,16 +98,18 @@ async function contextFixture(t, profile = 'contract/v1') {
     assert.equal(result.status, 0, result.stderr)
   }
   if (profile === 'contract/v1') {
-    cli('oracle-stage.mjs', 'begin', '--dir', directory, '--profile', profile)
-    for (const to of ['CHECKED', 'DRAFTED']) cli('oracle-stage.mjs', 'advance', '--dir', directory, '--to', to)
+    cli('oracle-step.mjs', '--dir', directory)
   } else {
-    // Prepared stage fixture exercises the lock/guard boundary, not execution of Formal proof; since 0.107.0 a DRAFTED record
-    // also carries the pin of the inputs CHECKED judged
+    // A prepared lock exercises the guard boundary, not the Formal proof: the locked record and the manifest the lock writes
+    // for these bytes once the authoring graph passes (oracle-stage.mjs). The create below takes them as a re-lock, so
+    // the manifest must equal the one the lock computes.
+    const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
     const bytes = '{}\n'
     await writeFile(join(directory, 'oracle.package.json'), bytes)
-    const { inputsPin } = await import(pathToFileURL(join(dirname(script), 'oracle-stage.mjs')).href)
-    await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', verificationProfile: profile,
-      packageSha256: createHash('sha256').update(bytes).digest('hex'), inputsSha256: await inputsPin(directory), history: [] }))
+    await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'ORACLE_READY', verificationProfile: profile,
+      packageSha256: sha256(bytes), history: [] }))
+    const manifest = { algorithm: 'sha256', verificationProfile: profile, oracle: { path: 'oracle.md', sha256: sha256(card) }, schemaVersion: 1, sources: [] }
+    await writeFile(lock, `${JSON.stringify(manifest, null, 2)}\n`)
   }
   cli('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock)
   const ledger = join(directory, 'runs.jsonl')

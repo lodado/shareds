@@ -17,7 +17,7 @@ import {
   stableStringify,
 } from './oracle-fs.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
-import { assertReadyToLock, assertRelockPinned, markLocked, readStage } from './oracle-stage.mjs'
+import { assertReadyToLock, markLocked, readStage } from './oracle-stage.mjs'
 
 const verifyScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
@@ -428,31 +428,36 @@ export async function invalidatedWitnesses(lockPath) {
   return invalidated
 }
 
-async function assertStaged(directory, requestedProfile) {
+async function assertStaged(directory, requestedProfile, mode) {
   try {
-    return await assertReadyToLock(directory, requestedProfile)
+    return await assertReadyToLock(directory, requestedProfile, mode)
   } catch (error) {
     throw new CliError(error.code ?? 'STAGE_GATE', error.message)
   }
 }
 
-async function stagedAuthorization(directory, requestedProfile, rootDirectory) {
+/**
+ * The stage half of create and verify: create judges the authoring graph on the current files (oracle-stage.mjs), verify
+ * takes only a locked record. The package and card bytes judged are the ones snapshotted and locked.
+ */
+async function stageSnapshotOf(directory, rootDirectory) {
   const stage = await readStage(directory)
-  const stageSnapshot = stage?.verificationProfile !== undefined ? await snapshot(join(directory, 'stage.json'), 'STAGE_CHANGED', {
-    allowHardlinks: false, base: rootDirectory,
-  }) : null
-  const binding = await assertStaged(directory, requestedProfile)
-  if (binding.kind === 'explicit' && !stageSnapshot) throw new CliError('STAGE_CHANGED', 'Explicit stage appeared during authorization')
+  if (stage?.verificationProfile === undefined) return null
+  return snapshot(join(directory, 'stage.json'), 'STAGE_CHANGED', { allowHardlinks: false, base: rootDirectory })
+}
+
+async function stagedAuthorization(directory, requestedProfile, rootDirectory, mode = {}) {
+  const stageSnapshot = await stageSnapshotOf(directory, rootDirectory)
+  const binding = await assertStaged(directory, requestedProfile, mode)
+  if (mode.verify && binding.kind === 'explicit' && !stageSnapshot) throw new CliError('STAGE_CHANGED', 'Explicit stage appeared during authorization')
   const authorization = { binding, stageSnapshot, rootDirectory }
-  if (stageSnapshot) {
-    authorization.record = JSON.parse(stageSnapshot.bytes.toString('utf8'))
-    if (binding.profile === 'formal-bend/v1') {
-      authorization.packageSnapshot = await snapshot(join(directory, 'oracle.package.json'), 'STAGE_STALE', {
-        allowHardlinks: false, base: rootDirectory,
-      })
-      if (authorization.packageSnapshot.sha256 !== authorization.record.packageSha256) {
-        throw new CliError('STAGE_STALE', 'Staged package does not match the authorized snapshot')
-      }
+  if (stageSnapshot) authorization.record = JSON.parse(stageSnapshot.bytes.toString('utf8'))
+  if (binding.profile === 'formal-bend/v1' && binding.judged.packageSha256) {
+    authorization.packageSnapshot = await snapshot(join(directory, 'oracle.package.json'), 'STAGE_STALE', {
+      allowHardlinks: false, base: rootDirectory,
+    })
+    if (authorization.packageSnapshot.sha256 !== binding.judged.packageSha256) {
+      throw new CliError('STAGE_STALE', 'Staged package does not match the authorized snapshot')
     }
   }
   await assertAuthorizationUnchanged(authorization)
@@ -464,7 +469,7 @@ async function assertAuthorizationUnchanged({ stageSnapshot, packageSnapshot, ro
   if (stageSnapshot) await assertUnchanged(stageSnapshot, 'STAGE_CHANGED', { allowHardlinks: false, base: rootDirectory })
 }
 
-function assertAuthorizedCard({ binding, record }, oracleSnapshot) {
+function assertAuthorizedCard({ binding }, oracleSnapshot) {
   try {
     resolveProfileBinding({ bindings: [
       { artifact: 'staged authorization', profile: binding.profile },
@@ -473,8 +478,9 @@ function assertAuthorizedCard({ binding, record }, oracleSnapshot) {
   } catch (error) {
     throw new CliError(error.code ?? 'STAGE_GATE', error.message)
   }
-  if (binding.profile === 'contract/v1' && record?.cardSha256 !== oracleSnapshot.sha256) {
-    throw new CliError('STAGE_STALE', 'Card snapshot differs from the whole approved staged card')
+  const judged = binding.judged?.cardSha256
+  if ((binding.profile === 'contract/v1' || judged) && judged !== oracleSnapshot.sha256) {
+    throw new CliError('STAGE_STALE', binding.profile === 'contract/v1' ? 'Card snapshot differs from the whole approved staged card' : 'Card snapshot differs from the card the lock judged')
   }
 }
 
@@ -488,8 +494,10 @@ export async function createLock(options) {
   const rootDirectory = await realpath(repositoryRoot(lockDirectory)).catch((error) => {
     throw new CliError('ORACLE_PATH_INVALID', `Cannot resolve repository root: ${error.message}`)
   })
-  // 패키지 경로의 오라클은 인터뷰·모델·검사·Draft 단계를 모두 거친 뒤에만 잠긴다(oracle-stage.mjs)
-  const authorization = await stagedAuthorization(canonicalLockDirectory, options.profile, rootDirectory)
+  // 패키지 경로의 오라클은 작성 그래프의 결정적 노드가 지금 바이트로 모두 통과할 때만 잠긴다(oracle-stage.mjs) — 같은 바이트로
+  // 이미 잠근 기록의 재잠금은 lock 파일이 있을 때만 다시 판정하지 않는다
+  const present = await lstat(lockPath).then(() => true, () => false)
+  const authorization = await stagedAuthorization(canonicalLockDirectory, options.profile, rootDirectory, { present })
   const { binding } = authorization
   const oraclePath = resolve(options.oracle)
   const canonicalOracle = await realpath(oraclePath).catch((error) => {
@@ -501,12 +509,6 @@ export async function createLock(options) {
   }
 
   const presentLock = await existingLock(lockPath, lockDirectory, rootDirectory)
-  // lock을 지우고 다시 만드는 ORACLE_READY 재잠금은 멱등이 아니다 — CHECKED가 판정한 입력 그대로인지 stage가 다시 잰다
-  if (!presentLock) {
-    await assertRelockPinned(canonicalLockDirectory).catch((error) => {
-      throw new CliError(error.code ?? 'STAGE_GATE', error.message)
-    })
-  }
   if (presentLock) resolveProfileBinding({ requestedProfile: options.profile, bindings: [{ artifact: 'card/stage', profile: binding.profile }, { artifact: 'lock', profile: presentLock.manifest.verificationProfile }] })
   const sourceInputs = [...new Set(options.sources)]
   if (sourceInputs.some(isAbsolute)) throw new CliError('INPUT_UNREADABLE', 'Sources must be repository-relative')
@@ -577,7 +579,7 @@ export async function createLock(options) {
     }
     finalLock ??= await snapshot(lockPath, 'LOCK_INVALID', { allowHardlinks: false, base: rootDirectory })
   }
-  await markLocked(canonicalLockDirectory)
+  await markLocked(canonicalLockDirectory, authorization)
   process.stdout.write(`ORACLE_LOCKED sha256:${manifest.oracle.sha256} manifest-sha256:${finalLock.sha256}\n`)
 }
 
@@ -602,7 +604,7 @@ export async function verifyLock(options, hooks = {}) {
   const { manifest, lockSnapshot } = await readManifest(lockPath, canonicalLockDirectory, 'LOCK_INVALID', rootDirectory)
   const oracleSnapshot = await verifyEntry(canonicalLockDirectory, rootDirectory, manifest.oracle, 'ORACLE_CHANGED')
   const cardProfile = readCardProfile(oracleSnapshot.bytes.toString('utf8'))
-  const authorization = cardProfile ? await stagedAuthorization(canonicalLockDirectory, options.profile, rootDirectory) : null
+  const authorization = cardProfile ? await stagedAuthorization(canonicalLockDirectory, options.profile, rootDirectory, { verify: true }) : null
   const stage = authorization?.record ?? await readStage(canonicalLockDirectory)
   resolveProfileBinding({ requestedProfile: options.profile, bindings: [
     { artifact: 'card', profile: cardProfile },
@@ -631,12 +633,11 @@ async function main() {
   else throw new CliError('USAGE', 'Expected create or verify', 2)
 }
 
+// not awaited at the top level: the lock judges the model node, which imports this module back (the receipt store)
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    await main()
-  } catch (error) {
+  main().catch((error) => {
     const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
     process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
     process.exitCode = cliError.exitCode
-  }
+  })
 }

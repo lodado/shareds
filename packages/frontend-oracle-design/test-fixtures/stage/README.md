@@ -1,34 +1,50 @@
 # Stage fixture
 
-A skill tool fixture for the authoring stage record of `oracle-stage.mjs` in `frontend-oracle-design`. It models
-the stages a `formal-bend/v1` package moves through and the stage half of the lock, so `prove` and `laws` run on a
-finite state machine and the real stage commands can be compared with it. It decides nothing for a real application.
+A skill tool fixture for authoring in `frontend-oracle-design`: the authoring graph `oracle-step.mjs` evaluates
+(`oracle-stage.mjs` `evaluateGraph`, `recordCheck`, `briefStatus`) and the lock that judges it (`oracle-lock.mjs
+create`), for both profiles. It decides nothing for a real application. The header of `MODEL.bend` lists what each
+state field abstracts and what is left out.
 
 ## Fixture policy
 
-1. `advance` moves one stage forward (DISCOVERING, MODELED, CHECKED, DRAFTED) when that step's gate passes; only
-   the lock enters ORACLE_READY, from DRAFTED.
-2. CHECKED or DRAFTED whose Bend inputs changed after CHECKED judged them run CHECKED again in place on
-   `advance --to CHECKED`.
-3. `rewind` with a reason goes back to a stage at or before the current one; without a reason it is a usage error.
-4. A package changed after the record took its digest, or Bend inputs changed after the pin a step needs, make the
-   step stale.
-5. A refused command keeps the stage and the inputs; `status` and file edits write no record.
-6. A name after `--to` that is no stage is a skip. No `--to` at all is a usage error before the record is read, so
-   the model has no event for it.
+1. No record says where the authoring is. Each step evaluates the deterministic nodes in the profile's order (Formal:
+   package, model, card; Contract: confirmation, card) on the files as they are, up to the first failing one, and
+   records one check. Its label is that node's (DISCOVERING, MODELED, CHECKED) or DRAFTED.
+2. A step names the reviews before the first failing node (Formal: the model analyst after the package, the card
+   reviews after the card; Contract: cold-read first) that have no return saved for their current input and fewer
+   than 2 rounds; a step that stops names none. A round is a saved return for a new input digest; a return saved
+   again for the same input adds none. The conditional source-aware review is left out: step names it until its first
+   return is saved, then counts it like a card review.
+3. An edit changes only the node its part owns and takes the saved return away from the reviews whose input the part
+   feeds; a package or Bend edit also leaves the card projection out of date (it records the digest of both) until
+   the next step projects it, so it feeds the card reviews too, while the model analyst reads the sources only.
+4. The lock is accepted exactly when every deterministic node passes on the bytes it reads (a stale projection fails
+   the card); it reads no review. `--check` changes nothing in the oracle directory and fails exactly when the lock
+   would be refused.
+5. The same issue list on a third distinct file state stops the step (NEEDS_DECISION); fewer do not.
+6. A locked oracle stays locked until a byte its profile reads changes; then only a new revision goes on.
 
 ## Files
 
-- `MODEL.bend`: `Stage`/`Target`/`Inputs`/`Why`/`Last`/`Run`/`Part`/`Msg` types, `Run.step` over every state and
-  event, `init`, `next`, `observe`, `stale`, and 29 relations: forward, refusal, frame, environment and safety.
-- `LAWS.bend`: one cell law per relation: it holds for every state and event of the model.
-- `PROOF.bend`: imports `./LAWS.bend` and defines no law.
-- `authoring/`: the larger model this one is the stage part of, with `begin`, the authoring round budget,
-  `review-input`, `extend` and `walk` (its own README).
+- `MODEL.bend`: `Graph` (Blank, FormalAt, ContractAt, Locked, Drifted) over `Health`/`Rev`/`Run`/`Seen`, `Msg`
+  (Start, Step, Check, Save, Lock, Edit of a part), `Graph.step`, `hint` (the phase line's next), `label`, `enabled`
+  (one edit between two checks), `policy` and `rank`, and 9 relations: `Q_lock_judges`, `Q_lock_only`,
+  `Q_check_reads`, `Q_next_first`, `Q_edit_local`, `Q_rounds`, `Q_stop_third`, `Q_refused_keeps`,
+  `Q_locked_stays`. `Graph.safe` is all of them on every command plus the state invariants (a check of these files
+  has a run exactly when a node fails; a Formal check with the package and the model passing has the card projected)
+  and `ranked`: the move the next names (step, save the returns asked for, fix the part of the first failing node,
+  lock) lowers the rank (three per failing node and per review round left, plus one while the last check is not of
+  these files), so following NEXT FOR YOU never returns to a state.
+- `LAWS.bend`: four cell laws (`run_counts`, `save_rounds`, `first_failing`, `first_failing_contract`), two
+  witnesses (a Formal package and a Contract card reach the lock), and five traces: the stop on the third edited
+  state and not the second, no third card review round, one round for a return saved twice, and a Bend edit that
+  asks for the card reviews again and not the model analyst.
+- `PROOF.bend`: the witness traces.
 
-The proof is generated: `oracle-model.mjs prove --dir test-fixtures/stage` generates the cell arms of the 29 laws,
-one case per state and event (120 × 28 = 3,360 each), and checks them in a temporary copy. It writes nothing here.
-
-`skills/frontend-oracle-design/scripts/oracle-stage-machine.test.mjs` checks that proof, that `laws` with every
-relation pins all 3,360 cells, and that every event from each of the 12 stage-and-inputs pairs a trace reaches ends
-where the model says when it runs the real `oracle-stage.mjs` commands.
+`oracle-model.mjs prove --dir test-fixtures/stage` generates the cell arms and checks the laws in a temporary copy.
+`prove-reach --model MODEL.bend --prefix Graph --safe safe` proves `Graph.safe` on all 730 states a trace reaches
+(4,204 states of the type × 18 events). `skills/frontend-oracle-design/scripts/oracle-stage-machine.test.mjs` runs
+both, and `oracle-authoring-machine.cases.mjs` replays 19 model traces (393 events covering all 253 (view, event,
+exit, view after) items the model reaches) on the real `oracle-step.mjs` and `oracle-lock.mjs`, a stale-search
+package for Formal and the toggle card for Contract, checking after every event the exit status, the label, the review
+rounds, the run of the same issues and the phase line's next against the model.

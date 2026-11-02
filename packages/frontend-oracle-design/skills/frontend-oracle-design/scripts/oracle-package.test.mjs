@@ -108,7 +108,7 @@ test('asyncCells: each async operation decides the seven cells before modelling 
   const decided = (decision, ref) => Object.fromEntries(ASYNC_CELLS.map((id) => [id, { decision, ref }]))
   const withCells = (asyncCells, extra = {}) => ({ ...clone(PKG), ...extra, ...(asyncCells === undefined ? {} : { asyncCells }) })
 
-  // required only at the MODELED gate, and only when Async is in the space of a version 2 package
+  // required only at the package node, and only when Async is in the space of a version 2 package
   assert.deepEqual(asyncCellIssues(withCells(undefined)), [])
   assert.deepEqual(asyncCellIssues(withCells(undefined), { required: true }), [], 'a version 1 package keeps its earlier shape')
   const v2 = withCells(undefined, { packageVersion: 2 })
@@ -1039,8 +1039,8 @@ test('a version-2 package names the Space discovery record and disposes every in
   for (const term of modeled.terms) if (term.family === 'Order') delete term.family
   modeled.families.Order = 'modeled: behavior'
   assert.deepEqual(packageIssues(modeled), [])
-  // Inherited is decided with the others at the model stage (MODELED refuses it): found only at the projection, after
-  // MODELED had passed, its repair cost a rewind.
+  // Inherited is decided with the others at the package node (it refuses it): found only at the projection, after the
+  // model had passed, its repair would rerun the model.
   const noInherited = clone(ready)
   delete noInherited.families.Inherited
   assert.ok(issuesAt(noInherited).some((issue) => issue.startsWith('package-family: Inherited')))
@@ -1317,7 +1317,7 @@ test('patch applies set, append and remove in order, writes once and reports the
     '--append', '/assumptions={"id":"A9","statement":"x"}',
     '--remove', '/aiRuns/0'])
   assert.equal(patched.status, 0, patched.stderr)
-  assert.match(patched.stdout, /^PACKAGE_PATCHED \S+\/oracle\.package\.json · set \/sources\/\[id=S1\]\/standard, append \/assumptions, remove \/aiRuns\/0 · MODELED-gate issues: \d+/)
+  assert.match(patched.stdout, /^PACKAGE_PATCHED \S+\/oracle\.package\.json · set \/sources\/\[id=S1\]\/standard, append \/assumptions, remove \/aiRuns\/0 · package-node issues: \d+/)
   const after = JSON.parse(await readFile(path, 'utf8'))
   assert.equal(after.sources.find((source) => source.id === 'S1').standard, 'clarified fixture policy')
   assert.deepEqual(after.assumptions, [{ id: 'A9', statement: 'x' }])
@@ -1343,10 +1343,11 @@ test('a bad patch writes nothing: a missing branch, a value that is not JSON, or
   assert.match(locked.stderr, /^PACKAGE_LOCKED: /)
   assert.deepEqual(await readFile(path), bytes)
 
+  // editing before the lock is free: a 0.126 record's stage asks for no rewind (oracle-step.mjs judges the files again)
   await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'MODELED', packageSha256: sha256(bytes), history: [] }))
-  const stale = patch('--set', '/sources/[id=S1]/standard="ok"')
-  assert.equal(stale.status, 0, stale.stderr)
-  assert.match(stale.stdout, /^stage MODELED recorded other package bytes — oracle-stage\.mjs rewind --dir \S+ --to DISCOVERING --reason review-finding\|gate-failure\|user-answer\|source-change$/m)
+  const edited = patch('--set', '/sources/[id=S1]/standard="ok"')
+  assert.equal(edited.status, 0, edited.stderr)
+  assert.doesNotMatch(edited.stdout, /rewind/)
 })
 
 test('patch refuses an unreadable stage, a lock beside the package and a linked package, and skips a no-op write', async (t) => {

@@ -9,7 +9,9 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fullProductFixture } from '../../../test-fixtures/full-product/fixture.mjs'
+import { PACKAGE_DIR, template } from './oracle-authoring-machine.cases.mjs'
 import { verifyLock } from './oracle-lock.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-lock.mjs')
 
@@ -21,11 +23,11 @@ async function contractFixture(t) {
   const stage = join(directory, 'stage.json')
   const card = `${fullProductFixture().render()}\n## Verification Profile\n\n- Profile: contract/v1\n`
   await writeFile(oracle, card)
-  const stageScript = new URL('./oracle-stage.mjs', import.meta.url).pathname
-  for (const args of [['begin'], ['advance', '--to', 'CHECKED'], ['advance', '--to', 'DRAFTED']]) {
-    const result = spawnSync(process.execPath, [stageScript, ...args, '--dir', directory], { encoding: 'utf8' })
-    assert.equal(result.status, 0, result.stderr)
-  }
+  // one step records the explicit contract/v1 profile and a check of these files: every node passes
+  const stepScript = new URL('./oracle-step.mjs', import.meta.url).pathname
+  const result = spawnSync(process.execPath, [stepScript, '--dir', directory], { cwd: directory, encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stdout)
+  assert.equal(JSON.parse(await readFile(stage, 'utf8')).verificationProfile, 'contract/v1')
   return { directory, oracle, lock, stage, card }
 }
 
@@ -67,6 +69,43 @@ syncBuiltinESMExports()
     } else assert.equal(JSON.parse(await readFile(stage)).stage, 'DISCOVERING')
   })
 }
+
+test('public create rejects a Formal card swapped between the judgment and the snapshot', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await mkdtemp(join(tmpdir(), 'oracle-lock-formal-race-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const { base, card } = await template(root)
+  const oracle = join(base, PACKAGE_DIR, 'oracle.md')
+  const lock = join(base, PACKAGE_DIR, 'oracle.lock.json')
+  const swapped = `${card}\n`
+  const preload = join(root, 'swap.mjs')
+  // realpath(oracle.md) is the first read of the card after the graph judged it: the bytes snapshotted are not those
+  await writeFile(preload, `import fs from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
+const original = fs.realpath
+let changed = false
+fs.realpath = async function(path, ...args) {
+  if (!changed && path === ${JSON.stringify(oracle)}) {
+    changed = true
+    await fs.writeFile(path, ${JSON.stringify(swapped)})
+  }
+  return original.call(this, path, ...args)
+}
+syncBuiltinESMExports()
+`)
+  const { NODE_TEST_CONTEXT: _parent, ...env } = process.env
+  await mkdir(join(root, 'receipts'))
+  const result = spawnSync(process.execPath, ['--import', preload, script, 'create', '--oracle', oracle, '--lock', lock], {
+    cwd: base,
+    encoding: 'utf8',
+    env: { ...env, ORACLE_LINT_CACHE: join(root, 'receipts') },
+  })
+  assert.equal(result.status, 1, `${result.stdout}${result.stderr}`)
+  assert.match(result.stderr, /^STAGE_STALE: Card snapshot differs from the card the lock judged/)
+  await assert.rejects(readFile(lock), { code: 'ENOENT' })
+  assert.equal(await readFile(oracle, 'utf8'), swapped)
+})
 
 for (const mutation of ['rewind', 'profile', 'pin', 'replacement']) {
   test(`verify rejects during-operation explicit stage ${mutation}`, async (t) => {

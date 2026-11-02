@@ -1,3 +1,145 @@
+# 0.127.0: authoring is one graph over the files; oracle-step.mjs runs it and the lock is the only commit
+
+## Why
+
+Wave W1 of `.ai/plans/fod-simplify/PLAN.md` ("내부 플로우도 조나 단순화"). Of the 40 OHRIGHT lines in the eight
+example runs, 7 (class B) were costs paid only to get a check: model-input registered without a preview, the same
+bytes registered again for a round, and a walk that went ahead before the fix and needed a rewind. Authoring kept
+five stored stages, moved them with walk and rewind, and counted that with four caps. The two 0.125.0 runs measured
+for 0.126.0 spent about 60% of their time in authoring and used 5 of 10 rewinds each.
+
+## Change
+
+- The position is derived from the files through one ordered gate graph (`GRAPH` in oracle-stage.mjs). Formal:
+  package → model-analyst (review) → model → card → cold-read, reverse-impossible and source-aware (reviews).
+  contract/v1: cold-read and source-aware (reviews) → confirmation → card. The first failing node names the position
+  (package or confirmation DISCOVERING, model MODELED, card CHECKED); every node passing is DRAFTED; the lock writes
+  ORACLE_READY.
+- Editing is free. There is no begin, advance, rewind, walk or extend. The lock is the only commit: it runs every
+  deterministic node on the current files (receipt-backed), refuses with `STAGE_GATE` naming each failing node and its
+  issues, and never trusts a recorded stage it did not lock. The lock format and verifyLock are unchanged.
+- Each review kind gets at most 2 rounds (`REVIEW_ROUNDS`). A round is a saved return for a new input digest
+  (`reviews/<kind>-<digest12>`); the same digest adds none. The input builders register nothing. Round 2 is
+  confirm-fixes: step continues the round-1 reviewer with only its finding IDs (the path of its round-1 return) and
+  the repair diff. The translation review counts the package's recorded `crossCheck.reviewedBy.inputDigest` as a
+  round even after the mappings changed, so a dispute, a fix and two records end with "ask the user how to settle
+  the mappings", never a third dispatch.
+- The source-aware review is a conditional review node in both profiles, keyed by the card digest and saved as
+  `reviews/source-aware-<digest12>.md`. No file marks machine-readably when it applies (card/policy-sources.md's
+  triggers are author judgments), so step names it with that test (Formal: step (1) of the lock line; contract/v1:
+  beside the user-confirmation issue) until its first return is saved. From then on it is counted, asked again for a
+  new card and shown by status like cold-read, its round 2 included.
+- The files digest a check records includes the PROOF.bend closure: a PROOF.bend-only edit is a new file state, so
+  status shows the files changed and a proof failing the same way on three such states stops the step. The lock's
+  input pin (`inputsSha256`) and verifyLock are unchanged.
+- The same non-empty issue list on a third distinct file state prints NEEDS_DECISION ("the same issues came back
+  after three edits: stop and report them to the user"; `SAME_ISSUES_STOP`, a detector over the recorded checks, not a
+  cap).
+- `oracle-step.mjs` is the only agent entry and ends with `NEXT FOR YOU:`. `--check` runs every node on a scratch
+  projection, lists each failing node, the answers the lock waits for and the reviews waiting, changes nothing in the
+  oracle directory (a passing model check may fill the receipt cache), and exits 1 exactly when the lock would refuse
+  those files (a failing node or an approval it waits for).
+- stage.json keeps its name, `verificationProfile` and history (one line per position change, `step` or `lock`) and
+  adds `checks` (files digest, issues digest, label, next; the last 20) and `reviews` (kind, digest). A 0.126.0
+  record loads at every stage: its label shows until the first step, its progress fields (`iterations`, `rewinds`,
+  `inputsSha256`, …) drop on the next write, history and dispatches stay.
+- Deleted: oracle-cycle.mjs (fast, walk, preflight, card-lint; step runs the scratch projection and lint itself), the
+  stage verbs begin, advance, rewind, review-input and extend, the authoring approvals, delegation and ceiling of
+  oracle-iterations.mjs, and the rewind cap.
+- A Contract lock line names the `repo:` sources of the card's Source Registry (it printed `<approved-source>`). A
+  Formal lock line always names oracle.package.json, so a package whose self source names another file is refused by
+  the lock (`source-lock-unregistered`), where init refused it after the lock (`PACKAGE_UNLOCKED`). The guard's
+  STAGE_PROTECTED message and `oracle-package.mjs patch` (`package-node issues`, was `MODELED-gate issues`) name the
+  new flow.
+- oracle-reflect reads 0.127.0 records: a `step` history entry at an earlier stage than the entry before it counts as
+  rework under its walk (`byWalk`, as a rewind did), and a recorded check whose next is `stop` counts once per run of
+  stops in `stops.NEEDS_DECISION`.
+- Docs: every walk, rewind, advance, extend, begin, review-input and registration instruction is now "run
+  oracle-step.mjs and do what NEXT FOR YOU says" (SKILL.md, README, controller-formal, author-formal, card-format,
+  contract/confirmation-lock, contract/requirements, common, controller-entry-formal, model-patterns,
+  bend-cross-verification, mandatory-verification); bundles regenerated.
+
+Measured, 0.126.0 → 0.127.0:
+
+- Authoring commands: 14 forms (12 verbs: stage begin, advance with three targets, rewind, extend, review-input,
+  status; cycle fast, walk, preflight, card-lint; step; lock create) → 4 (step, step `--check`, stage status, lock
+  create).
+- Authoring caps: 4 (2 rounds per revision, delegation up to 5, ceiling 6, 10 rewinds) → 1 (2 rounds per review kind),
+  plus the three-edit stop.
+- Authoring refusal codes: 27 → 8. Counted as the distinct codes an authoring command exits with (oracle-stage.mjs,
+  oracle-cycle.mjs, the iteration codes the stage threw, step's catch-all); the lock's own codes are unchanged and not
+  counted.
+- Authoring Bend models: stage/MODEL.bend 25,038 B + stage/authoring/MODEL.bend 49,386 B = 74,424 B, laws 6,739 B,
+  proofs 798 B → one graph model 42,547 B, laws 3,054 B, proof 581 B.
+- Authoring modules: stage 1,026 + cycle 342 + step 757 + iterations 254 = 2,379 lines → 1,003 + 0 + 1,012 + 198 =
+  2,213.
+- Skill docs outside the bundles: 929,623 → 926,148 B (−3,475); bundles −3,031 B; role-review bundle 61,988 B (cap
+  62,000); Formal Delivery closure 444,132 B (cap 446,000).
+
+## Tests
+
+- The graph model (test-fixtures/stage: MODEL, LAWS, PROOF, README) replaces both authoring models: its laws are
+  proven by the kernel with `Graph.safe` on every reached state, and the real-CLI replay
+  (oracle-authoring-machine.cases.mjs) checks 19 traces, 393 events, the phase line on 151 model states.
+- oracle-step.cases.mjs: bClassIncidents (a preview builds without registering, a return saved again for the same
+  input adds no round, a Bend edit does not ask the analyst again, a break and its fix after DRAFTED rewind and spend
+  nothing), checkParity (`--check` fails exactly when the lock refuses and names every issue it names), stopOnThird
+  (the stop on the third recurrence only), noThirdRound, legacyRecords (a 0.126.0 record at each stage loads with its
+  label), contractThroughStep, authoringToLock and handWrittenLines.
+- From the round-1 review: noThirdRound opens the source-aware review with its first saved return and checks that
+  round 2 of cold-read, reverse-impossible and source-aware continues the round-1 reviewer with its finding IDs and
+  the repair diff; translationRounds (a dispute, a fix and two records: the third mapping table goes to the user, no
+  third dispatch); proofEditsStop (a PROOF.bend-only edit shows as changed files, and a proof failing the same way
+  stops on the third edit); lockNamesPackage (a self source naming another file: the lock line names the package once
+  and the lock refuses it, writing no lock). oracle-stage.test: the lock refuses a card or LAWS.bend changed while it
+  judges (a preload edits after check-card: `STAGE_STALE`, no lock file), and reflect counts a 0.127.0 record's
+  backward steps and stops. oracle-lock.test: a Formal card swapped between the judgment and the snapshot is refused
+  (`STAGE_STALE`, no lock file).
+- One `oracle-step.mjs` call replaces begin and advance in contract-evidence, contract-profile, contract-public-runner,
+  contract-stale-search, contract-tway, profile-packets, profile-public-failures, modular-guard and oracle-lock.test.
+- Changed on purpose: a Contract record's history is the positions step saw (`DRAFTED`, `ORACLE_READY`), not a
+  four-stage walk; a pending Contract card fails the step at confirmation and the check is recorded (a refused
+  advance left stage.json unchanged); a Bend download failure is a step refusal (exit 2) that records nothing; a
+  forged DRAFTED record meets `STAGE_GATE` (was `CARD_LINT_FAILED`: the graph now runs before the card lint); the
+  lock-coverage model test drops the package instead of forging DRAFTED; modular-guard's Formal fixture is a
+  prepared ORACLE_READY record and manifest that create accepts as a re-lock (was a forged DRAFTED record the old lock
+  trusted); the round-2 doc pin no longer names `--attempt`; the patch output pin. After the round-1 review: the
+  oracle-stage PROOF.bend test expects a proof-only edit to change the files digest and make the recorded check stale
+  (it expected the digest unchanged and the check current); contractThroughStep's confirmation line also names the
+  source-aware review and its reviews record carries `source-aware: 0`; authoringToLock's lock line starts with the
+  source-aware review as (1); bClassIncidents' round-2 line is confirm-fixes; the `--check` doc pin says "changes
+  nothing in the oracle directory".
+- Deleted with the behavior they tested: 18 oracle-stage tests (rounds, rewinds, walk, extend, delegation, the
+  rewind cap, analyst dispatch rounds, Contract begin, the stage machine, walk-back, the DRAFTED gate, a Bend edit
+  after CHECKED, the pre-pin record, the DRAFTED race), oracle-cycle.test.mjs (5), the step cases preflightFirst and
+  preflightSeesHandWritten (the preflight is gone; checkParity and handWrittenLines cover its hazards and sourced N/A
+  lines), the oracle-run case "delivery review approvals stop at the round ceiling" (the ceiling and its extension
+  are gone; review-extend has refused since 0.123.0), and the three stage-machine tests of the old models.
+
+## Open facts (not fixed)
+
+- A step records the files digest after it evaluates, so an edit made while a step runs can be recorded as checked.
+  The lock judges the files again, so it cannot lock them unchecked.
+- Nothing replaces `oracle-cycle.mjs fast` as a folder-wide quick check; the docs point to
+  `oracle-model.mjs check --file`.
+- A Formal lock runs the model node again when no receipt matches its inputs (another machine, a cleared cache,
+  `ORACLE_LINT_CACHE=off`); 0.126.0 trusted the DRAFTED record and its input pin instead.
+- PROOF.bend stays outside the lock's input pin, so the lock neither records it nor sees it change while it judges;
+  the files digest step records weighs it. The graph model and its replay leave out a PROOF.bend-only edit (it would
+  need a new part, events and pins) and the source-aware review (the replay never saves its return, so it stays
+  named only); proofEditsStop and noThirdRound cover them.
+- Left as found: oracle-workflow.graph.json:118 and delivery/green-review.md:20 disagree (Delivery, not this wave).
+
+## Verification
+
+- `pnpm test` (whole package): 1,347 pass, 0 fail, 0 skipped (363 s).
+- After the round-1 fixes: oracle-stage, oracle-lock and oracle-stage-machine tests 94 pass, 0 fail; skill-contract,
+  mandatory-verification and reference-bundles 131 pass, 0 fail. MODEL.bend is unchanged, so the proof below stands.
+- `prove-reach --model MODEL.bend --prefix Graph --safe safe` in test-fixtures/stage: `Graph.safe` holds on all 730
+  reachable states (diameter 15) of a 4,204-state, 18-event domain.
+- `pnpm lint`: 0 errors, 398 warnings (405 at 0.126.0); no changed file has more warnings than its HEAD text (eslint
+  `--stdin` on `git show HEAD:`); the bundle and eval checks pass. `prettier --check EVALUATION.md` passes.
+
 # 0.126.0: step names the gates in order, holds what a gate would refuse, and lists late package issues before the walk
 
 ## Why

@@ -10,9 +10,9 @@ allowed-tools:
 Fixed verification profile: `formal-bend/v1`. Select before authoring and preserve it across card,
 stage, lock, run, worker packet and receipt. No downgrade or fallback to another profile.
 One canonical runtime serves both controllers and all roles.
-Settle outcome/non-goals and risky premises before expensive authoring. Model, analyst, translation and
-card review laps share the persisted authoring budget; register every independent dispatch with
-`oracle-stage.mjs review-input --attempt`. Delivery packets carry their own bounded `reviewScope`.
+Settle outcome/non-goals and risky premises before expensive authoring. Before the lock run
+`oracle-step.mjs --dir <dir>` and do what NEXT FOR YOU says; each review kind gets at most 2 rounds.
+Delivery packets carry their own bounded `reviewScope`.
 
 ## Entry: always first
 

@@ -142,8 +142,7 @@ test('Contract t-way Delivery verifies evidence.json frame/sequence names in a t
       { family: 'Order', dimension: 'calls', choices: 'single, repeated' },
     ]
     const generated = dispositioned(w.oracle, tWayCard({ dimensions }))
-    ok(run('oracle-stage.mjs', 'begin', '--dir', w.directory, '--profile', 'contract/v1'))
-    for (const to of ['CHECKED', 'DRAFTED']) ok(run('oracle-stage.mjs', 'advance', '--dir', w.directory, '--to', to))
+    ok(run('oracle-step.mjs', '--dir', w.directory))
     const lock = join(w.directory, 'oracle.lock.json')
     ok(run('oracle-lock.mjs', 'create', '--oracle', w.oracle, '--lock', lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md', '--profile', 'contract/v1'))
     writeFileSync(join(w.src, 'product.mjs'), 'export const toggle = (enabled) => !enabled\n')

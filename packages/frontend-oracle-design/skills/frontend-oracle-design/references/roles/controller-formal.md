@@ -5,16 +5,16 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
 
 ## Phases
 
-Drive the run with `oracle-step.mjs --dir <dir>` and do what its last line, `NEXT FOR YOU:`, says. It runs
-the mechanical next command itself (begin, walk, red, green, exec, close, guide, report) with every
-argument filled, and stops for a file to write, a reviewer to dispatch, or the user's approval or decision.
+Drive the run with `oracle-step.mjs --dir <dir>` and do what its last line, `NEXT FOR YOU:`, says. Before
+the lock it checks the files as they are; after it, it runs the mechanical next command (red, green, exec,
+close, guide, report) with every argument filled. It stops for a file to write, a reviewer to dispatch, or
+the user's approval or decision.
 
 Six phases group the stage and Delivery states: a view, not new states, budgets or gates. Start each
 Progress message (common's table) and every answer to a progress question with the line from
 `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
 after it (`guide` opens with the same phase): `phase N/6 <name> · next: <command>`, then the newly
-established fact. Register each independent dispatch with `oracle-stage.mjs review-input --attempt <id>`,
-adding `--model` and `--effort` when known.
+established fact. Save each review's return unchanged where step names it.
 Where the host sets effort per dispatch (Claude Code's Agent `effort`), cap execution roles (a worker
 running given commands, packet assembly, a repair spelled out by exact findings) at `high`, never above
 the session's; author, analyst, every reviewer and the blind mapper keep the session's effort and their
@@ -39,7 +39,7 @@ None of those metrics/candidates is a gate. Low follows the same applicable cond
 
 ## 1. Intake
 
-States: no stage record. Command: $oracle-intake, then `oracle-stage.mjs begin`. Touchpoint: the first
+States: no stage record. Command: $oracle-intake, then `oracle-step.mjs`. Touchpoint: the first
 `yes`. Refusal: ask for a source the user has not given, never assume it; hold only separable blocked scope.
 
 Invoke $oracle-intake for approved source investigation and risk/capability discovery, then send the
@@ -51,24 +51,21 @@ independence rule names them (analyst, cold-read, reverse-impossible, source-awa
 
 ## 2. Model
 
-States: DISCOVERING, MODELED, CHECKED. Command: `oracle-cycle.mjs walk --dir <dir> [--to <stage>]`.
-Touchpoint: none. Refusal: the walk stops at the first failure with `failed.code`, `detail` and `next`;
-a stale stage stops as STAGE_STALE, so rerun with `--reason <cause>` to rewind to DISCOVERING and re-walk
-(no authoring round; review laps spend them).
+States: DISCOVERING, MODELED, CHECKED, derived from the files. Command: `oracle-step.mjs --dir <dir>`
+(`--check` lists every failing node and changes nothing in the oracle directory). Touchpoint: none. Refusal: step names the first
+failing node's issues; fix them and rerun, editing is free and nothing rewinds. The same issues on a third
+edited state stop it (NEEDS_DECISION): report them to the user.
 
-Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
-Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
-`advance --to MODELED | CHECKED | DRAFTED` once each gate passes; `walk` runs the fast Bend/package check,
-every remaining `advance` and the DRAFTED `project-card` in one call. A walk back is
-`rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
+Invoke $oracle-author for the source-bound model package, checks and projected Draft with all manual
+duties; step projects the card once the package and the model pass. The model check passes
 at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
-passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
-CHECKED also runs `prove` and `laws` ([bend-proof](../bend-proof.md) forms, Nat and List cut at the bound):
+passed it before (`ORACLE_LINT_CACHE=off` turns receipts off).
+It also runs `prove` and `laws` ([bend-proof](../bend-proof.md) forms, Nat and List cut at the bound):
 `open`, `failed`, `unsafe`, a false relation cell or a trace law its own `run` breaks from a reachable state
 stops it; free cells, unreached counterexamples to induction and other law forms are a report, undecided
 when an installed Bend cannot run. Without `PROOF.bend` the proof is not judged; the receipt keys it too.
 
-The model analyst is dispatched once per revision, in a fresh context that is never the author's, and that same
+The model analyst is dispatched when step names it, in a fresh context that is never the author's, and that same
 context is continued for its translation review ([discovery](../discovery.md)), not redispatched.
 Send every repair of the same revision (review findings, lint or proof failures, a user answer) to
 the author context that wrote the package, continued with only the findings and changed inputs
@@ -79,20 +76,19 @@ the run directory and the open findings. The Delivery test worker is continued t
 ## 3. Card review and lock
 
 States: DRAFTED. Command: `oracle-lock.mjs create`. Touchpoint: card approval, none under common's
-pre-authorized approval. Refusal: `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes and
-the Bend files and registered sources CHECKED judged (after a Bend edit, `advance --to CHECKED` judges
-them again, even with a re-projected card), and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
+pre-authorized approval. Refusal: `oracle-lock.mjs create` judges every node again on the current package,
+Bend files, registered sources and card, refuses when one fails or a file changes while it judges, and only
+the scripts write stage.json. The lock still runs card lint itself, so a hand-written
 record skips no check; repair a refusal in the author context.
 
 1. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
-   with card bytes alone: `oracle-review-view.mjs card --oracle <card>` as the reading view plus a byte
-   copy of the card, both written outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
+   with card bytes alone: the `oracle-review-view.mjs card` reading view plus a byte copy of the card,
+   both written by step outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
    Drive that nail and record root, falsifying observation and result in journal.md. In the same gate,
-   run the reverse two-sample read once per card: extract impossible dispositions with
-   `scripts/oracle-verify.mjs card --ir`, hand them with the witness falsifier table from
+   run the reverse two-sample read once per card: hand the impossible dispositions step extracts with
+   `scripts/oracle-verify.mjs card --ir`, the witness falsifier table from
    [`card/interaction-sweep.md`](../card/interaction-sweep.md) and the `oracle-adequacy.mjs explore-input`
-   file to a second context-free reviewer; its dispatch registers with `review-input --kind
-reverse-impossible --input <that file>` (other bytes start a new round).
+   file to a second context-free reviewer.
    Frame it as "one of these is wrong: build the counterexample". Promote every disagreement to needs-decision.
    The review role owns the reviewer procedure; do not load it here.
 2. When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies, obtain a source-aware fresh
@@ -101,8 +97,10 @@ reverse-impossible --input <that file>` (other bytes start a new round).
    linked P/O/D, Open question or justified N/A. It supplements, never replaces, card-only cold-read and
    reverse-impossible review. If independence is unavailable, record only the contract-permitted
    same-context fallback and limitation. Never claim this satisfies a required independent High review.
-3. These reviews share the authoring budget of 2 rounds per revision. A round-2 confirmation continues the
-   round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`.
+   Step names it with the file its return is saved as; once that return is saved it counts rounds.
+3. Each review kind gets at most 2 rounds per revision: a return saved for a new input digest; the same
+   input saved again adds none. A round-2 confirmation continues the
+   round-1 reviewer the same way, with only its finding IDs and the repair diff.
 4. Show existing revisions as semantic delta and new cards in full with Open questions. Every surviving
    question carries candidate rows and recommendation, so a single `yes` both answers and confirms.
    `yes` adopts every recommendation and approves the card; `Q<n>=<option>` swaps one option and

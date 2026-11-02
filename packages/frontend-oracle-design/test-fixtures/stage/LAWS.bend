@@ -1,149 +1,62 @@
 import Base
 import ./MODEL.bend as M
 
-# Each law: the relation holds for every state and event of the model.
+# Laws of the authoring graph model. The every-trace law is MODEL.bend's `Graph.safe` (the state invariants, the
+# rank following NEXT FOR YOU lowers, and every Q relation on every command, in every state a trace reaches):
+# `oracle-model.mjs prove-reach --model MODEL.bend --prefix Graph --safe safe` proves it with the kernel. The laws
+# below are the cells and traces `prove` checks.
 
-law discovering_models:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_discovering_models(s, m, M.Run.step(s, m)) == True{} : Bool}
+# a step records the run of the same issues by counting, for every record and verdict
+law run_counts:
+  for s: M.Seen
+  for f: Bool
+  {M.Graph.run_counts(s, f) == True{} : Bool}
 
-law modeled_checks:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_modeled_checks(s, m, M.Run.step(s, m)) == True{} : Bool}
+# a save adds at most one round, only to a review step asks for, and none to a return saved for its input
+law save_rounds:
+  for r: M.Rev
+  for w: Bool
+  {M.Graph.save_rounds(r, w) == True{} : Bool}
 
-law checked_drafts:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_checked_drafts(s, m, M.Run.step(s, m)) == True{} : Bool}
+# the Formal label names the first failing node of package, model, card
+law first_failing:
+  for p: M.Health
+  for m: M.Health
+  for k: M.Health
+  {M.Graph.first_failing(p, m, k) == True{} : Bool}
 
-law recheck_judges:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_recheck_judges(s, m, M.Run.step(s, m)) == True{} : Bool}
+# the Contract label names the first failing node of confirmation, card, and never the model
+law first_failing_contract:
+  for q: M.Health
+  for k: M.Health
+  {M.Graph.first_failing_contract(q, k) == True{} : Bool}
 
-law lock_locks:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_lock_locks(s, m, M.Run.step(s, m)) == True{} : Bool}
+# Witness: a Formal package reaches the lock, so the laws do not hold merely because nothing happens
+law formal_locks:
+  exs t: List<M.Msg>
+  {M.Graph.is_locked(M.Graph.run_all(t, M.Graph.init())) == True{} : Bool}
 
-law relock_keeps:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_relock_keeps(s, m, M.Run.step(s, m)) == True{} : Bool}
+# Witness: a Contract card reaches the lock after its cold-read and the user's approval
+law contract_locks:
+  exs t: List<M.Msg>
+  {M.Graph.locked_as(M.Graph.run_all(t, M.Graph.init()), 1n) == True{} : Bool}
 
-law rewind_discovers:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_discovers(s, m, M.Run.step(s, m)) == True{} : Bool}
+# The model issues coming back on a third edited state stop the step
+law stop_on_third:
+  {M.Graph.stops(M.Graph.run_all([M.Start{M.Formal{}}, M.Edit{M.BendFiles{}, M.Breaks{}}, M.Step{}, M.Edit{M.BendFiles{}, M.Keeps{}}, M.Step{}, M.Edit{M.BendFiles{}, M.Keeps{}}, M.Step{}], M.Graph.init())) == True{} : Bool}
 
-law rewind_models:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_models(s, m, M.Run.step(s, m)) == True{} : Bool}
+# ... and on the second they do not
+law no_stop_on_second:
+  {M.Graph.stops(M.Graph.run_all([M.Start{M.Formal{}}, M.Edit{M.BendFiles{}, M.Breaks{}}, M.Step{}, M.Edit{M.BendFiles{}, M.Keeps{}}, M.Step{}], M.Graph.init())) == False{} : Bool}
 
-law rewind_checks:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_checks(s, m, M.Run.step(s, m)) == True{} : Bool}
+# After two card review rounds a changed card asks for no third: the next is the lock
+law no_third_round:
+  {M.Graph.hint_is(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}], M.Graph.init()), 1n) == True{} : Bool}
 
-law rewind_drafts:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_drafts(s, m, M.Run.step(s, m)) == True{} : Bool}
+# A return saved again for the same input is the same round
+law same_input_one_round:
+  {M.Graph.rounds(M.Graph.rev_c(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Save{}, M.Step{}], M.Graph.init()))) == 1n : Nat}
 
-law lock_only:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_lock_only(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law skip_refused:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_skip_refused(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law rewind_back:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_back(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law lock_needs_drafted:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_lock_needs_drafted(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law rewind_needs_reason:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_needs_reason(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law advance_stale:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_advance_stale(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law rewind_stale:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_stale(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law lock_stale:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_lock_stale(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law gate_refuses:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_gate_refuses(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law refused_keeps:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_refused_keeps(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law status_reads:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_status_reads(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law edit_writes_nothing:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_edit_writes_nothing(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law package_edit_stales:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_package_edit_stales(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law bend_edit_stales:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_bend_edit_stales(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law other_edit_keeps:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_other_edit_keeps(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law advance_never_locks:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_advance_never_locks(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law ready_only_by_lock:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_ready_only_by_lock(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law rewind_never_forward:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_rewind_never_forward(s, m, M.Run.step(s, m)) == True{} : Bool}
-
-law advance_one_step:
-  for s: M.Run
-  for m: M.Msg
-  {M.Run.R_advance_one_step(s, m, M.Run.step(s, m)) == True{} : Bool}
+# An edit of the Bend files changes the projected card the card reviews read, never the model analyst's input
+law bend_edit_asks_card_reviews:
+  {M.Graph.asks_card_only(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Edit{M.BendFiles{}, M.Keeps{}}, M.Step{}], M.Graph.init())) == True{} : Bool}

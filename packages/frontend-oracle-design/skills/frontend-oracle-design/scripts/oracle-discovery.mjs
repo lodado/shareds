@@ -54,7 +54,6 @@ import {
   requirementMapping,
   sourcePath,
 } from './oracle-package.mjs'
-import { recordAuthoringInput } from './oracle-stage.mjs'
 import { defSignature, parseBendTypes, toPlain, toRuntime, typeIR } from './oracle-types.mjs'
 
 export { isolatedClassifier } from './oracle-classifier.mjs'
@@ -636,9 +635,9 @@ async function declaredSpace(loaded) {
 }
 
 /**
- * What crossCheckIssues (the CHECKED gate) would refuse that needs no Bend: an undeclared mapping, a declared record
- * without a Case space, a missing or stale translation review. oracle-cycle.mjs preflight lists them before the walk
- * passes MODELED, where a repair still costs no rewind; the world and the candidates stay CHECKED's.
+ * What crossCheckIssues (the model node) would refuse that needs no Bend: an undeclared mapping, a declared record
+ * without a Case space, a missing or stale translation review. oracle-step.mjs --check and the lock list them when an
+ * earlier node fails; the world and the candidates stay the model node's.
  */
 export async function crossCheckReadiness(loaded) {
   const declared = await declaredSpace(loaded)
@@ -2569,9 +2568,8 @@ async function crossCheckCommand(command, options) {
   if (command === 'mapping-input') {
     if (!options.output) throw new CliError('USAGE', USAGE, 2)
     const text = await mappingInput({ loaded })
-    const iterations = await recordAuthoringInput(dirname(resolve(options.package)), 'translation', text)
     await writeFile(options.output, text)
-    process.stdout.write(`MAPPING_INPUT_WRITTEN ${options.output} sha256:${sha256(text)} round:${iterations.round} mode:${iterations.mode}\n`)
+    process.stdout.write(`MAPPING_INPUT_WRITTEN ${options.output} sha256:${sha256(text)}\n`)
     return
   }
   const { bin } = await ensureBend()

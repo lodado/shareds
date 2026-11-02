@@ -85,8 +85,8 @@ const WHY = {
 /**
  * The model events each `next:` command of oracle-next.mjs NEXT_LINES runs in one call, per model: `delivery`
  * (test-fixtures/delivery), `lap` (test-fixtures/review-lap, from the state, since `close` picks its own steps) and
- * `authoring` (test-fixtures/stage/authoring). A `marker` names a step no model event stands for: a read (`guide` lists
- * the blocker and its fix, `close --check-report` checks the final report in a closed state), the user's approval or
+ * `graph` (test-fixtures/stage, the authoring graph). A `marker` names a step no model event stands for: a read (`guide`
+ * lists the blocker and its fix, `close --check-report` checks the final report in a closed state), the user's
  * decision, or the hand-off to the Delivery run. Every next the replays reach matches exactly one entry.
  */
 const NEXT_EVENTS = {
@@ -99,12 +99,10 @@ const NEXT_EVENTS = {
   },
   guide: { marker: 'read' },
   report: { marker: 'read' },
-  begin: { authoring: () => [{ $: 'Begin' }] },
-  walk: { authoring: () => [{ $: 'Walk', reason: false }] },
-  walkReason: { authoring: () => [{ $: 'Walk', reason: true }] },
-  lock: { authoring: () => [{ $: 'Lock' }] },
-  // the event the CLI accepts once the user approved; asking first is the user decision
-  extend: { authoring: () => [{ $: 'Approve', right: true }] },
+  step: { graph: () => [{ $: 'Step' }] },
+  lock: { graph: () => [{ $: 'Lock' }] },
+  // the same issues came back after three edits: the user decides
+  stop: { marker: 'decision' },
   init: { marker: 'hand-off' },
   revise: { marker: 'decision' },
 }

@@ -1,6 +1,5 @@
 import { Buffer } from 'node:buffer'
-import process from 'node:process'
-import { sha256, stableStringify } from './oracle-fs.mjs'
+import { sha256 } from './oracle-fs.mjs'
 
 export class IterationError extends Error {
   constructor(code, message) {
@@ -9,7 +8,7 @@ export class IterationError extends Error {
   }
 }
 
-/** One full pass and one confirmation pass. Callers persist this in their existing stage or ledger. */
+/** One full pass and one confirmation pass. The Delivery ledger persists it. */
 export function iterationBudget(value, legacyRound = 1) {
   if (value === undefined) return { round: legacyRound, limit: 2, inputs: {}, approvals: [] }
   if (!value || !Number.isSafeInteger(value.round) || value.round < 1 ||
@@ -196,59 +195,4 @@ export function blockingRemedy(blocking) {
     return ids.length > 0 ? [`${ids.join(', ')} ${kind}: ${route}`] : []
   })
   return routes.length > 0 ? routes.join('; ') : FINDINGS_BLOCKING_NEXT
-}
-
-/** Highest authoring limit a standing delegation ("don't ask, handle it") can grant; past it the user is asked. */
-export const DELEGATED_ROUND_CAP = 5
-
-/**
- * No approval in any phase opens a round past this, one past the delegation cap; there is no override. A limit stored
- * above it before the ceiling existed stays usable; only further extensions are refused.
- */
-export const ROUND_CEILING = 6
-
-/** The ceiling in force: tests may lower it (ORACLE_ROUND_CEILING, from the delegation cap up), never raise it. */
-export function roundCeiling() {
-  const lowered = Number(process.env.ORACLE_ROUND_CEILING)
-  if (!Number.isSafeInteger(lowered) || lowered < DELEGATED_ROUND_CAP || lowered >= ROUND_CEILING) return ROUND_CEILING
-  return lowered
-}
-
-/** A source reference records human authority, it does not authenticate it. Never manufacture this document. */
-export function extendIterations(value, approval, phase) {
-  const budget = iterationBudget(value)
-  if (approval?.decision === 'delegated-rounds') return delegateRounds(budget, approval, phase)
-  const round = Math.max(budget.round, budget.limit) + 1
-  if (round > roundCeiling()) {
-    throw new IterationError('ITERATION_CEILING_REACHED',
-      `round ${round} is past the ceiling of ${roundCeiling()} review rounds: the contract itself is wrong. Stop at NEEDS_DECISION; the user rewrites the sources and a new run id starts at round 1`)
-  }
-  if (approval?.decision !== 'approve-one-more-round' || approval.phase !== phase || approval.round !== round ||
-      typeof approval.source !== 'string' || !approval.source.trim() ||
-      typeof approval.reason !== 'string' || !approval.reason.trim()) {
-    const delegation = phase === 'authoring' ? `, or a recorded standing delegation (decision delegated-rounds, upTo at most ${DELEGATED_ROUND_CAP})` : ''
-    throw new IterationError('ITERATION_APPROVAL_REQUIRED',
-      `requires the user's explicit approval of ${phase} round ${round}: decision, phase, round, source and reason${delegation}`)
-  }
-  const digest = sha256(stableStringify(approval))
-  if (budget.approvals.some((entry) => entry.digest === digest)) {
-    throw new IterationError('ITERATION_APPROVAL_REUSED', 'an approval grants exactly one additional round')
-  }
-  return { ...budget, limit: round, approvals: [...budget.approvals, { ...approval, digest }] }
-}
-
-/** The user's own standing delegation raises the authoring limit once, up to the cap; it never covers a policy change. */
-function delegateRounds(budget, approval, phase) {
-  if (budget.approvals.some((entry) => entry.decision === 'delegated-rounds')) {
-    throw new IterationError('ITERATION_APPROVAL_REUSED', 'a standing delegation is recorded once per revision; past it, ask the user for one more round')
-  }
-  if (phase !== 'authoring' || approval.phase !== 'authoring' || !Number.isSafeInteger(approval.upTo) ||
-      approval.upTo <= budget.limit || approval.upTo > DELEGATED_ROUND_CAP ||
-      typeof approval.source !== 'string' || !approval.source.trim() ||
-      typeof approval.reason !== 'string' || !approval.reason.trim()) {
-    throw new IterationError('ITERATION_APPROVAL_REQUIRED',
-      `a standing delegation raises authoring rounds above the current limit ${budget.limit} and at most to ${DELEGATED_ROUND_CAP}: decision delegated-rounds, phase authoring, upTo, source (the user's words) and reason`)
-  }
-  const digest = sha256(stableStringify(approval))
-  return { ...budget, limit: approval.upTo, approvals: [...budget.approvals, { ...approval, digest }] }
 }

@@ -427,9 +427,10 @@ node skills/scripts/oracle-run.mjs status \
 node skills/scripts/oracle-reflect.mjs --root . [--min-runs 2]
 ```
 
-`rewind`는 `--reason review-finding|gate-failure|user-answer|source-change`와 선택 `--note`로
-되돌린 이유를 `stage.json` history에 남깁니다. `oracle-reflect.mjs`는 `.ai/oracles/*/`의 이
-이유와 `runs.jsonl`의 budget 보정을 모아, 두 run 이상에서 되풀이된 원인을 후보로 냅니다.
+0.126.0까지 `rewind`는 `--reason review-finding|gate-failure|user-answer|source-change`와 선택 `--note`로
+되돌린 이유를 `stage.json` history에 남겼습니다(0.127.0부터 되감기는 없고 위치는 파일에서 계산합니다).
+`oracle-reflect.mjs`는 `.ai/oracles/*/`의 이 이유와 `runs.jsonl`의 budget 보정을 모아, 두 run 이상에서
+되풀이된 원인을 후보로 냅니다.
 읽기만 하며 제안을 적용하지 않습니다(`applied: false`). 후보를 사전 잠금 스윕, 카드 lint,
 intake 질문으로 옮기는 일은 유지보수자가 합니다. 0.101.0 이전 rewind는 `unrecorded`로만 셉니다.
 
@@ -441,8 +442,9 @@ node skills/scripts/oracle-stage.mjs status --dir .ai/oracles/<id> --brief
 node skills/scripts/oracle-run.mjs status --dir .ai/oracles/<id> --brief
 ```
 
-0.102.0부터 `stage.json` history의 걸음마다 시각(`at`)이, advance에는 관문 시간(`durationMs`)이
-남고, `review-input --attempt`는 디스패치 시각(선택 `--model`·`--effort`)을 남깁니다. `--timing`은
+0.102.0부터 `stage.json` history의 걸음마다 시각(`at`)이 남습니다. 0.126.0까지는 advance의 관문 시간
+(`durationMs`)과 `review-input --attempt`의 디스패치 시각도, 0.127.0부터는 `oracle-step.mjs`가 저장된 리뷰
+반환마다 시각을 남깁니다. `--timing`은
 run마다 저작(단계별 머문 시간·관문 시간·rewind 복귀 시간)과 Delivery(상태별 시간·실행 명령 시간·리뷰
 라운드)를 따로 잽니다. 시각이 없는 옛 기록은 `untimed`로만 셉니다. `status --brief`는 6단계 중 어디인지와
 다음 명령 하나(`phase 4/6 RED · next: oracle-run.mjs red ...`, 0.118.0부터 `guide` 첫 줄도 같음)를 먼저,
@@ -477,7 +479,7 @@ node skills/scripts/oracle-package.mjs patch --package .ai/oracles/<id>/oracle.p
 않게 포인터는 작은따옴표로 감쌉니다. 값은 JSON이라 문자열도 따옴표가 있어야 합니다. 중간 가지가 없거나 값이
 JSON이 아니면 아무것도 쓰지 않고, 내용이 같으면 다시 쓰지 않습니다(`PACKAGE_UNCHANGED`). 객체에 없던 키를 만들면
 `(new key)`로 알립니다. `stage.json`이 ORACLE_READY이거나 읽을 수 없거나, 패키지 옆에 `oracle.lock.json`이 있으면
-`PACKAGE_LOCKED`(또는 `STAGE_INVALID`)로 거부하고, 심볼릭 링크는 따라가지 않습니다. 쓴 뒤에는 MODELED 관문과 같은
+`PACKAGE_LOCKED`(또는 `STAGE_INVALID`)로 거부하고, 심볼릭 링크는 따라가지 않습니다. 쓴 뒤에는 패키지 노드와 같은
 구조 검사 결과를 보여 주기만 하고 막지는 않습니다.
 
 ### 위험 등급과 프로필 선택
@@ -501,16 +503,14 @@ Contract 카드에서는 거부).
 0.105.0부터 작성자는 Draft를 보여 주기 전에 `oracle-verify.mjs card --oracle <card> --draft`를 돌립니다. lint 전체를
 돌리되 사용자의 답을 기다리는 것(확인 상태·출처, Visual QA 허가, needs-decision 칸, 승인을 기다리는 출처)만 `pending`으로 찍고 나머지는
 그대로 실패합니다. needs-evidence 칸과 사전 위임 표시의 꼴은 작성자가 고칠 일이라 실패로 남고, 관문과 lock은 이
-플래그를 쓰지 않습니다. `advance --to CHECKED`는 패키지·Bend 파일·등록 출처·하네스·node·Bend가 모두 같은 통과를
-영수증으로 기억했다가 그대로 통과시키고, 판정 문장 끝에 `receipt: these exact inputs passed before`를 붙입니다.
+플래그를 쓰지 않습니다. 모델 검사(0.126.0까지 `advance --to CHECKED`)는 패키지·Bend 파일·등록 출처·하네스·node·Bend가
+모두 같은 통과를 영수증으로 기억했다가 그대로 통과시킵니다.
 실패, Bend 실행 실패로 판정하지 못하거나 파생이 덜 돈 통과, 관문이 도는 동안 입력 파일의 내용이나 표식(크기·시각·inode,
 링크와 그 대상 모두)이 바뀐 통과는 남기지 않습니다
-(`ORACLE_LINT_CACHE=off`로 끔). 0.107.0부터 `stage.json`은 CHECKED가 판정한 Bend 파일과 등록 출처의 digest
-(`inputsSha256`)도 고정합니다. 패키지를 그대로 두고 Bend만 고친 뒤 카드를 다시 투영해도 DRAFTED와 lock은
-`STAGE_STALE`로 거부하고, `advance --to CHECKED`로 그 자리에서 CHECKED를 다시 돌아야 합니다(되돌림이 아니라서
-저작 라운드를 쓰지 않습니다). 0.107.0 전에 고정 없이 기록된 CHECKED·DRAFTED도 같은 명령으로 다시 검사합니다.
-관문이 도는 동안 입력이 바뀐 통과는 CHECKED로 기록하지 않고, lock 파일을 지우고 ORACLE_READY를 다시 잠글 때도
-고정을 다시 잽니다. CHECKED는 `prove`와 `laws`도 직접 돌립니다. 증명하지 못한 law(`open`·`failed`·`unsafe`), 승인한
+(`ORACLE_LINT_CACHE=off`로 끔). 0.127.0부터 위치는 기록하지 않고 `oracle-step.mjs`와 lock이 지금 바이트로
+노드를 다시 돕니다. 그래서 Bend만 고쳐도 되감기 없이 다음 step이 그 자리에서 다시 판정하고, lock은 판정한 Bend
+파일과 등록 출처의 digest(`inputsSha256`)를 `stage.json`에 고정하며, 판정하는 동안 입력이 바뀌면 `STAGE_STALE`로
+거부합니다. 모델 검사는 `prove`와 `laws`도 직접 돌립니다. 증명하지 못한 law(`open`·`failed`·`unsafe`), 승인한
 관계가 거짓인 칸, 공간이 닿는 상태에서 깨지는 trace 법칙은 막고, 자유 칸과 공간이 닿지 않는 귀납 반례는 보고만 합니다.
 `laws`는 Nat·List를 패키지의 bound에서 자르고, Bend가 돌지 못하면 둘 다 undecided로 남깁니다. `PROOF.bend`는 영수증
 키에만 들고 고정에는 들지 않아서, 증명만 고쳐도 진행 중인 run의 고정은 그대로입니다. 제품 코드가 이미 있으면 작성자는 `project-card` 뒤, lock 전에도 sweep을 돌려 모델

@@ -2,7 +2,8 @@
 
 // 여러 run을 가로질러 되풀이된 원인을 센다 — 한 run 안에서는 rewind·보정이 그 run의 수리일 뿐이지만, 같은 원인이 여러 run에서
 // 되풀이되면 그것은 스킬이 아직 구조로 막지 못한 실수다. 읽기만 하고 제안만 낸다: 새 lint·스윕 규칙·intake 질문으로 옮기는
-// 일은 유지보수자가 한다(applied는 언제나 false). 0.101 이전 rewind는 이유가 없으므로 unrecorded로만 센다 — 추측하지 않는다.
+// 일은 유지보수자가 한다(applied는 언제나 false). 0.101 이전 rewind와 0.127부터 step이 남긴 되돌아간 걸음은 이유가 없으므로
+// unrecorded로만 센다 — 추측하지 않는다.
 
 import { readdir, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -66,7 +67,10 @@ async function collect(root) {
     } catch (error) {
       skipped.push({ run: id, error: `runs.jsonl: ${error.message}` })
     }
-    if (stage || ledger.length) runs.push({ id, history: stage?.history ?? [], dispatches: stage?.dispatches ?? [], ledger })
+    // a saved review return per input digest (0.127) or a registered dispatch (0.126 and before); the checks step records
+    // (0.127) carry its stops
+    if (stage || ledger.length)
+      runs.push({ id, history: stage?.history ?? [], dispatches: [...(stage?.dispatches ?? []), ...(stage?.reviews ?? [])], checks: stage?.checks ?? [], ledger })
   }
   return { runs, skipped }
 }
@@ -74,6 +78,21 @@ async function collect(root) {
 const bump = (counts, key) => {
   counts[key] = (counts[key] ?? 0) + 1
 }
+
+const STAGE_ORDER = ['DISCOVERING', 'MODELED', 'CHECKED', 'DRAFTED', 'ORACLE_READY']
+
+/**
+ * 되돌아간 걸음 — 0.126까지는 rewind 기록, 0.127부터는 앞 기록보다 이른 위치를 남긴 step(위치는 파일에서 계산하므로 고친 편집이
+ * 앞 노드를 깨면 위치가 뒤로 간다). 0.127 기록에는 이유가 없다.
+ */
+function walksBack(history, index) {
+  const step = history[index]
+  if (step.evidence === 'rewind') return true
+  return step.evidence === 'step' && index > 0 && STAGE_ORDER.indexOf(step.stage) < STAGE_ORDER.indexOf(history[index - 1].stage)
+}
+
+/** step이 멈춘 횟수(0.127) — 같은 실패 목록이 세 번째 고친 상태에서 나와 next가 stop인 검사, 이어진 stop은 한 번. */
+const stepStops = (checks = []) => checks.filter((check, index) => check.next === 'stop' && checks[index - 1]?.next !== 'stop').length
 
 export function reflectRuns(runs, { minRuns = 2 } = {}) {
   const rewinds = { total: 0, unrecorded: 0, byReason: {}, byWalk: {} }
@@ -91,7 +110,7 @@ export function reflectRuns(runs, { minRuns = 2 } = {}) {
   for (const run of runs) {
     run.history.forEach((step, index) => {
       // CHECKED를 그 자리에서 다시 돈 걸음(0.107.0)도 재작업이다 — 되돌림과 같이 센다
-      if (step.evidence !== 'rewind' && !step.recheck) return
+      if (!walksBack(run.history, index) && !step.recheck) return
       rewinds.total += 1
       bump(rewinds.byWalk, `${run.history[index - 1]?.stage ?? '?'}→${step.stage}`)
       if (!step.reason) {
@@ -110,6 +129,8 @@ export function reflectRuns(runs, { minRuns = 2 } = {}) {
       }
       if (event.type === 'transition' && STOP_STATES.has(event.state)) bump(stops, event.state)
     }
+    const stopped = stepStops(run.checks)
+    if (stopped > 0) stops.NEEDS_DECISION = (stops.NEEDS_DECISION ?? 0) + stopped
   }
   const candidates = [...signals.values()]
     .filter((entry) => entry.runs.size >= minRuns)
@@ -128,7 +149,6 @@ export function reflectRuns(runs, { minRuns = 2 } = {}) {
   return { runs: runs.length, rewinds, budgets, stops, candidates }
 }
 
-const STAGE_ORDER = ['DISCOVERING', 'MODELED', 'CHECKED', 'DRAFTED', 'ORACLE_READY']
 const at = (entry) => Date.parse(entry?.at ?? '')
 const sum = (values) => values.reduce((total, value) => total + value, 0)
 
@@ -152,7 +172,7 @@ function unionMs(spans) {
 
 /**
  * lock 전 저작 시간 — 시각이 찍힌 stage 기록만 센다(0.102 이전 기록은 시각이 없어 untimed). 단계마다 머문 시간, advance 관문이 쓴
- * 시간, 그리고 rewind마다 되감기 전 가장 앞선 단계(furthest, 시각 없이 전체 기록에서)로 다시 돌아오기까지 걸린 시간(regain)을
+ * 시간, 그리고 되돌아간 걸음(walksBack)마다 그 전 가장 앞선 단계(furthest, 시각 없이 전체 기록에서)로 다시 돌아오기까지 걸린 시간(regain)을
  * 낸다. 앞부분만 시각이 없는 기록은 partial로 표시하고 시작을 모르므로 전체 저작 시간을 내지 않는다.
  */
 function authoringTiming(history) {
@@ -170,7 +190,7 @@ function authoringTiming(history) {
   const rewinds = []
   const spans = []
   history.forEach((entry, index) => {
-    if (entry.evidence !== 'rewind' || !Number.isFinite(at(entry))) return
+    if (!walksBack(history, index) || !Number.isFinite(at(entry))) return
     const before = history.slice(0, index).map((step) => STAGE_ORDER.indexOf(step.stage))
     const furthest = before.length > 0 ? Math.max(...before) : STAGE_ORDER.indexOf(entry.stage)
     const regained = history

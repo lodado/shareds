@@ -14,7 +14,7 @@ not grounds for failure. Missing Contract runners/reporters are actual environme
 Approval precedes CHECKED and its whole-card hash. Preapproval strict checks leave DISCOVERING unchanged.
 After actual human confirmation: strict Space check → CHECKED → full unchanged-card lint → DRAFTED →
 immutable lock tool → ORACLE_READY. Only the lock tool writes ORACLE_READY. Never create MODELED or a
-fake package. Modified CHECKED bytes rewind for rechecking, changed meaning also requires reapproval.
+fake package. The next step checks modified card bytes again, changed meaning also requires reapproval.
 
 Delivery requires `contract-cases:reported` with actual reported case IDs covering every required
 executable frame/scenario, not labels or test counts. Under default t-way coverage these are the

@@ -319,9 +319,9 @@ not a re-review, so this gate is the last cheap place to find a defect.
 
 ### Review round budget — at most 2
 
-Card review (cold read, reverse-impossible, source-aware), analyst/model revision and translation share
-at most 2 authoring rounds per revision, counted in review laps (a rewind spends none). The runtime keeps
-the count in `stage.json`; the journal explains findings and scope decisions. A fresh defect hunt after
+Each card review (cold read, reverse-impossible, source-aware), the model analyst and the translation
+review gets at most 2 rounds per revision. A round is a return saved for a new input digest; the same input
+saved again adds none. The journal explains findings and scope decisions. A fresh defect hunt after
 every repair can keep expanding the modeled world rather than verify the agreed outcome.
 
 1. **Round 1** is the full review. Group its findings by shared root cause and repair each group
@@ -337,39 +337,17 @@ every repair can keep expanding the modeled world rather than verify the agreed 
 5. The same row in the findings of both rounds is a card design defect, not a wording defect. Return
    a decision to narrow that row's scope instead of repairing it a third time.
 6. After round 2, unresolved blockers stop at `NEEDS_DECISION`. Delegating choices does not waive
-   mandatory constraints or authorize locking an unjudgeable contract. A round 3 needs the user's explicit approval and is never started by the
-   controller on its own.
+   mandatory constraints or authorize locking an unjudgeable contract. There is no round 3: step never
+   asks for one, and no approval or delegation opens one.
 
-Runtime dispatch:
-
-- `oracle-stage.mjs begin --dir <dir>` before authoring/independent inputs; `status` is read-only and
-  reports `iterations.round`, `limit`, `mode` and `exhausted`.
-- Every walk back names its cause: `oracle-stage.mjs rewind --dir <dir> --to <stage> --reason
-review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The reason is kept in
-  `stage.json` history for reflection and never changes the gate. Changed
-  package bytes walk back to DISCOVERING; Bend files or registered sources changed after CHECKED are judged
-  again in place by `advance --to CHECKED` (same `--reason` and `--note`; reflection counts it as rework),
-  and only a card-only repair on unchanged inputs resumes at CHECKED or DRAFTED by rewind.
-- `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
-  `oracle-discovery.mjs mapping-input` register their input digests. Every analyst or reviewer dispatch,
-  a resumed session's too, registers its permitted raw input with
-  `oracle-stage.mjs review-input --dir <dir> --kind <kind> --input <file> --attempt <dispatch-id>` and a
-  distinct `--attempt` (reverse-impossible: the `explore-input` file). Reuse the
-  attempt only for transport redelivery, not new analysis. This counts repeated analysis of unchanged
-  sources too. Keep procedural metadata separate from blind task inputs.
-- A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the
-  current round starts the next round; different roles' first updates share that repair batch.
-  Identical input consumes no round and permits no fresh hunt.
-- `ITERATION_BUDGET_EXHAUSTED` refuses before any write: keep the findings, stop. Old rewinds count.
-  Ten rewinds/rechecks end in `REWIND_CAP_REACHED`.
-- Only after explicit approval, use `oracle-stage.mjs extend --dir <dir> --approval <file>`.
-  It records `decision: "approve-one-more-round"`, `phase: "authoring"`, the next `round`,
-  `source` (that user message) and `reason`: one round plus ten rewinds (no reset, policy
-  approval, unlock or waiver), none past round 6 (`ITERATION_CEILING_REACHED`: contract wrong;
-  new sources, new run id), so at most 50 rewinds a revision. The source is self-report, not proof of
-  identity: never fabricate it or call blanket delegation that. A user who
-  delegated the choices ("알아서 해") gets one `decision: "delegated-rounds"` record per revision
-  (`phase: "authoring"`, `upTo` at most 5, the user's words as `source`, `reason`); policy changes still ask.
+Runtime dispatch: run `oracle-step.mjs --dir <dir>` and do what NEXT FOR YOU says. It checks the files as
+they are, so editing is free and nothing rewinds; the lock judges every node again. It writes each review's
+input outside the repository and names where its return is saved; keep procedural metadata out of blind
+inputs. A role's first pass is `full`; a later one is `confirm-fixes`. Step names the source-aware review
+with its trigger until its first return is saved; then it counts rounds like the others. `--check` lists
+every failing node and changes nothing in the oracle directory (a passing model check may fill the receipt
+cache). The same issue list on a third edited state stops the step (`NEEDS_DECISION`): keep the findings
+and report them to the user instead of editing again.
 
 ### 1. Cold read — a reader who was not in the conversation
 

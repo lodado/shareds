@@ -53,8 +53,8 @@ copies of the policy.
 4. Check the Bend laws, complete the bounded space and run the Adequacy check before confirmation
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
-   confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
-   `oracle-stage.mjs` runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
+   confirmed and locked together; PROOF remains a repairable proof candidate. The model check of
+   `oracle-step.mjs` and the lock runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
    `unsafe` proof (without PROOF.bend none is judged), a law the model breaks, a refuted check and a coordinate
    setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
    the same with `WORLD_SETTING_UNSATISFIABLE`): exclude that setting with a sourced assumption or fix the row

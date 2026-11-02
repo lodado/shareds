@@ -161,7 +161,7 @@ function cellIssue(where, cell, { approved, questions, holds }) {
 }
 
 /**
- * `asyncCells` 검사. 있으면 모양을 늘 본다. `required`(lock 전 단계 기계의 MODELED 관문)이면 Async가 공간에 있는 버전 2
+ * `asyncCells` 검사. 있으면 모양을 늘 본다. `required`(작성 그래프의 패키지 노드)이면 Async가 공간에 있는 버전 2
  * 패키지에서 작업마다 일곱 칸이 모두 처분돼야 한다 — 모델을 쓰기 전에 열린 칸을 한 번에 묻게 하는 장치다.
  */
 export function asyncCellIssues(pkg, { required = false } = {}) {
@@ -472,8 +472,8 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       ]
     return family === 'Inherited' && tagged.length > 0 ? null : ['package-family', `${family}: ${form}`]
   }
-  // every family, Inherited included: the disposition reads only families and terms, so MODELED can refuse what the
-  // projection would — found after MODELED, its repair cost a rewind
+  // every family, Inherited included: the disposition reads only families and terms, so the package node can refuse what
+  // the projection would — found at the card, its repair would rerun the model
   if (confirmedAxes)
     for (const family of FAMILIES) {
       const issue = familyIssue(family)
@@ -2032,7 +2032,7 @@ function newKeyMark(op, pointer, created) {
 /**
  * 잠긴 revision은 고치지 않는다 — stage.json이 ORACLE_READY거나 읽을 수 없으면, 또는 패키지 옆에 oracle.lock.json이 있으면 멈춘다
  * (새 revision은 늘 새 경로라 패키지 옆의 lock은 곧 잠김이다). 심볼릭 링크는 따라가지 않는다. 디렉터리 잠금 안에서 다시 읽고
- * 고쳐 써서 동시에 고친 둘 중 하나를 잃지 않는다. 내용이 같으면 쓰지 않는다. 쓴 뒤에는 MODELED 관문과 같은 구조 검사를 보고만 한다.
+ * 고쳐 써서 동시에 고친 둘 중 하나를 잃지 않는다. 내용이 같으면 쓰지 않는다. 쓴 뒤에는 패키지 노드와 같은 구조 검사를 보고만 한다.
  */
 async function patchCommand(path, operations) {
   const absolute = resolve(path)
@@ -2054,12 +2054,7 @@ async function patchCommand(path, operations) {
     const written = JSON.parse(text)
     const issues = [...packageIssues(written, { stage: 'model' }), ...asyncCellIssues(written, { required: true })]
     const done = operations.map(({ op, pointer }) => [op, pointer, newKeyMark(op, pointer, created)].filter(Boolean).join(' '))
-    const lines = [`PACKAGE_PATCHED ${path} · ${done.join(', ')} · MODELED-gate issues: ${issues.length}`, ...issues.slice(0, 5).map((issue) => `  ${issue}`)]
-    if (record?.packageSha256 && record.packageSha256 !== sha256(text)) {
-      const where = relative(process.cwd(), directory) || '.'
-      lines.push(`stage ${record.stage} recorded other package bytes — oracle-stage.mjs rewind --dir ${where} --to DISCOVERING --reason review-finding|gate-failure|user-answer|source-change`)
-    }
-    return lines.join('\n')
+    return [`PACKAGE_PATCHED ${path} · ${done.join(', ')} · package-node issues: ${issues.length}`, ...issues.slice(0, 5).map((issue) => `  ${issue}`)].join('\n')
   })
 }
 

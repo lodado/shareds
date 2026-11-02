@@ -94,9 +94,9 @@ Its Formal coordination runs six phases, each with one command and at most one u
    prerequisites. First apply common's convergent planning: settle scope and check the highest-risk premise
    before expensive authoring. Controller owns stage intent.
 3. Card review and lock: explicitly load and invoke [`$oracle-review`](../../oracle-review/SKILL.md) in the
-   required independent contexts; same-context switching is not independence. Card review shares the
-   authoring budget of 2 rounds per revision; round 2 only confirms round 1's repairs
-   ([budget](card/card-format.md#review-round-budget--at-most-2)). Never start a round 3 without the user's approval.
+   required independent contexts; same-context switching is not independence. Each card review gets at
+   most 2 rounds per revision; round 2 only confirms round 1's repairs
+   ([budget](card/card-format.md#review-round-budget--at-most-2)). There is no round 3.
    Obtain human confirmation (common's pre-authorized approval counts), then lock through the existing scripts.
    No lock, target tests, production or dependency edits before confirmation.
    Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production;

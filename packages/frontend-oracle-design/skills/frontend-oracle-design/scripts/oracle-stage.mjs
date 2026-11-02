@@ -1,21 +1,20 @@
 #!/usr/bin/env node
 
-// lock 전 단계 기계 — 인터뷰·모델·검사·Draft를 건너뛰고 lock으로 가는 길을 스크립트로 막는다.
-// DISCOVERING → MODELED → CHECKED → DRAFTED → ORACLE_READY(lock이 성공하면 lock이 쓴다). 한 걸음씩만 앞으로 가고, 걸음마다
-// 이미 있는 검사를 부른다: 패키지 구조(validate --stage model), 파생·교차검증 처분(derive + cross-check 관문)과 적정성·
-// 증명·법칙, 카드 재생성 비교(check-card). 패키지 바이트가 바뀌면 기록은 낡은 것이다 — rewind로 되돌아가 다시 걷는다.
-// CHECKED부터는 관문이 판정한 Bend 파일과 등록한 출처도 고정한다(inputsSha256, 잠그지 않는 PROOF.bend는 빼고) — 패키지를
-// 그대로 두고 Bend만 고쳐 다시 투영한 카드가 CHECKED를 다시 돌지 않고 lock까지 가지 않게.
-// 패키지가 없는 손으로 쓴 카드는 이 기계를 거치지 않는다. 이 기록은 손으로 써도 통과하지 못한다는 보증이 아니라(원장과 같은
-// 자기 신고다), 단계를 건너뛰는 가장 쉬운 길을 닫는다 — 위조는 hook이 stage.json 직접 쓰기를 막고 리뷰가 본다.
+// 작성 그래프 — 잠그기 전 "어디까지 왔나"는 저장하지 않고 부를 때마다 파일에서 계산한다. 결정적 노드를 순서대로 평가한다:
+// Formal은 패키지(model 단계 완결), 모델(파생·교차검증·적정성·증명·법칙, 같은 입력의 통과는 영수증), 카드(생성 영역 재생성
+// 비교와 lock의 Draft lint), Contract는 승인(User Confirmation과 엄격한 Space)과 카드 lint. 판정은 새로 하지 않고 기존 검사를
+// 부른다. 위치 이름(DISCOVERING~DRAFTED)은 처음 실패하는 노드에서 나오고, 리뷰 노드는 oracle-step.mjs가 그 사이에 끼운다.
+// 잠금(oracle-lock.mjs create)이 유일한 확정이다: 기록한 단계를 믿지 않고 지금 바이트로 결정적 노드를 모두 다시 돈다.
+// stage.json은 잠금 기록(ORACLE_READY와 잠근 바이트의 digest), 프로필(hook이 읽는다), oracle-step.mjs가 남기는 최근 검사
+// (반복 감지)와 리뷰 라운드만 든다. 0.126 기록의 단계·라운드·되감기는 읽지만 위치에 쓰지 않는다. 직접 쓰기는 hook이 막는다.
 
 import { spawnSync } from 'node:child_process'
-import { lstat, mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { elapsedLabel, repositoryRoot, sha256, stableStringify, withDirectoryLock } from './oracle-fs.mjs'
-import { assertIterationAvailable, extendIterations, iterationBudget, iterationStatus, observeIteration, roundCeiling } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { isEmptyCell, markdownLines, sectionLines } from './oracle-space.mjs'
 
@@ -25,8 +24,8 @@ export const AUTHORING_STAGES = Object.freeze({
   'contract/v1': Object.freeze(['DISCOVERING', 'CHECKED', 'DRAFTED', 'ORACLE_READY']),
 })
 export const STAGE_FILE = 'stage.json'
-// 컨트롤러가 보여 주는 6단계 — 작성 단계(stage.json)와 Delivery 상태(run-state.json) 위의 보기일 뿐 상태 기계가 아니다.
-// 관문은 그대로 advance·lock·transition이 연다. 진행 한 줄(두 스크립트의 status --brief, guide)이 이 표 하나를 같이 쓴다.
+// 컨트롤러가 보여 주는 6단계 — 작성 위치와 Delivery 상태(run-state.json) 위의 보기일 뿐 상태 기계가 아니다.
+// 진행 한 줄(두 스크립트의 status --brief, guide)이 이 표 하나를 같이 쓴다.
 export const PHASES = Object.freeze(['Intake', 'Model', 'Card review and lock', 'RED', 'GREEN', 'Review and close'])
 const PHASE_OF_STATE = Object.freeze({
   DISCOVERING: 2,
@@ -42,39 +41,50 @@ const PHASE_OF_STATE = Object.freeze({
   FAIL: 6,
 })
 
-/** `phase N/6 <name> · next: <command>` — 작성 기록이 없으면(첫 `yes` 전) Intake다. */
+/** `phase N/6 <name> · next: <command>` — 작성 기록이 없으면(첫 step 전) Intake다. */
 export function phaseLine(state, next) {
   const index = state === null ? 1 : PHASE_OF_STATE[state]
   if (!index) throw new Error(`no phase for state ${state}`)
   return `phase ${index}/${PHASES.length} ${PHASES[index - 1]} · next: ${next}`
 }
 
+/**
+ * 그래프 — 프로필마다 순서대로. 결정적 노드는 실패할 때의 위치 이름(label)을 갖고, 리뷰 노드(review)는 독립 리뷰어의
+ * 반환을 기다린다(잠금은 리뷰를 확인하지 않는다). 리뷰는 입력 digest마다 한 라운드다. 조건부 리뷰(conditional: source-aware)는
+ * card/policy-sources.md의 계기가 정하므로 저장된 첫 반환이 연다 — 그 전에는 oracle-step.mjs가 조건과 함께 이름만 댄다.
+ */
+export const GRAPH = Object.freeze({
+  'formal-bend/v1': Object.freeze([
+    { id: 'package', label: 'DISCOVERING' },
+    { id: 'model-analyst', review: true },
+    { id: 'model', label: 'MODELED' },
+    { id: 'card', label: 'CHECKED' },
+    { id: 'cold-read', review: true },
+    { id: 'reverse-impossible', review: true },
+    { id: 'source-aware', review: true, conditional: true },
+  ]),
+  'contract/v1': Object.freeze([
+    { id: 'cold-read', review: true },
+    { id: 'source-aware', review: true, conditional: true },
+    { id: 'confirmation', label: 'DISCOVERING' },
+    { id: 'card', label: 'CHECKED' },
+  ]),
+})
+// status가 라운드를 보이는 리뷰 종류 — 번역표 리뷰는 그래프 노드가 아니라 모델 노드의 문제(cross-check-unreviewed)가 부른다
+const ROUND_KINDS = ['model-analyst', 'translation', 'cold-read', 'reverse-impossible', 'source-aware']
+// 리뷰 종류마다 라운드 상한 — 라운드는 새 입력 digest에 대해 저장된 반환 하나다(같은 digest는 라운드를 더하지 않는다)
+export const REVIEW_ROUNDS = 2
+// 같은 실패 목록이 고친 파일 상태 세 개에서 연달아 나오면 oracle-step.mjs가 멈추고 사용자에게 넘긴다(새 상한이 아니라 감지)
+export const SAME_ISSUES_STOP = 3
+// 반복 감지에 쓰는 최근 검사 수
+const CHECK_LIMIT = 20
+
 const PACKAGE_FILE = 'oracle.package.json'
-const packageScript = join(fileURLToPath(new URL('.', import.meta.url)), 'oracle-package.mjs')
-const REVIEW_KINDS = new Set(['model-analyst', 'translation', 'cold-read', 'reverse-impossible', 'source-aware'])
-// 되돌린 이유 — oracle-reflect.mjs가 run을 가로질러 같은 원인을 센다. 자유 서술은 note 한 줄로만 붙는다.
-export const REWIND_REASONS = Object.freeze(['review-finding', 'gate-failure', 'user-answer', 'source-change'])
-const NOTE_LIMIT = 200
-// 독립 디스패치 기록은 최근 것만 둔다 — 시간 보고(oracle-reflect --timing)와 진행 한 줄(status --brief)이 읽는다
-const DISPATCH_LIMIT = 100
-// 되감기 상한 — 리뷰 입력 없이 rewind→advance→rewind가 끝없이 도는 것을 막는다. 실측(실기록 17개) 최대 9회의 바로 위다.
-// 되감기와 CHECKED 재검사가 센다. extend가 받아들여지면 지금 횟수에서 이만큼 더 허용한다
-export const REWIND_CAP = 10
+const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
+const packageScript = join(SCRIPTS, 'oracle-package.mjs')
+const verifyScript = join(SCRIPTS, 'oracle-verify.mjs')
 
-/** 쓰이는 상한 — 테스트는 ORACLE_REWIND_CAP으로 낮출 수만 있다. */
-export function rewindCap() {
-  const lowered = Number(process.env.ORACLE_REWIND_CAP)
-  if (!Number.isSafeInteger(lowered) || lowered < 1 || lowered >= REWIND_CAP) return REWIND_CAP
-  return lowered
-}
-
-const isCount = (value) => Number.isSafeInteger(value) && value >= 0
-// 되감기 횟수는 이력에서 다시 셀 수 있다 — 되감기 항목과 CHECKED 재검사 항목
-const countedRewinds = (history) => history.filter((entry) => entry.evidence === 'rewind' || entry.recheck === true).length
-const rewindAllowance = (record) => record.rewindAllowance ?? rewindCap()
-const DETAIL_LIMIT = 80
-
-// 단계 기록의 시각 — 판정에는 쓰지 않고, 단계별 리드타임과 진행 한 줄만 이것으로 계산한다
+// 기록의 시각 — 판정에는 쓰지 않고, 위치별 리드타임과 진행 한 줄만 이것으로 계산한다
 const now = () => new Date().toISOString() // oracle:nondeterminism 기록은 실제 시각을 남긴다
 
 class StageError extends Error {
@@ -85,6 +95,16 @@ class StageError extends Error {
   }
 }
 
+/** 스키마 버전 1의 객체이고, 단계가 있으면 아는 이름이다. */
+function isRecord(record) {
+  if (record === null || typeof record !== 'object' || record.schemaVersion !== 1) return false
+  return record.stage === undefined || STAGES.includes(record.stage)
+}
+
+/**
+ * stage.json — 없으면 null. 스키마 버전과 잠금 기록(stage가 있으면 단계 이름)만 확인한다. 0.126 기록의 iterations·rewinds·
+ * dispatches·history는 그대로 읽히고 위치 계산에 쓰이지 않는다.
+ */
 export async function readStage(directory) {
   let record
   try {
@@ -93,18 +113,9 @@ export async function readStage(directory) {
     if (error.code === 'ENOENT') return null
     throw new StageError('STAGE_INVALID', `${STAGE_FILE} cannot be read: ${error.message}`)
   }
-  if (record?.schemaVersion !== 1 || !STAGES.includes(record.stage) || !Array.isArray(record.history))
-    throw new StageError('STAGE_INVALID', `${STAGE_FILE} does not match schema version 1`)
-  if (record.verificationProfile !== undefined) {
-    const binding = resolveProfileBinding({ bindings: [{ artifact: 'stage', profile: record.verificationProfile }] })
-    if (!AUTHORING_STAGES[binding.profile]?.includes(record.stage)) throw new StageError('STAGE_INVALID', 'stage is not in its bound authoring profile')
-  }
-  // Old histories remain evidence. Upgrading must not grant eight completed rewinds a fresh allowance.
-  record.iterations = iterationBudget(record.iterations, 1 + record.history.filter((entry) => entry.evidence === 'rewind').length)
-  if ((record.rewinds !== undefined && !isCount(record.rewinds)) || (record.rewindAllowance !== undefined && !isCount(record.rewindAllowance)))
-    throw new StageError('STAGE_INVALID', 'rewinds and rewindAllowance are counts')
-  // 저장한 횟수는 줄지 않는다 — 이력이 더 많이 세면 그것을 쓴다(옛 기록)
-  record.rewinds = Math.max(record.rewinds ?? 0, countedRewinds(record.history))
+  if (!isRecord(record)) throw new StageError('STAGE_INVALID', `${STAGE_FILE} does not match schema version 1`)
+  if (record.verificationProfile !== undefined) resolveProfileBinding({ bindings: [{ artifact: 'stage', profile: record.verificationProfile }] })
+  if (!Array.isArray(record.history)) record.history = []
   return record
 }
 
@@ -131,137 +142,254 @@ async function bindingAt(directory, record, requestedProfile) {
   return resolveProfileBinding({ requestedProfile, bindings })
 }
 
-function moved(record, stage, digest, evidence, { inputsSha256, ...timing } = {}) {
-  const iterations = record.iterations
-  const recorded = record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }
-  // CHECKED가 판정한 입력의 고정은 CHECKED 뒤 단계만 지닌다 — 그 앞으로 되돌아가면 풀린다
-  const pinned = inputsSha256 ? { inputsSha256 } : {}
-  const result = {
-    ...record,
-    stage,
-    ...recorded,
-    ...pinned,
-    iterations: { ...iterations, inputs: { ...iterations.inputs, stage: { digest: digest ?? sha256(evidence), round: iterations.round } } },
-    history: [...record.history, { stage, ...recorded, ...pinned, evidence, iterationRound: iterations.round, at: now(), ...timing }],
+/** 이 오라클의 프로필 바인딩 — 카드와 기록이 말하는 것. 그래프는 Contract가 아니면 Formal이다. */
+export async function bindingOf(directory, requestedProfile) {
+  return bindingAt(directory, await readStage(directory), requestedProfile)
+}
+
+const graphProfile = (binding) => (binding.profile === 'contract/v1' ? 'contract/v1' : 'formal-bend/v1')
+
+// ---- 결정적 노드
+
+/** 한 번의 평가가 나눠 쓰는 것 — 저장소 루트(`repo:` 출처를 푸는 자리)와 한 번만 읽는 패키지. */
+function graphContext(directory, binding, timeoutMs) {
+  return { directory, root: pinRoot(directory), binding, profile: graphProfile(binding), timeoutMs }
+}
+
+async function loadedPackage(context) {
+  if (!context.loaded) {
+    const { loadPackage } = await import('./oracle-package.mjs')
+    context.loaded = await loadPackage(join(context.directory, PACKAGE_FILE), { root: context.root }).catch((error) => ({ error: error.message }))
   }
-  if (!inputsSha256) delete result.inputsSha256
-  return result
+  return context.loaded
+}
+
+function runScript(script, args, cwd) {
+  const child = spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  return { status: child.status, output: `${child.stdout ?? ''}${child.stderr ?? ''}`.trim(), stdout: child.stdout ?? '' }
+}
+
+const firstOutputLine = (output) => output.split('\n')[0]
+
+/** 카드 lint가 찍는 문제, 첫 줄 뒤에 한 줄씩 — `--draft`가 사용자 답을 기다린다고 한 것(pending)은 따로 둔다. */
+function lintLines(output) {
+  const lines = output.split('\n').slice(1).filter((line) => /^ {2}\S/.test(line))
+  return {
+    issues: lines.filter((line) => !line.startsWith('  pending ')).map((line) => line.trim()),
+    pending: lines.filter((line) => line.startsWith('  pending ')).map((line) => line.trim().replace(/^pending /, '')),
+  }
 }
 
 /**
- * lock 관문 — 패키지 경로의 오라클은 DRAFTED에서만, 기록한 것과 같은 패키지 바이트로만 잠긴다. 이미 ORACLE_READY인 같은
- * 패키지의 재잠금(멱등)은 통과한다. 패키지가 없으면(손으로 쓴 카드) 해당 없다.
+ * 카드 파일의 Draft lint — 잠금이 oracle.md를 lint하듯 저장소 루트에서(`--root`로 사본도 `code()` 증인과 출처를 저장소에서 푼다).
+ * issues는 고칠 것, pending은 사용자의 답(승인·출처)이 정하는 것이다.
  */
-export async function assertReadyToLock(directory, requestedProfile) {
-  const record = await readStage(directory)
-  const binding = await bindingAt(directory, record, requestedProfile)
-  if (binding.profile === 'contract/v1') {
-    if (!record) throw new StageError('STAGE_MISSING', 'Contract lock requires a DRAFTED stage')
-    if (record.stage !== 'ORACLE_READY') assertIterationAvailable(record.iterations)
-    if (!['DRAFTED', 'ORACLE_READY'].includes(record.stage)) throw new StageError('STAGE_NOT_DRAFTED', `the oracle is at ${record.stage}; the lock needs DRAFTED`)
-    if (record.cardSha256 !== sha256(await cardBytes(directory))) throw new StageError('STAGE_STALE', 'whole approved card changed after CHECKED')
-    return binding
-  }
-  const bytes = await packageBytes(directory)
-  if (!bytes) {
-    if (binding.kind === 'explicit') throw new StageError('STAGE_NO_PACKAGE', 'Explicit Formal requires oracle.package.json')
-    return binding
-  }
-  if (!record) {
-    throw new StageError(
-      'STAGE_MISSING',
-      `${PACKAGE_FILE} exists but there is no ${STAGE_FILE} — oracle-stage.mjs begin, then advance through MODELED, CHECKED and DRAFTED before the lock`,
-    )
-  }
-  if (record.stage !== 'ORACLE_READY') assertIterationAvailable(record.iterations)
-  if (!['DRAFTED', 'ORACLE_READY'].includes(record.stage))
-    throw new StageError('STAGE_NOT_DRAFTED', `the oracle is at ${record.stage}; the lock needs DRAFTED`)
-  if (record.packageSha256 !== sha256(bytes))
-    throw new StageError('STAGE_STALE', `${PACKAGE_FILE} changed after ${record.stage} — oracle-stage.mjs rewind --to <stage> --reason <cause>, then advance again`)
-  // 잠근 뒤에는 lock과 카드의 inputs-sha256 표식이 Bend를 지킨다 — 다시 잠그는 ORACLE_READY는 고정을 다시 재지 않는다
-  if (record.stage === 'DRAFTED') await assertPinned(directory, record)
-  return binding
+function draftLint(card, root) {
+  const linted = runScript(verifyScript, ['card', '--oracle', card, '--draft', '--root', root], root)
+  const { issues, pending } = lintLines(linted.output)
+  if (linted.status === 0 || issues.length > 0 || pending.length > 0) return { issues, pending }
+  return { issues: [`card-lint: ${firstOutputLine(linted.output)}`], pending }
 }
 
-/** lock이 만들어진 뒤 기록을 ORACLE_READY로 옮긴다. 패키지 경로가 아니면 아무것도 하지 않는다. */
-export async function markLocked(directory) {
-  const record = await readStage(directory)
-  if (!record || record.stage === 'ORACLE_READY') return
-  const binding = await assertReadyToLock(directory)
-  const bytes = binding.profile === 'contract/v1' ? await cardBytes(directory) : await packageBytes(directory)
-  if (!bytes) return
-  await writeStage(directory, moved(record, 'ORACLE_READY', sha256(bytes), 'lock', { inputsSha256: record.inputsSha256 }))
+/** 저장소 밖 임시 폴더에서 `work(folder)`, 그 뒤 폴더를 지운다. */
+async function inScratch(work) {
+  const scratch = await mkdtemp(join(tmpdir(), 'oracle-graph-'))
+  try {
+    return await work(scratch)
+  } finally {
+    await rm(scratch, { recursive: true, force: true })
+  }
 }
 
-async function gate(directory, target, { timeoutMs, profile } = {}) {
-  if (profile === 'contract/v1') {
-    const card = (await cardBytes(directory)).toString('utf8')
-    const confirmation = sectionLines(markdownLines(card), 'User Confirmation')
-    const source = confirmation.find((line) => /^- Source:/i.test(line.trim()))?.split(':').slice(1).join(':').trim()
-    if (!confirmation.some((line) => /^- Status:\s*approved\s*$/i.test(line.trim())) || !source || isEmptyCell(source)) {
-      throw new StageError('STAGE_GATE', 'Contract CHECKED requires actual user confirmation with approving response source')
-    }
-    const verifier = fileURLToPath(new URL('./oracle-verify.mjs', import.meta.url))
-    const checked = spawnSync(process.execPath, [verifier, 'card', '--oracle', join(directory, 'oracle.md'), ...(target === 'CHECKED' ? ['--case-space'] : [])], { encoding: 'utf8', cwd: process.cwd() })
-    if (checked.status !== 0) throw new StageError('STAGE_GATE', (checked.stderr || checked.stdout || checked.error?.message || 'Contract lint failed').trim())
-    return target === 'CHECKED' ? 'approved strict Contract Space' : 'whole Contract card lint'
-  }
-  const packagePath = join(directory, PACKAGE_FILE)
-  const { asyncCellIssues, loadPackage, packageIssues } = await import('./oracle-package.mjs')
-  // `repo:` 출처는 고정과 같은 저장소 루트에서 푼다 — 관문이 판정한 파일과 고정이 재는 파일이 같아야 한다
-  const root = pinRoot(directory)
-  const loaded = await loadPackage(packagePath, { root })
-  if (target === 'MODELED') {
-    const issues = [...packageIssues(loaded.pkg, { stage: 'model' }), ...asyncCellIssues(loaded.pkg, { required: true })]
-    if (issues.length > 0) throw new StageError('STAGE_GATE', `package is not model-complete: ${issues.join('; ')}`)
-    return 'package validate --stage model'
-  }
-  if (target === 'CHECKED') return checkedGate(loaded, packagePath, timeoutMs)
-  // DRAFTED — 카드의 생성 영역이 패키지에서 다시 만든 것과 같다
-  // 카드의 투영 다이제스트가 패키지 경로 표기를 품는다 — 저장소 루트 기준 상대 경로로 project-card한 카드와 같은 표기로 비교한다
-  const checked = spawnSync(
-    process.execPath,
-    [packageScript, 'check-card', '--package', relative(root, packagePath), '--card', relative(root, join(directory, 'oracle.md'))],
-    { encoding: 'utf8', cwd: root },
+/** 생성 영역만 있고 투영이 옮기는 손으로 쓴 절은 없는 카드. */
+function generatedOnly(text, generatedBlock) {
+  const found = generatedBlock(text)
+  if (!found.present || found.malformed) return null
+  const title = text.split('\n')[0]
+  return [title, '', text.slice(found.start, found.end), '', '## User Confirmation', '', '- Status: pending', '- Source: none yet', ''].join('\n')
+}
+
+/**
+ * `issues` 중 손으로 쓴 절만 내는 것 — 생성 영역만으로도 나는 문제는 패키지에서 온다(또는 규칙이 받는 손 줄: 출처 있는 N/A,
+ * Interaction sweep). 손으로 쓴 절만 내는 문제는 oracle.md의 생성 표식 밖에서 고친다.
+ */
+async function handWrittenOf(text, issues, root) {
+  if (issues.length === 0) return []
+  const { generatedBlock } = await import('./oracle-package.mjs')
+  const bare = generatedOnly(text, generatedBlock)
+  if (bare === null) return []
+  const fromRegion = new Set(
+    await inScratch(async (scratch) => {
+      await writeFile(join(scratch, 'oracle.md'), bare)
+      return draftLint(join(scratch, 'oracle.md'), root).issues
+    }),
   )
-  if (checked.status !== 0)
-    throw new StageError('STAGE_GATE', `check-card failed: ${(checked.stdout + checked.stderr).trim().split('\n')[0]}`)
-  return 'check-card'
+  return issues.filter((issue) => !fromRegion.has(issue))
 }
 
-/** CHECKED — 파생, 교차검증, 잠그기 전 적정성·증명·법칙. 같은 입력으로 이미 통과했으면 영수증으로 넘어간다(checkedReceipt). */
-async function checkedGate(loaded, packagePath, timeoutMs) {
+/** check-card — 카드의 생성 영역이 패키지에서 다시 만든 것과 같은가(저장소 루트 기준 상대 경로로 투영과 같은 표기). */
+function checkCard(context, card) {
+  const { directory, root } = context
+  const checked = runScript(packageScript, ['check-card', '--package', relative(root, join(directory, PACKAGE_FILE)), '--card', relative(root, card)], root)
+  if (checked.status === 0) return []
+  try {
+    const issues = JSON.parse(checked.stdout.trim().split('\n').at(-1)).issues
+    if (Array.isArray(issues) && issues.length > 0) return issues
+  } catch {
+    // not the JSON line: the first line says why
+  }
+  return [`check-card: ${firstOutputLine(checked.output)}`]
+}
+
+/** 패키지에서 카드를 투영한다 — oracle.md가 있으면 그 손으로 쓴 절을 그대로 둔다. */
+function projectCard(context, out) {
+  const { directory, root } = context
+  const projected = runScript(packageScript, ['project-card', '--package', relative(root, join(directory, PACKAGE_FILE)), '--out', relative(root, out)], root)
+  return projected.status === 0 ? null : `card-projection: ${firstOutputLine(projected.output)}`
+}
+
+const NODE_EVALUATORS = {
+  /** 패키지 — model 단계 완결(packageIssues)과 비동기 칸. 패키지가 없으면 그것이 문제다. */
+  async package(context) {
+    if (!(await packageBytes(context.directory))) return { issues: [`package-missing: write ${PACKAGE_FILE} with $oracle-intake (sources, requirements, Space discovery)`] }
+    const loaded = await loadedPackage(context)
+    if (loaded.error) return { issues: [`package-unreadable: ${loaded.error}`] }
+    const { asyncCellIssues, packageIssues } = await import('./oracle-package.mjs')
+    return { issues: [...packageIssues(loaded.pkg, { stage: 'model' }), ...asyncCellIssues(loaded.pkg, { required: true })] }
+  },
+  /** 모델 — 앞 노드가 막혔으면(--check, 잠금) Bend 없이 아는 교차검증 문제만, 아니면 전체(modelCheck: 문제와 통과의 근거). */
+  async model(context, { blocked }) {
+    const loaded = await loadedPackage(context)
+    if (loaded.error) return { issues: [] }
+    if (!blocked) return modelCheck(context, loaded)
+    const { crossCheckReadiness } = await import('./oracle-discovery.mjs')
+    return { issues: await crossCheckReadiness(loaded).catch(() => []) }
+  },
+  /**
+   * 카드 — project가 `write`면 oracle.md에 다시 투영하고(손으로 쓴 절은 그대로), `scratch`면 임시 사본에 투영해 lint만 한다.
+   * `none`은 지금 oracle.md를 본다(잠금). check-card와 Draft lint, 그 중 손으로 쓴 절만 내는 문제, 사용자 답을 기다리는 항목.
+   */
+  async card(context, { project, blocked }) {
+    const card = join(context.directory, 'oracle.md')
+    if (project === 'write') {
+      const failed = projectCard(context, card)
+      if (failed) return { issues: [failed] }
+    }
+    const current = await readFile(card, 'utf8').catch(() => null)
+    const issues = current === null ? ['card-missing: oracle-step.mjs projects oracle.md once the package and the model pass'] : checkCard(context, card)
+    if (project === 'none') return { issues }
+    // --check: the Draft lint of the card a projection would give now, hand-written sections kept
+    if (project === 'scratch') {
+      const { packageIssues } = await import('./oracle-package.mjs')
+      const loaded = await loadedPackage(context)
+      if (blocked && (loaded.error || packageIssues(loaded.pkg, { stage: 'project' }).length > 0)) return { issues }
+      return inScratch(async (scratch) => {
+        const copy = join(scratch, 'oracle.md')
+        if (current !== null) await writeFile(copy, current)
+        const failed = projectCard(context, copy)
+        if (failed) return { issues: [...issues, failed] }
+        const linted = draftLint(copy, context.root)
+        const text = await readFile(copy, 'utf8')
+        return { issues: [...new Set([...issues, ...linted.issues])], handWritten: current === null ? [] : await handWrittenOf(text, linted.issues, context.root), pending: linted.pending }
+      })
+    }
+    if (issues.length > 0) return { issues }
+    const linted = draftLint(card, context.root)
+    return { issues: linted.issues, handWritten: await handWrittenOf(current, linted.issues, context.root), pending: linted.pending }
+  },
+  /** Contract 승인 — 실제 사용자 확인과 그 출처, 그리고 엄격한 Space(`card --case-space`). */
+  async confirmation(context) {
+    const card = await cardBytes(context.directory)
+    if (!card) return { issues: ['card-missing: write oracle.md with the Contract card'] }
+    const confirmation = sectionLines(markdownLines(card.toString('utf8')), 'User Confirmation')
+    const source = confirmation.find((line) => /^- Source:/i.test(line.trim()))?.split(':').slice(1).join(':').trim()
+    const issues = []
+    if (!confirmation.some((line) => /^- Status:\s*approved\s*$/i.test(line.trim())) || !source || isEmptyCell(source))
+      issues.push('user-confirmation: show the user the whole card and record their approval: ## User Confirmation with - Status: approved and - Source: <their response>')
+    const checked = runScript(verifyScript, ['card', '--oracle', join(context.directory, 'oracle.md'), '--case-space'], process.cwd())
+    if (checked.status !== 0) issues.push(...contractLint(checked.output))
+    return { issues }
+  },
+}
+
+/** Contract 카드 lint의 문제 — 줄이 없으면 첫 줄. */
+function contractLint(output) {
+  const { issues, pending } = lintLines(output)
+  const all = [...issues, ...pending]
+  return all.length > 0 ? all : [`card-lint: ${firstOutputLine(output)}`]
+}
+
+/** Contract 카드 — 전체 카드 lint(`oracle-verify.mjs card`). */
+async function contractCard(context) {
+  if (!(await cardBytes(context.directory))) return { issues: [] }
+  const checked = runScript(verifyScript, ['card', '--oracle', join(context.directory, 'oracle.md')], process.cwd())
+  return { issues: checked.status === 0 ? [] : contractLint(checked.output) }
+}
+
+/** 노드 하나 — 문제 목록(비면 통과)과 카드의 손으로 쓴 절·사용자 답 항목. */
+export async function evaluateNode(context, id, options = {}) {
+  if (context.profile === 'contract/v1' && id === 'card') return contractCard(context)
+  return NODE_EVALUATORS[id](context, options)
+}
+
+/**
+ * 그래프의 결정적 노드를 순서대로 평가한다. `deep`이면 앞 노드가 실패해도 입력이 있는 노드를 모두 돈다(oracle-step.mjs
+ * --check, 잠금) — 아니면 처음 실패한 노드에서 멈춘다. label은 처음 실패한 노드의 위치, 모두 통과하면 DRAFTED다.
+ */
+export async function evaluateGraph(directory, { binding, deep = false, project = 'none', timeoutMs } = {}) {
+  const resolved = binding ?? (await bindingOf(directory))
+  const context = graphContext(directory, resolved, timeoutMs)
+  const nodes = []
+  for (const node of GRAPH[context.profile].filter(({ review }) => !review)) {
+    const blocked = nodes.some(({ issues }) => issues.length > 0)
+    if (blocked && !deep) break
+    nodes.push({ id: node.id, label: node.label, ...(await evaluateNode(context, node.id, { project, blocked })) })
+  }
+  return { binding: resolved, profile: context.profile, context, nodes, label: nodes.find(({ issues }) => issues.length > 0)?.label ?? 'DRAFTED' }
+}
+
+const numbered = (issues) => issues.map((issue, index) => `${index + 1}) ${issue}`).join('; ')
+
+/** 노드의 실패 목록 한 줄 — 잠금의 거절이 쓴다. */
+export function nodeIssuesText(nodes) {
+  return nodes
+    .filter(({ issues }) => issues.length > 0)
+    .map(({ id, issues }) => `${id}: ${numbered(issues)}`)
+    .join(' · ')
+}
+
+/**
+ * 모델 노드 — 파생, 교차검증, 잠그기 전 적정성·증명·법칙. 같은 입력으로 이미 통과했으면 영수증으로 넘어간다(checkedReceipt).
+ * 파생이 실패하면 그것만, 아니면 교차검증·적정성·증명의 문제를 한꺼번에 낸다. 통과하면 무엇을 판정했는지(evidence)를 함께 낸다.
+ */
+async function modelCheck(context, loaded) {
+  const { timeoutMs } = context
+  const packagePath = join(context.directory, PACKAGE_FILE)
   const { ensureBend } = await import('./ensure-bend.mjs')
   const { crossCheckIssues } = await import('./oracle-discovery.mjs')
   const { derivePackage } = await import('./oracle-package.mjs')
   const { readReceipt } = await import('./oracle-lock.mjs')
   const { bin } = await ensureBend()
-  // 키를 못 만들면(읽을 수 없는 입력 등) 영수증 없이 관문을 돈다 — 그 실패는 아래 검사가 제 문장으로 알린다
+  // 키를 못 만들면(읽을 수 없는 입력 등) 영수증 없이 돈다 — 그 실패는 아래 검사가 제 문장으로 알린다
   const receipt = await checkedReceipt(loaded, bin).catch(() => null)
   const remembered = receipt ? await readReceipt(receipt) : null
-  if (remembered) return `${remembered}; receipt: these exact inputs passed before`
+  if (remembered) return { issues: [], evidence: `${remembered}; receipt: these exact inputs passed before` }
   const { derived } = await derivePackage(loaded, { bin, timeoutMs })
-  if (derived.status !== 'derived') throw new StageError('STAGE_GATE', `derive returned ${derived.status}`)
-  const open = await crossCheckIssues({ loaded, bin, timeoutMs })
-  if (open.length > 0) throw new StageError('STAGE_GATE', `cross-check is not settled: ${open.join('; ')}`)
+  if (derived.status !== 'derived') {
+    const why = (derived.diagnostics ?? []).slice(0, 3).map((entry) => entry.message ?? entry.code).filter(Boolean)
+    return { issues: [['derive returned', derived.status, ...(why.length > 0 ? [`(${why.join('; ')})`] : [])].join(' ')] }
+  }
+  const crossCheck = await crossCheckIssues({ loaded, bin, timeoutMs })
   // 모델만으로 아는 결함은 잠그기 전에 막는다 — 잠근 뒤에 라벨 런이 알려 주면 그 모델은 고칠 수 없고 새 revision이 든다
   const { preLockIssues } = await import('./oracle-adequacy.mjs')
   const adequacy = await preLockIssues({ package: packagePath, bin, cwd: loaded.root, timeoutMs })
-  if (adequacy.issues.length > 0)
-    throw new StageError(
-      'STAGE_GATE',
-      `the model has defects the lock would freeze: ${adequacy.issues.join('; ')} — fix them in the package or world, then run oracle-adequacy.mjs check --package for the full report`,
-    )
-  const verdict = adequacy.checked ? `adequacy found no refuted check or unsatisfiable setting over ${adequacy.worlds} worlds` : `adequacy not judged (${adequacy.reason})`
   const proof = await preLockProof({ ...(await behaviorFiles(loaded)), bin, timeoutMs })
-  if (proof.issues.length > 0)
-    throw new StageError(
-      'STAGE_GATE',
-      `the laws or their proof have defects the lock would freeze: ${proof.issues.join('; ')} — fix the model, the law or PROOF.bend, then run oracle-model.mjs laws and prove --dir for the full report`,
-    )
+  const issues = [...crossCheck, ...adequacy.issues, ...proof.issues]
+  if (issues.length > 0) return { issues }
+  const verdict = adequacy.checked ? `adequacy found no refuted check or unsatisfiable setting over ${adequacy.worlds} worlds` : `adequacy not judged (${adequacy.reason})`
   const evidence = [`derive ${derived.digest}`, 'cross-check settled', verdict, ...proof.notes].join('; ')
   if (receipt && settledByBytes(derived, adequacy) && proof.settled) await rememberChecked(receipt, loaded, bin, evidence)
-  return evidence
+  return { issues: [], evidence }
 }
 
 /** 행동 모델의 MODEL.bend·LAWS.bend 경로, 법칙 행 이름, 공간 범위 — 법칙 파일이 없는 패키지(세계만)는 laws가 null이다. */
@@ -518,10 +646,10 @@ function settledByBytes(derived, adequacy) {
 }
 
 /**
- * CHECKED 영수증 — 파생·교차검증·적정성·증명·법칙은 패키지와 그 Bend 파일(전이 import 포함), LAWS.bend 옆 PROOF.bend와 그
- * import, 패키지가 등록한 `repo:` 출처, 하네스, node, bend만 읽는다. 그 바이트가 모두 같으면 같은 판정이 나오므로, 통과한 조합은 판정 문장과 함께 기억해 rewind 뒤 다시 걷는 길에서
- * 같은 관문(큰 모델에서는 Bend 열거)을 다시 돌지 않는다. 위치·규칙은 카드 lint 영수증과 같다(ORACLE_LINT_CACHE, `off`면 끔).
- * 실패는 남기지 않는다. `stamp`는 키에 들지 않는 파일 표식(크기·시각·inode)으로, 관문 전후를 비교하는 데만 쓴다 — 링크 자신과
+ * 모델 노드의 영수증 — 파생·교차검증·적정성·증명·법칙은 패키지와 그 Bend 파일(전이 import 포함), LAWS.bend 옆 PROOF.bend와 그
+ * import, 패키지가 등록한 `repo:` 출처, 하네스, node, bend만 읽는다. 그 바이트가 모두 같으면 같은 판정이 나오므로, 통과한 조합은 판정 문장과 함께 기억해 다음
+ * oracle-step.mjs와 잠금이 같은 판정(큰 모델에서는 Bend 열거)을 다시 돌지 않는다. 위치·규칙은 카드 lint 영수증과 같다(ORACLE_LINT_CACHE, `off`면 끔).
+ * 실패는 남기지 않는다. `stamp`는 키에 들지 않는 파일 표식(크기·시각·inode)으로, 판정 전후를 비교하는 데만 쓴다 — 링크 자신과
  * 그 대상을 둘 다 잰다(키는 대상의 바이트를 해시하므로, 대상만 바꿨다 되돌려도 드러나야 한다).
  */
 async function checkedReceipt(loaded, bin) {
@@ -534,8 +662,8 @@ async function checkedReceipt(loaded, bin) {
 }
 
 /**
- * CHECKED가 읽는 입력 — 패키지와 그 Bend 파일(전이 import 포함), 등록한 `repo:` 출처의 digest, 그리고 그 파일들의 표식.
- * `proof`면 PROOF.bend와 그 import도 잰다(영수증만): PROOF.bend는 잠그지 않는 증명 후보라 고정에 들지 않는다.
+ * 모델 노드가 읽는 입력 — 패키지와 그 Bend 파일(전이 import 포함), 등록한 `repo:` 출처의 digest, 그리고 그 파일들의 표식.
+ * `proof`면 PROOF.bend와 그 import도 잰다(영수증과 파일 상태): PROOF.bend는 잠그지 않는 증명 후보라 잠금의 고정에 들지 않는다.
  */
 async function checkedInputs(loaded, { proof = false } = {}) {
   const { packageInputs, sourcePath } = await import('./oracle-package.mjs')
@@ -571,19 +699,22 @@ async function proofInputs(loaded) {
   const present = await stat(entry).then(() => true, () => false)
   if (!present) return { inputs: [], paths: [entry] }
   const { bendInputs } = await import('./oracle-model.mjs')
-  const inputs = await bendInputs(entry)
+  // closure를 읽을 수 없으면(없는 import) PROOF.bend의 바이트만 잰다 — 그 결함은 증명이 알린다
+  const inputs = await bendInputs(entry).catch(async () => [{ path: entry, sha256: sha256(await readFile(entry, 'utf8')) }])
   return { inputs, paths: inputs.map(({ path }) => path) }
 }
 
 /**
- * CHECKED의 고정 — 관문이 판정한 입력(checkedInputs)의 digest. `repo:` 출처는 저장소 루트 기준이라 오라클 디렉터리
- * (`<root>/.ai/oracles/<id>`)에서 루트를 얻는다: lock이 다른 cwd에서 불러도 같은 파일을 잰다. 그 밖의 자리는 관문과 같이 cwd다.
+ * 모델 입력의 고정 — 모델 노드가 판정하는 입력(checkedInputs)의 digest. 잠금이 기록한다(inputsSha256). `proof`면 PROOF.bend와
+ * 그 import도 넣는다: 파일 상태 digest가 Bend 편집을 보는 길이고, 증명만 고쳐도 새 파일 상태다(잠금의 고정에는 들지 않는다).
+ * `repo:` 출처는 저장소 루트 기준이라 오라클 디렉터리(`<root>/.ai/oracles/<id>`)에서 루트를 얻는다: lock이 다른 cwd에서 불러도
+ * 같은 파일을 잰다. 그 밖의 자리는 노드와 같이 cwd다.
  */
-async function checkedPin(directory, root = pinRoot(directory)) {
+async function checkedPin(directory, { proof = false } = {}) {
   const { loadPackage } = await import('./oracle-package.mjs')
-  const loaded = await loadPackage(join(directory, PACKAGE_FILE), { root })
-  const { inputs, sources, stamp } = await checkedInputs(loaded)
-  return { digest: sha256(stableStringify({ inputs, sources })), stamp }
+  const loaded = await loadPackage(join(directory, PACKAGE_FILE), { root: pinRoot(directory) })
+  const { inputs, sources, proof: proven } = await checkedInputs(loaded, { proof })
+  return sha256(stableStringify({ inputs, sources, ...(proof ? { proof: proven } : {}) }))
 }
 
 function pinRoot(directory) {
@@ -591,430 +722,276 @@ function pinRoot(directory) {
   return root === directory ? process.cwd() : root
 }
 
-/** 지금 입력의 고정값 — CHECKED가 기록하는 inputsSha256과 같다. 손으로 만든 stage 기록으로 lock 경계를 시험하는 테스트가 쓴다. */
-export async function inputsPin(directory, { root } = {}) {
-  return (await checkedPin(directory, root)).digest
-}
-
 /**
- * DRAFTED와 그 lock은 CHECKED가 판정한 입력 그대로여야 한다 — 고정이 없으면(0.107.0 전 기록) 판정한 입력을 알 수 없다.
- * CHECKED·DRAFTED는 그 자리에서 CHECKED를 다시 돌면 되고(recheckable), 잠근 기록은 되돌아가 다시 걷는다.
- */
-async function assertPinned(directory, record) {
-  const next = record.stage === 'ORACLE_READY'
-    ? 'rewind --to MODELED --reason <cause> and advance again, or start a new revision'
-    : 'advance --to CHECKED to judge the current inputs'
-  if (!record.inputsSha256) throw new StageError('STAGE_STALE', `${record.stage} was recorded without the Bend pin (before 0.107.0) — ${next}`)
-  const { digest } = await checkedPin(directory).catch((error) => {
-    throw new StageError('STAGE_STALE', `the package inputs CHECKED judged cannot be read again: ${error.message}`)
-  })
-  if (digest !== record.inputsSha256) throw new StageError('STAGE_STALE', `the Bend files or registered sources changed after CHECKED — ${next}`)
-}
-
-/**
- * lock 파일 없이 ORACLE_READY를 다시 잠그는 길 — 같은 lock이 있으면 멱등 재잠금이지만, lock을 지우고 다시 만들면 CHECKED가
- * 판정하지 않은 모델을 그 승인과 함께 새로 잠글 수 있다. 그때는 CHECKED의 고정을 다시 잰다.
- */
-export async function assertRelockPinned(directory) {
-  const record = await readStage(directory)
-  if (record?.stage !== 'ORACLE_READY' || (await bindingAt(directory, record)).profile === 'contract/v1' || !(await packageBytes(directory))) return
-  await assertPinned(directory, record)
-}
-
-/**
- * 관문이 도는 동안 입력이 바뀌었으면(고쳤다가 되돌린 것까지) 그 판정은 키의 바이트가 낸 것이 아니다 — 패키지를 다시 읽어 키와
+ * 판정이 도는 동안 입력이 바뀌었으면(고쳤다가 되돌린 것까지) 그 판정은 키의 바이트가 낸 것이 아니다 — 패키지를 다시 읽어 키와
  * 파일 표식을 다시 재고, 둘 다 같을 때만 영수증을 남긴다.
  */
 async function rememberChecked(receipt, loaded, bin, evidence) {
   const { loadPackage } = await import('./oracle-package.mjs')
   const { writeReceipt } = await import('./oracle-lock.mjs')
-  // 다시 잴 수 없으면 남기지 않는다 — 다음 advance가 관문을 다시 돌 뿐이다
+  // 다시 잴 수 없으면 남기지 않는다 — 다음 검사가 다시 돌 뿐이다
   const again = await loadPackage(loaded.path, { root: loaded.root }).then((reloaded) => checkedReceipt(reloaded, bin)).catch(() => null)
   if (again?.key !== receipt.key || again.stamp !== receipt.stamp) return
-  // 영수증은 속도를 위한 캐시다 — 쓸 수 없는 위치(읽기 전용 tmpdir, 샌드박스)는 다음 advance가 관문을 다시 돌게 둘 뿐이다
+  // 영수증은 속도를 위한 캐시다 — 쓸 수 없는 위치(읽기 전용 tmpdir, 샌드박스)는 다음 검사가 다시 돌게 둘 뿐이다
   await writeReceipt(receipt, evidence).catch(() => {})
 }
 
-async function begin(directory, requestedProfile) {
-  const binding = await bindingAt(directory, null, requestedProfile)
-  if (binding.profile !== 'contract/v1' && !(await packageBytes(directory))) throw new StageError('STAGE_NO_PACKAGE', `${PACKAGE_FILE} is not in ${directory}`)
-  if (await readStage(directory)) throw new StageError('STAGE_EXISTS', `${STAGE_FILE} already exists — use rewind to revisit a stage`)
-  const record = { schemaVersion: 1, stage: 'DISCOVERING', packageSha256: null, iterations: iterationBudget(), history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin', at: now() }] }
-  if (binding.kind === 'explicit') {
-    record.verificationProfile = binding.profile
-    if (binding.profile === 'contract/v1') {
-      delete record.packageSha256
-      record.cardSha256 = null
-      record.history = [{ stage: 'DISCOVERING', cardSha256: null, evidence: 'begin', at: record.history[0].at }]
-    }
-  }
-  await mkdir(directory, { recursive: true })
-  await writeStage(directory, record)
-  return record
-}
+// ---- 잠금
 
-async function advance(directory, target, options) {
-  const record = await readStage(directory)
-  if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE} — run begin first`)
-  assertIterationAvailable(record.iterations)
-  if (target === 'ORACLE_READY') throw new StageError('STAGE_LOCK_ONLY', 'ORACLE_READY is written by oracle-lock.mjs create, not by advance')
-  const binding = await bindingAt(directory, record, options.requestedProfile)
-  const recheck = await rechecks(directory, record, target, binding, options.explanation)
-  const contract = binding.profile === 'contract/v1'
-  const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
-  if (!bytes) throw new StageError('STAGE_NO_PACKAGE', `${PACKAGE_FILE} is not in ${directory}`)
-  const digest = contract ? record.cardSha256 : record.packageSha256
-  if (digest && digest !== sha256(bytes))
-    throw new StageError('STAGE_STALE', contract ? 'whole approved card changed after CHECKED - rewind --to <stage> --reason <cause>, then advance again' : `${PACKAGE_FILE} changed after ${record.stage} — rewind --to <stage> --reason <cause>, then advance again`)
-  const started = performance.now()
-  const run = () => gate(directory, target, { ...options, profile: binding.profile })
-  const { evidence, inputsSha256 } = contract ? { evidence: await run() } : await pinnedGate(directory, record, target, run)
-  if (contract && sha256(await cardBytes(directory)) !== sha256(bytes)) throw new StageError('STAGE_STALE', 'whole Contract card changed during gate')
-  const result = moved(record, target, sha256(bytes), evidence, {
-    durationMs: Math.round(performance.now() - started),
-    inputsSha256,
-    ...(recheck ? { recheck: true, ...options.explanation } : {}),
-  })
-  result.rewinds = record.rewinds + Number(recheck)
-  // 판정한 패키지의 뜻 — 되돌림이 뜻이 같은 수정(출처 위치)인지 가른다
-  if (!contract) result.meaningSha256 = meaningOf(bytes)
-  await writeStage(directory, result)
-  return result
+/** 잠근 뒤의 걸음이 막혔을 때 — 계약이 틀렸으니 사용자가 출처를 고치고 새 run으로 시작한다. */
+export const REVISE_NEXT = 'NEEDS_DECISION: the user rewrites the sources, then oracle-step.mjs --dir <new run dir>'
+
+const lockedDigests = (record, contract) =>
+  contract ? { cardSha256: record.cardSha256 } : { packageSha256: record.packageSha256, ...(record.inputsSha256 ? { inputsSha256: record.inputsSha256 } : {}) }
+
+const pinOf = (directory, options) => checkedPin(directory, options).catch(() => null)
+
+const stepHint = (directory) => `run oracle-step.mjs --dir ${relative(process.cwd(), directory) || '.'} and do what NEXT FOR YOU says`
+
+/** Formal 패키지가 없는 오라클 — 명시 Formal이면 거절, 손으로 쓴 카드(프로필 없음)는 해당 없다. */
+function withoutPackage(binding) {
+  if (binding.kind === 'explicit') throw new StageError('STAGE_NO_PACKAGE', 'Explicit Formal requires oracle.package.json')
+  return { ...binding, judged: {} }
 }
 
 /**
- * 패키지의 뜻의 지문 — 출처의 위치(`sources[].location`)만 뺀 나머지다. 위치는 같은 출처를 가리키는 자리라, 옮겨도 행·정책·모델은
- * 그대로다(고정할 출처 바이트는 lock이 따로 잰다). 읽을 수 없으면 null이라 뜻이 같다고 보지 않는다.
+ * 잠근 기록의 digest — 잠근 바이트(Formal은 패키지, Contract는 카드)가 바뀌었으면 새 revision이다. lock 파일이 있는 재잠금과
+ * verify는 그 digest를 그대로 받고, 그 밖에는 null(판정할 차례). verify는 잠근 기록만 받는다.
  */
-function meaningOf(bytes) {
-  try {
-    const document = JSON.parse(bytes.toString('utf8'))
-    if (Array.isArray(document.sources)) document.sources = document.sources.map(withoutLocation)
-    return sha256(stableStringify(document))
-  } catch {
+function lockedDigest(directory, record, { contract, bytes, present, verify }) {
+  if (record?.stage !== 'ORACLE_READY') {
+    if (verify) throw new StageError(record ? 'STAGE_STALE' : 'STAGE_MISSING', `the oracle is not locked — ${stepHint(directory)}`)
     return null
   }
+  if ((contract ? record.cardSha256 : record.packageSha256) !== sha256(bytes ?? ''))
+    throw new StageError('STAGE_STALE', `${contract ? 'the approved card' : PACKAGE_FILE} changed after the lock — ${REVISE_NEXT}`)
+  if (!present && !verify) return null
+  return lockedDigests(record, contract)
 }
 
-function withoutLocation(source) {
-  if (source === null || typeof source !== 'object') return source
-  return { ...source, location: null }
-}
-
-/** 판정한 뒤 바뀐 것이 출처 위치뿐인가 — 바이트는 다르고 뜻의 지문은 같다. 지문이 없는 옛 기록은 그렇게 보지 않는다. */
-function onlyMetadataChanged(record, bytes) {
-  if (!bytes || record.packageSha256 === null || record.packageSha256 === sha256(bytes)) return false
-  return record.meaningSha256 !== undefined && record.meaningSha256 === meaningOf(bytes)
-}
-
-/** 마지막 되돌림(없으면 시작) 뒤에 보낸 독립 리뷰의 종류 — 그 결과가 돌아왔는지는 기록에 없다. */
-export function dispatchedSinceLastRewind(record) {
-  const lastWalk = [...record.history].reverse().find((entry) => entry.evidence === 'rewind' || entry.evidence === 'begin')
-  const since = lastWalk ? Date.parse(lastWalk.at) : 0
-  return [...new Set((record.dispatches ?? []).filter((entry) => Date.parse(entry.at) >= since).map((entry) => entry.kind))].sort()
-}
-
-/**
- * 그 자리에서 다시 검사 — CHECKED·DRAFTED 기록의 고정이 낡았거나 없으면(0.107.0 전) CHECKED를 다시 돈다. MODELED의 판정은
- * 패키지만 읽어 그대로이고(바뀐 패키지는 advance가 STAGE_STALE로 막는다), 되돌림이 아니어서 저작 라운드를 쓰지 않는다 —
- * 리뷰가 시킨 수리는 그 리뷰 입력이 이미 라운드를 센다.
- */
-async function recheckable(directory, record, target, binding) {
-  if (target !== 'CHECKED' || binding.profile === 'contract/v1' || !['CHECKED', 'DRAFTED'].includes(record.stage)) return false
-  return assertPinned(directory, record).then(() => false, () => true)
+/** 지금 바이트로 결정적 노드를 모두 돈다 — 하나라도 실패하면 거절, 도는 동안 바뀌었으면 다시. 통과하면 판정한 digest. */
+async function judgedFiles(directory, binding, { contract, pkg, card, timeoutMs }) {
+  const pin = contract ? null : await pinOf(directory)
+  const { nodes } = await evaluateGraph(directory, { binding, deep: true, timeoutMs })
+  if (nodes.some(({ issues }) => issues.length > 0))
+    throw new StageError('STAGE_GATE', `the lock judged the current files: ${nodeIssuesText(nodes)} — ${stepHint(directory)}`)
+  const [pkgAfter, cardAfter] = await Promise.all([packageBytes(directory), cardBytes(directory)])
+  const pinAfter = contract ? null : await pinOf(directory)
+  if (sha256(pkgAfter ?? '') !== sha256(pkg ?? '') || sha256(cardAfter ?? '') !== sha256(card ?? '') || pinAfter !== pin)
+    throw new StageError('STAGE_STALE', 'the files changed while the lock judged them — run the lock again')
+  if (contract) return { cardSha256: sha256(card ?? '') }
+  return { packageSha256: sha256(pkg), ...(pin ? { inputsSha256: pin } : {}), cardSha256: card && sha256(card) }
 }
 
 /**
- * advance의 걸음 — 다음 단계로 가거나(false) CHECKED를 그 자리에서 다시 돈다(true). 그 밖은 STAGE_SKIP이다. 다시 검사는
- * 되돌림처럼 이유를 남길 수 있고(oracle-reflect가 재작업으로 센다), 앞으로 가는 걸음에는 이유가 없다.
+ * lock 관문 — 잠금이 유일한 확정이다. 같은 바이트로 이미 잠근 기록(ORACLE_READY)은 lock 파일이 있으면(`present`, 재잠금)
+ * 그 digest만 비교하고, 그 밖에는 지금 바이트로 결정적 노드를 모두 돈다(기록한 단계를 믿지 않는다). `verify`는 잠근 기록만
+ * 받는다. 패키지 없는 손으로 쓴 카드(프로필 없음)는 해당 없다. 돌려주는 judged는 잠금이 스냅숏과 비교하고 기록에 남기는 digest다.
  */
-async function rechecks(directory, record, target, binding, explanation) {
-  const stages = AUTHORING_STAGES[binding.profile] ?? STAGES
-  const next = stages[stages.indexOf(record.stage) + 1]
-  if (!stages.includes(target)) throw new StageError('STAGE_SKIP', `${record.stage} can only advance to ${next ?? 'nothing'}, not ${target}`)
-  const recheck = target !== next && (await recheckable(directory, record, target, binding))
-  if (target !== next && !recheck) throw new StageError('STAGE_SKIP', `${record.stage} can only advance to ${next ?? 'nothing'}, not ${target}`)
-  if (explanation && !recheck) throw new StageError('USAGE', '--reason belongs to rewind or to advance --to CHECKED judging changed inputs again', 2)
-  // 재검사는 되감기처럼 센다
-  if (recheck) assertRewindAvailable(record)
-  return recheck
-}
-
-/**
- * Formal 관문과 그 고정 — CHECKED는 관문 전후로 입력을 재어 그대로일 때만 그 digest를 고정한다(고쳤다 되돌린 것도 표식으로
- * 드러난다). 관문 전에 못 쟀으면 관문이 제 문장으로 실패를 알리고, 관문이 통과했는데 못 쟀다면 그 측정 오류를 알린다(다시
- * advance해도 같다). DRAFTED는 CHECKED의 고정을 관문 전후로 확인하고 지닌다. MODELED는 Bend를 읽지 않아 고정이 없다.
- */
-async function pinnedGate(directory, record, target, run) {
-  if (target === 'DRAFTED') {
-    await assertPinned(directory, record)
-    const evidence = await run()
-    await assertPinned(directory, record)
-    return { evidence, inputsSha256: record.inputsSha256 }
-  }
-  if (target !== 'CHECKED') return { evidence: await run() }
-  const measure = () => checkedPin(directory).then((pin) => ({ pin }), (error) => ({ error }))
-  const before = await measure()
-  const evidence = await run()
-  if (before.error) throw new StageError('STAGE_STALE', `the inputs CHECKED judged cannot be measured: ${before.error.message}`)
-  const after = await measure()
-  if (after.error || after.pin.digest !== before.pin.digest || after.pin.stamp !== before.pin.stamp)
-    throw new StageError('STAGE_STALE', 'the Bend files or registered sources changed while the CHECKED gate ran — advance again')
-  return { evidence, inputsSha256: before.pin.digest }
-}
-
-/** DISCOVERING으로 돌아가면 패키지 바이트의 고정을 푼다 — 모델 단계부터 다시 검사하며 새로 고정한다. */
-function rewoundDigest(target, bytes) {
-  if (target === 'DISCOVERING' || !bytes) return null
-  return sha256(bytes)
-}
-
-function rewindReason(reason, note) {
-  if (!REWIND_REASONS.includes(reason)) throw new StageError('USAGE', `rewind requires --reason ${REWIND_REASONS.join('|')}`, 2)
-  if (note !== undefined && (!note.trim() || /[\r\n]/.test(note) || note.length > NOTE_LIMIT))
-    throw new StageError('USAGE', `--note is one non-empty line of at most ${NOTE_LIMIT} characters`, 2)
-  return note === undefined ? { reason } : { reason, note: note.trim() }
-}
-
-async function rewind(directory, target, explanation) {
+export async function assertReadyToLock(directory, requestedProfile, { present = false, verify = false, timeoutMs } = {}) {
   const record = await readStage(directory)
-  if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE} — run begin first`)
-  const binding = await bindingAt(directory, record)
-  const stages = AUTHORING_STAGES[binding.profile] ?? STAGES
-  if (!stages.includes(target) || target === 'ORACLE_READY' || stages.indexOf(target) > stages.indexOf(record.stage))
-    throw new StageError('STAGE_REWIND', `rewind goes back to DISCOVERING, MODELED, CHECKED or DRAFTED at or before ${record.stage}`)
+  const binding = await bindingAt(directory, record, requestedProfile)
   const contract = binding.profile === 'contract/v1'
-  const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
-  if (contract && target !== 'DISCOVERING' && record.cardSha256 !== sha256(bytes)) throw new StageError('STAGE_STALE', 'changed Contract must rewind to DISCOVERING for approval and strict Space recheck')
-  // 바뀐 패키지를 MODELED·CHECKED로 되돌려 기록하면 그 단계의 관문을 건너뛴 채 새 바이트가 통과로 남는다 — 처음부터 다시 걷는다
-  if (!contract && target !== 'DISCOVERING' && record.packageSha256 !== (bytes ? sha256(bytes) : null))
-    throw new StageError('STAGE_STALE', `${PACKAGE_FILE} changed after ${record.stage} — a changed package walks back to DISCOVERING; only unchanged package bytes resume at ${target}`)
-  // MODELED 관문은 Bend를 읽지 않는다 — 바뀐 Bend는 MODELED로 되돌아가 CHECKED를 다시 돈다
-  const keepsPin = !contract && (target === 'CHECKED' || target === 'DRAFTED')
-  if (keepsPin) await assertPinned(directory, record)
-  const inputSha256 = sha256(JSON.stringify([bytes?.toString('utf8'), (await cardBytes(directory))?.toString('utf8')]))
-  const previous = record.history.at(-1)
-  if (record.stage === target && previous?.evidence === 'rewind' && previous.inputSha256 === inputSha256) return record
-  // 저작 라운드는 리뷰 왕복을 센다 — 고친 바이트를 review-input으로 다시 보낼 때 다음 라운드가 된다. 되감기는 그 수리의
-  // 일부라 라운드를 쓰지 않는다. 이미 소진된 기록(옛 이력 승계)은 되감기도 NEEDS_DECISION으로 멈춘다
-  assertIterationAvailable(record.iterations)
-  assertRewindAvailable(record)
-  // 판정한 뒤 바뀐 것이 출처 위치뿐이면 리뷰가 읽은 뜻은 그대로다 — 이력에 표시만 남긴다(관문은 DISCOVERING부터 다시 돈다)
-  const metadataOnly = !contract && onlyMetadataChanged(record, bytes)
-  const dispatched = explanation.reason === 'review-finding' ? [] : dispatchedSinceLastRewind(record)
-  const result = moved(record, target, rewoundDigest(target, bytes), 'rewind', { inputsSha256: keepsPin ? record.inputsSha256 : undefined })
-  result.rewinds = record.rewinds + 1
-  Object.assign(result.history.at(-1), { inputSha256, ...explanation, ...(metadataOnly ? { metadataOnly: true } : {}), ...(dispatched.length > 0 ? { dispatchedBefore: dispatched } : {}) })
-  await writeStage(directory, result)
-  return result
+  const [pkg, card] = await Promise.all([packageBytes(directory), cardBytes(directory)])
+  if (!contract && !pkg) return withoutPackage(binding)
+  const locked = lockedDigest(directory, record, { contract, bytes: contract ? card : pkg, present, verify })
+  return { ...binding, judged: locked ?? (await judgedFiles(directory, binding, { contract, pkg, card, timeoutMs })) }
 }
 
-/** 디스패치에 붙이는 모델·effort는 선택이다 — 한 줄짜리 짧은 이름만 받는다. */
-function dispatchDetails({ model, effort } = {}) {
-  const details = {}
-  for (const [name, value] of Object.entries({ model, effort })) {
-    if (value === undefined) continue
-    if (!value.trim() || /[\r\n]/.test(value) || value.length > DETAIL_LIMIT) throw new StageError('USAGE', `--${name} is one non-empty line of at most ${DETAIL_LIMIT} characters`, 2)
-    details[name] = value.trim()
-  }
-  return details
+// 0.126까지의 기록이 진행을 적던 필드 — 위치는 이제 파일에서 계산하므로 다음 쓰기에서 떨어진다(이력과 디스패치는 남는다)
+const PROGRESS_FIELDS = ['stage', 'packageSha256', 'cardSha256', 'inputsSha256', 'meaningSha256', 'iterations', 'rewinds', 'rewindAllowance']
+
+function withoutProgress(record) {
+  const kept = { ...record }
+  for (const field of PROGRESS_FIELDS) delete kept[field]
+  return kept
 }
 
-/** Pure review-input builders stay pure; public dispatch commands register their final bytes here. */
-export async function recordAuthoringInput(directory, kind, text, attempt, details = {}) {
-  if (!REVIEW_KINDS.has(kind)) throw new StageError('USAGE', `unknown review kind: ${kind}`, 2)
-  if (attempt !== undefined && !attempt.trim()) throw new StageError('USAGE', '--attempt must name one dispatch', 2)
-  const described = dispatchDetails(details)
-  return withDirectoryLock(directory, 'stage', async () => {
-    const record = await readStage(directory) ?? await begin(directory)
-    if (record.stage === 'ORACLE_READY') throw new StageError('STAGE_LOCKED', 'authoring review cannot reopen a locked revision')
-    let iterations = observeIteration(record.iterations, kind, sha256(text))
-    if (attempt !== undefined) iterations = observeIteration(iterations, `${kind}:dispatch`, sha256(attempt))
-    // 같은 디스패치의 재전송은 시각을 다시 찍지 않는다 — 처음 보낸 시각이 그 리뷰의 시작이다
-    const seen = attempt === undefined || (record.dispatches ?? []).some((entry) => entry.kind === kind && entry.attempt === attempt)
-    const dispatches = seen ? record.dispatches : [...(record.dispatches ?? []), { kind, attempt, at: now(), ...described }].slice(-DISPATCH_LIMIT)
-    if (iterations !== record.iterations || dispatches !== record.dispatches) await writeStage(directory, { ...record, iterations, ...(dispatches ? { dispatches } : {}) })
-    const result = iterationStatus(iterations)
-    if (!record.iterations.inputs[kind]) result.mode = 'full'
-    return result
+/** lock이 만들어진 뒤 기록을 ORACLE_READY로 — 잠근 바이트의 digest와 프로필. 기록이 없으면 만든다. 패키지 없는 손 카드는 남기지 않는다. */
+export async function markLocked(directory, { binding } = {}) {
+  const judged = binding?.judged ?? {}
+  const contract = binding?.profile === 'contract/v1'
+  const digest = contract ? { cardSha256: judged.cardSha256 } : { packageSha256: judged.packageSha256, ...(judged.inputsSha256 ? { inputsSha256: judged.inputsSha256 } : {}) }
+  if (!(contract ? digest.cardSha256 : digest.packageSha256)) return
+  await withDirectoryLock(directory, 'stage', async () => {
+    const record = await readStage(directory)
+    if (record?.stage === 'ORACLE_READY') return
+    const base = withoutProgress(record ?? { schemaVersion: 1, history: [] })
+    await writeStage(directory, {
+      ...base,
+      ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}),
+      stage: 'ORACLE_READY',
+      ...digest,
+      history: [...base.history, { stage: 'ORACLE_READY', ...digest, evidence: 'lock', at: now() }],
+    })
   })
 }
 
-async function extend(directory, path) {
-  if (!path) throw new StageError('ITERATION_APPROVAL_REQUIRED', 'extend requires --approval <explicit-user-approval.json>')
-  const record = await readStage(directory)
-  if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE}`)
-  if (record.stage === 'ORACLE_READY') throw new StageError('STAGE_LOCKED', 'an extension cannot unlock an approved revision')
-  const approval = JSON.parse(await readFile(resolve(path), 'utf8'))
-  // 받아들여진 extend는 지금 횟수에서 상한만큼 더 되감게 한다 — 되감기를 위한 별도 명령은 없다
-  const result = { ...record, iterations: extendIterations(record.iterations, approval, 'authoring'), rewindAllowance: Math.max(rewindAllowance(record), record.rewinds + rewindCap()) }
-  await writeStage(directory, result)
-  return result
+// ---- oracle-step.mjs가 남기는 검사
+
+/**
+ * 지금 파일 상태 — 패키지, 모델 노드가 읽는 입력(Bend closure와 등록한 출처, LAWS.bend 옆 PROOF.bend와 그 import), 카드의
+ * digest. 고치지 않고 다시 돌면 같고, 증명만 고쳐도 달라진다(반복 감지와 진행 한 줄이 그 편집을 본다).
+ */
+export async function filesDigest(directory) {
+  const [pkg, card] = await Promise.all([packageBytes(directory), cardBytes(directory)])
+  const inputs = pkg ? await pinOf(directory, { proof: true }) : null
+  return sha256(stableStringify({ package: pkg && sha256(pkg), inputs, card: card && sha256(card) }))
 }
 
-/** extend가 받아들여질 수 있는 기록 — 잠기지 않았고, 다음 라운드가 상한을 넘지 않는다. */
-function canExtend(record) {
-  return record.stage !== 'ORACLE_READY' && Math.max(record.iterations.round, record.iterations.limit) + 1 <= roundCeiling()
+/** 실패 목록의 digest — 실패한 노드와 그 문제. 모두 통과하면 null(반복 감지는 실패만 센다). */
+export function issuesDigest(nodes) {
+  const failed = nodes.filter(({ issues }) => issues.length > 0).map(({ id, issues }) => [id, issues])
+  return failed.length > 0 ? sha256(stableStringify(failed)) : null
 }
 
-/** extend도 거절되는 기록의 다음 걸음 — 계약이 틀렸으니 사용자가 출처를 고치고 새 run으로 시작한다. */
-const REVISE_NEXT = 'NEEDS_DECISION: the user rewrites the sources, then oracle-stage.mjs begin --dir <new run dir>'
-
-/** 되감기 허용치를 다 쓴 기록은 더 되감지 않는다 — 앞으로 가거나, 사용자 승인으로 extend해야 한다. */
-function assertRewindAvailable(record) {
-  if (record.rewinds < rewindAllowance(record)) return
-  const back = canExtend(record)
-    ? `ask the user, then oracle-stage.mjs extend --approval <explicit-user-approval.json> allows ${rewindCap()} more`
-    : `extend is refused here (locked, or round ${roundCeiling()} reached): ${REVISE_NEXT}`
-  throw new StageError('REWIND_CAP_REACHED',
-    `${record.rewinds} rewinds and rechecks reach this revision's allowance of ${rewindAllowance(record)}: go forward (walk, lock), or ${back}`)
+/** 최근 검사 끝에서 같은 실패 목록이 연달아 나온 서로 다른 파일 상태 수 — SAME_ISSUES_STOP이면 멈출 때다. */
+export function sameIssuesRun(checks = []) {
+  const last = checks.at(-1)
+  if (!last?.issues) return 0
+  const files = new Set()
+  for (let index = checks.length - 1; index >= 0 && checks[index].issues === last.issues; index -= 1) files.add(checks[index].files)
+  return files.size
 }
 
-/** 기록한 바이트와 지금 바이트가 다르면 그 단계 기록은 낡았다(Contract는 카드, Formal은 패키지와 CHECKED 뒤의 고정 입력). */
-async function isStale(directory, record, binding) {
+/**
+ * 한 리뷰 종류의 라운드 — 반환이 저장된 서로 다른 입력 digest 수: 검사가 기록한 것과 reviews/에 있는 반환 파일(기록 전에
+ * 고쳐도 저장한 반환은 라운드다). digest는 파일 이름처럼 앞 12자로 비교한다.
+ */
+export async function reviewRounds(directory, record, kind) {
+  const names = await readdir(join(directory, 'reviews')).catch(() => [])
+  return new Set([
+    ...(record?.reviews ?? []).filter((entry) => entry.kind === kind).map((entry) => entry.digest.slice(0, 12)),
+    ...names.filter((name) => name.startsWith(`${kind}-`)).map((name) => name.slice(kind.length + 1, kind.length + 13)),
+  ]).size
+}
+
+/**
+ * oracle-step.mjs 한 번의 결과를 남긴다 — 기록이 없으면 만들고(명시 프로필이면 hook이 읽는 그 이름), 위치가 바뀌면 이력에 한 줄,
+ * (파일 상태, 실패 목록)이 바뀌면 검사에 한 줄(같으면 마지막 줄의 다음 걸음만 고친다), 저장된 리뷰 반환은 (종류, digest)마다
+ * 한 줄. 잠근 기록은 건드리지 않는다.
+ */
+export async function recordCheck(directory, { binding, label, files, issues, next, reviews = [] }) {
+  return withDirectoryLock(directory, 'stage', async () => {
+    const found = await readStage(directory)
+    if (found?.stage === 'ORACLE_READY') return found
+    const record = withoutProgress(found ?? { schemaVersion: 1, history: [] })
+    if (binding.kind === 'explicit') record.verificationProfile = binding.profile
+    const at = now()
+    if (record.history.at(-1)?.stage !== label) record.history = [...record.history, { stage: label, evidence: 'step', at }]
+    const checks = record.checks ?? []
+    const last = checks.at(-1)
+    const same = last?.files === files && last?.issues === issues
+    record.checks = [...(same ? checks.slice(0, -1) : checks), { files, issues, label, next, at: same ? last.at : at }].slice(-CHECK_LIMIT)
+    for (const review of reviews) {
+      const known = record.reviews ?? []
+      if (!known.some((entry) => entry.kind === review.kind && entry.digest === review.digest)) record.reviews = [...known, { kind: review.kind, digest: review.digest, at }]
+    }
+    await writeStage(directory, record)
+    return record
+  })
+}
+
+// ---- 진행 한 줄
+
+/** 같은 실패가 세 번 고친 뒤에도 돌아왔을 때의 다음 걸음 — 사용자의 결정이다. */
+export const STOP_NEXT = 'NEEDS_DECISION: the same issues came back after three edits: stop and report them to the user'
+
+/** 검사가 남긴 다음 걸음(step·lock·stop)의 명령. */
+function nextCommand(key, dir) {
+  if (key === 'lock') return `oracle-lock.mjs create --oracle ${dir}/oracle.md --lock ${dir}/oracle.lock.json --source <approved-source>`
+  if (key === 'stop') return STOP_NEXT
+  return `oracle-step.mjs --dir ${dir}`
+}
+
+/** 잠근 바이트가 바뀌었나 — 패키지(Contract는 카드), 잠글 때의 모델 입력 고정, lock이 묶은 카드. */
+async function lockDrift(directory, record, binding) {
   const contract = binding.profile === 'contract/v1'
-  const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
+  const [pkg, card] = await Promise.all([packageBytes(directory), cardBytes(directory)])
   const digest = contract ? record.cardSha256 : record.packageSha256
-  if (digest && (!bytes || digest !== sha256(bytes))) return true
-  if (contract || !['CHECKED', 'DRAFTED'].includes(record.stage)) return false
-  return assertPinned(directory, record).then(() => false, () => true)
+  if (digest && digest !== sha256((contract ? card : pkg) ?? '')) return true
+  if (!contract && record.inputsSha256 && pkg && (await pinOf(directory)) !== record.inputsSha256) return true
+  const manifest = await readFile(join(directory, 'oracle.lock.json'), 'utf8').then(JSON.parse, () => null)
+  return Boolean(manifest?.oracle?.sha256 && card && manifest.oracle.sha256 !== sha256(card))
+}
+
+/** 잠근 뒤의 다음 걸음 — 바뀐 바이트는 새 revision, init을 했으면 run 쪽 한 줄, 아니면 init. */
+function lockedNext(dir, drift, initialized) {
+  if (drift) return REVISE_NEXT
+  if (initialized) return `oracle-run.mjs status --brief --dir ${dir}`
+  return `oracle-run.mjs init --dir ${dir} --lock ${dir}/oracle.lock.json --scan-root <scan-root> --required-label <repo-check>`
+}
+
+/** 그 위치에 들어온 뒤 지난 시간 — 이력에 시각이 없으면 null. */
+function sinceLabel(history, label, nowMs) {
+  const entered = [...history].reverse().find((entry, index, all) => entry.stage === label && all[index + 1]?.stage !== label)
+  if (!entered?.at) return null
+  return `${elapsedLabel(entered.at, nowMs)} at ${label}`
+}
+
+/**
+ * 진행 한 줄 — 판정을 다시 돌지 않고 마지막 oracle-step.mjs 검사에서 읽는다: 위치, 그 위치에 머문 시간, 다음 명령. 그 뒤에 파일이
+ * 바뀌었으면 다음은 oracle-step.mjs다. 잠근 뒤에는 init(이미 했으면 run 쪽 한 줄), 잠근 바이트가 바뀌었으면 새 revision이다.
+ */
+export async function briefStatus(directory, nowMs = Date.now()) {
+  const dir = relative(process.cwd(), directory) || '.'
+  const record = await readStage(directory)
+  if (!record) return phaseLine(null, nextCommand('step', dir))
+  const binding = await bindingAt(directory, record)
+  if (record.stage === 'ORACLE_READY') {
+    const drift = await lockDrift(directory, record, binding)
+    const initialized = await stat(join(directory, 'run-state.json')).then(() => true, () => false)
+    return [phaseLine('ORACLE_READY', lockedNext(dir, drift, initialized)), `locked ${graphProfile(binding)}`, drift ? 'STALE: the locked bytes changed after the lock' : null].filter(Boolean).join(' · ')
+  }
+  const last = record.checks?.at(-1)
+  // 0.126 기록은 검사 없이 단계만 적었다 — 첫 step 전까지 그 이름을 보이고, 다음은 파일을 판정하는 step이다
+  if (!last) return phaseLine(record.stage ?? null, nextCommand('step', dir))
+  const current = last.files === (await filesDigest(directory))
+  return [
+    phaseLine(last.label, nextCommand(current ? last.next : 'step', dir)),
+    `${last.label} ${graphProfile(binding)}`,
+    sinceLabel(record.history, last.label, nowMs),
+    current ? null : 'files changed since the last check',
+  ].filter(Boolean).join(' · ')
 }
 
 async function status(directory) {
   const record = await readStage(directory)
   if (!record) return { stage: null }
   const binding = await bindingAt(directory, record)
-  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: await isStale(directory, record, binding), iterations: iterationStatus(record.iterations), rewinds: { count: record.rewinds, allowance: rewindAllowance(record) }, history: record.history }
+  const last = record.checks?.at(-1)
+  return {
+    stage: record.stage === 'ORACLE_READY' ? 'ORACLE_READY' : last?.label ?? record.stage ?? null,
+    ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}),
+    current: record.stage === 'ORACLE_READY' ? !(await lockDrift(directory, record, binding)) : Boolean(last) && last.files === (await filesDigest(directory)),
+    sameIssues: sameIssuesRun(record.checks),
+    reviews: Object.fromEntries(await Promise.all(ROUND_KINDS.map(async (kind) => [kind, await reviewRounds(directory, record, kind)]))),
+    history: record.history,
+  }
 }
 
-/**
- * 진행 한 줄 — 사용자가 "언제 끝남"을 묻기 전에 컨트롤러가 찍는다: 지금 단계와 자리, 그 단계에 머문 시간, 저작 예산,
- * 이 단계에서 보낸 독립 디스패치와 경과, 남은 단계. 판정을 대신하지 않는다 — 관문은 advance·lock이 연다.
- */
-export async function briefStatus(directory, nowMs = Date.now()) {
-  const dir = relative(process.cwd(), directory) || '.'
-  const record = await readStage(directory)
-  if (!record) return phaseLine(null, `oracle-stage.mjs begin --dir ${dir}`)
-  const binding = await bindingAt(directory, record)
-  const stages = AUTHORING_STAGES[binding.profile] ?? STAGES
-  const position = stages.indexOf(record.stage)
-  const entered = record.history.at(-1)?.at
-  const iterations = iterationStatus(record.iterations)
-  const dispatched = (record.dispatches ?? [])
-    .filter((entry) => !entered || Date.parse(entry.at) >= Date.parse(entered))
-    .map((entry) => `${entry.kind} ${elapsedLabel(entry.at, nowMs)} ago`)
-  const remaining = stages.slice(position + 1).map((stage) => (stage === 'ORACLE_READY' ? 'lock' : stage))
-  const place = [`stage ${record.stage}`, `${position + 1}/${stages.length}`, binding.profile].filter(Boolean).join(' ')
-  const stale = await isStale(directory, record, binding)
-  // 잠금 뒤 init까지 했으면 진행은 run 쪽 한 줄이 말한다
-  const initialized = record.stage === 'ORACLE_READY' && (await stat(join(directory, 'run-state.json')).then(() => true, () => false))
-  const next = initialized ? `oracle-run.mjs status --brief --dir ${dir}` : stageCommand(record.stage, binding.profile, dir, stages[position + 1], staleStep(record, stale))
-  return [
-    phaseLine(record.stage, next),
-    place,
-    entered ? `${elapsedLabel(entered, nowMs)} in stage` : null,
-    `authoring round ${iterations.round}/${iterations.limit}${iterations.exhausted ? ' exhausted' : ''}`,
-    `rewinds ${record.rewinds}/${rewindAllowance(record)}`,
-    dispatched.length ? `dispatched: ${dispatched.join(', ')}` : null,
-    remaining.length ? `remaining: ${remaining.join(' → ')}` : null,
-    stale ? 'STALE: the recorded bytes changed since this stage — rewind' : null,
-  ].filter(Boolean).join(' · ')
-}
-
-/**
- * 낡은 기록의 다음 걸음 — 되감기(rewind), 되감기 허용치를 다 썼으면 extend, extend도 막혔으면(잠긴 기록, 라운드 상한)
- * 새 revision이다. 낡지 않았으면 null.
- */
-function staleStep(record, stale) {
-  if (!stale) return null
-  if (record.rewinds < rewindAllowance(record)) return 'rewind'
-  return canExtend(record) ? 'extend' : 'revise'
-}
-
-
-const STALE_NEXT = {
-  extend: (dir) => `oracle-stage.mjs extend --dir ${dir} --approval <explicit-user-approval.json>`,
-  revise: () => REVISE_NEXT,
-}
-
-/** 이 작성 단계의 명령 하나 — Formal은 walk 한 번이 DRAFTED까지 가고, Contract는 advance를 한 칸씩 부른다. */
-function stageCommand(stage, profile, dir, following, staleNext) {
-  const contract = profile === 'contract/v1'
-  if (STALE_NEXT[staleNext]) return STALE_NEXT[staleNext](dir)
-  if (staleNext) return contract ? `oracle-stage.mjs rewind --dir ${dir} --to DISCOVERING --reason <cause>` : `oracle-cycle.mjs walk --dir ${dir} --reason <cause>`
-  if (stage === 'DRAFTED') return `oracle-lock.mjs create --oracle ${dir}/oracle.md --lock ${dir}/oracle.lock.json --source <approved-source>`
-  // init이 카드의 스택 라벨(proof·adequacy·type·fast-check·contract-cases)을 스스로 더한다 — 손으로는 저장소 검사만 적는다
-  if (stage === 'ORACLE_READY') return `oracle-run.mjs init --dir ${dir} --lock ${dir}/oracle.lock.json --scan-root <scan-root> --required-label <repo-check>`
-  return contract ? `oracle-stage.mjs advance --dir ${dir} --to ${following}` : `oracle-cycle.mjs walk --dir ${dir}`
-}
-
-const FLAGS = new Set(['brief'])
-const VALUED = ['dir', 'to', 'timeout-ms', 'profile', 'kind', 'input', 'approval', 'attempt', 'reason', 'note', 'model', 'effort']
+const USAGE = 'usage: oracle-stage.mjs status --dir <.ai/oracles/<id>> [--brief]  (oracle-step.mjs runs the authoring graph; oracle-lock.mjs create locks it)'
 
 function parse(args) {
   const options = {}
-  for (let index = 0; index < args.length; index += 1) {
-    const name = args[index]?.replace(/^--/, '')
-    if (FLAGS.has(name)) {
-      options[name] = true
-      continue
-    }
-    if (!VALUED.includes(name) || args[index + 1] === undefined) throw new StageError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
-    options[name] = args[index + 1]
-    index += 1
+  let index = 0
+  while (index < args.length) {
+    const [name, value] = [args[index], args[index + 1]]
+    if (name === '--brief') options.brief = true
+    else if (name === '--dir' && value !== undefined) options.dir = value
+    else throw new StageError('USAGE', `Unknown or incomplete option: ${name}\n${USAGE}`, 2)
+    index += name === '--dir' ? 2 : 1
   }
   return options
-}
-
-const USAGE = `usage:
-  oracle-stage.mjs begin --dir <.ai/oracles/<id>>
-  oracle-stage.mjs advance --dir <dir> --to MODELED|CHECKED|DRAFTED [--timeout-ms <n>] [--reason <cause> [--note <one line>] when CHECKED judges changed inputs again]
-  oracle-stage.mjs rewind --dir <dir> --to DISCOVERING|MODELED|CHECKED|DRAFTED --reason ${REWIND_REASONS.join('|')} [--note <one line>]
-  oracle-stage.mjs review-input --dir <dir> --kind <review-kind> --input <raw-input> --attempt <dispatch-id> [--model <id>] [--effort <level>]
-  oracle-stage.mjs extend --dir <dir> --approval <explicit-user-approval.json>
-  oracle-stage.mjs status --dir <dir> [--brief]`
-
-// 목표 단계(--to)를 받는 걸음
-const TARGETED = new Set(['advance', 'rewind'])
-
-/** 걸음에 목표가 없으면 기록을 읽기 전에 사용법 오류다 — 단계가 아닌 이름(STAGE_SKIP)과 다르다. */
-function assertTargeted(command, to) {
-  if (TARGETED.has(command) && to === undefined) throw new StageError('USAGE', `${command} requires --to <stage>`, 2)
 }
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   const options = parse(args)
-  if (!options.dir || !['begin', 'advance', 'rewind', 'status', 'review-input', 'extend'].includes(command)) throw new StageError('USAGE', USAGE, 2)
+  if (command !== 'status' || !options.dir) throw new StageError('USAGE', USAGE, 2)
   // cwd는 realpath로 보고된다(macOS /var → /private/var) — 같은 표기로 저장소 루트 기준 상대 경로를 만든다
   const directory = await realpath(resolve(options.dir)).catch(() => resolve(options.dir))
-  const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
-  if (options.brief && command !== 'status') throw new StageError('USAGE', '--brief belongs to status', 2)
-  if (command === 'status') {
-    process.stdout.write(options.brief ? `${await briefStatus(directory)}\n` : `${JSON.stringify(await status(directory))}\n`)
-    return
-  }
-  if (command === 'review-input') {
-    if (!options.input) throw new StageError('USAGE', 'review-input requires --input', 2)
-    const iterations = await recordAuthoringInput(directory, options.kind, await readFile(resolve(options.input), 'utf8'), options.attempt, { model: options.model, effort: options.effort })
-    process.stdout.write(`${JSON.stringify({ iterations })}\n`)
-    return
-  }
-  assertTargeted(command, options.to)
-  const explained = command === 'rewind' || (command === 'advance' && options.reason !== undefined)
-  const explanation = explained ? rewindReason(options.reason, options.note) : undefined
-  if (command === 'begin') await mkdir(directory, { recursive: true })
-  const result = await withDirectoryLock(directory, 'stage', async () => {
-    if (command === 'begin') return begin(directory, options.profile)
-    if (command === 'advance') return advance(directory, options.to, { timeoutMs, requestedProfile: options.profile, explanation })
-    if (command === 'extend') return extend(directory, options.approval)
-    return rewind(directory, options.to, explanation)
-  })
-  // rewind는 기록된 이유를 돌려준다 — 같은 되돌림의 재시도는 처음 이유를 유지하므로 호출자가 그것을 본다(undefined는 출력에서 빠진다)
-  const { evidence, reason, metadataOnly, dispatchedBefore } = result.history.at(-1)
-  const rewound = command === 'rewind'
-  const unsettled = dispatchedBefore ? `reviews dispatched since the last rewind (${dispatchedBefore.join(', ')}) — a rewind drops what they read; check their results are back before changing the package again` : undefined
-  process.stdout.write(`${JSON.stringify({ stage: result.stage, evidence, reason: rewound ? reason : undefined, metadataOnly: rewound ? metadataOnly : undefined, warning: rewound ? unsettled : undefined, iterations: iterationStatus(result.iterations) })}\n`)
+  process.stdout.write(options.brief ? `${await briefStatus(directory)}\n` : `${JSON.stringify(await status(directory))}\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

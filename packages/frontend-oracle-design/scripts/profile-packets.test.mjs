@@ -52,8 +52,7 @@ test('Contract public guidance worker and review artifacts bind identity and sel
     const cases = fixture.records.map((record, index) => `test(${JSON.stringify(names[index])},()=>{assert.equal(pending,true);assert.deepEqual(trace(${JSON.stringify(record.scenario.when)}),${JSON.stringify(record.scenario.when)})})\n`).join('')
     writeFileSync(testPath, `import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport {pending,trace} from './save.mjs'\ntest('save > pending',()=>{assert.equal(pending,true);for(const events of ${JSON.stringify(fixture.records.map(({ scenario }) => scenario.when))})assert.deepEqual(trace(events),events)})\n${cases}`)
     writeFileSync(oracle, `${fixture.render()}\n## Verification Profile\n\n- Profile: contract/v1\n`)
-    ok(run('oracle-stage.mjs', 'begin', '--dir', directory, '--profile', 'contract/v1'))
-    for (const to of ['CHECKED', 'DRAFTED']) ok(run('oracle-stage.mjs', 'advance', '--dir', directory, '--to', to))
+    ok(run('oracle-step.mjs', '--dir', directory))
     ok(run('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock))
     ok(run('oracle-run.mjs', 'init', '--dir', directory, '--lock', lock, '--scan-root', scanRoot,
       ...['save.test.mjs', 'save.d.mts', 'positive.mts', 'negative.mts', 'property.mjs', 'witness.test.mjs'].flatMap((path) => ['--harness-path', path]),

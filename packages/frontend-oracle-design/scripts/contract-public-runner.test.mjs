@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 const core = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
 const fixture = new URL('../test-fixtures/contract-v1/', import.meta.url)
-const scripts = Object.fromEntries(['stage', 'frames', 'verify', 'lock', 'run'].map((name) => [name, fileURLToPath(new URL(`oracle-${name}.mjs`, core))]))
+const scripts = Object.fromEntries(['step', 'frames', 'verify', 'lock', 'run'].map((name) => [name, fileURLToPath(new URL(`oracle-${name}.mjs`, core))]))
 const loader = fileURLToPath(new URL('deny-formal-loader.mjs', fixture))
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const json = (path) => JSON.parse(readFileSync(path, 'utf8'))
@@ -67,7 +67,6 @@ test('actual Contract toggle public RED and two reported Medium passes preserve 
       assert.equal(denied.status, 1)
       assert.ok(denied.stderr.includes(code))
     }
-    ok(cli('stage', 'begin', '--dir', directory, '--profile', 'contract/v1'))
     const cardCheck = cli('verify', 'card', '--oracle', oracle, '--case-space')
     ok(cardCheck)
     const declared = JSON.parse(cardCheck.stdout)
@@ -80,7 +79,7 @@ test('actual Contract toggle public RED and two reported Medium passes preserve 
     assert.equal(generated.rawCount, 2)
     assert.equal(generated.frames.length, 2)
     console.log(`FRAME_OUTPUT ${JSON.stringify(generated)}`)
-    for (const to of ['CHECKED', 'DRAFTED']) ok(cli('stage', 'advance', '--dir', directory, '--to', to, '--profile', 'contract/v1'))
+    ok(cli('step', '--dir', directory))
     ok(cli('lock', 'create', '--oracle', oracle, '--lock', lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md', '--profile', 'contract/v1'))
     const locked = readFileSync(lock)
     // the Contract card implies contract-cases, but a derived label is not a repository check: with nothing typed, init refuses

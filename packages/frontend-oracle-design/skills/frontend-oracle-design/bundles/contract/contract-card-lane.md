@@ -186,9 +186,9 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
-review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass.
+Each authoring review kind (model analyst, translation, card reviews) gets at most 2 rounds; Delivery
+review keeps its own two-round limit. No role restart or regenerated packet resets either, and
+exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -412,7 +412,7 @@ not grounds for failure. Missing Contract runners/reporters are actual environme
 Approval precedes CHECKED and its whole-card hash. Preapproval strict checks leave DISCOVERING unchanged.
 After actual human confirmation: strict Space check → CHECKED → full unchanged-card lint → DRAFTED →
 immutable lock tool → ORACLE_READY. Only the lock tool writes ORACLE_READY. Never create MODELED or a
-fake package. Modified CHECKED bytes rewind for rechecking, changed meaning also requires reapproval.
+fake package. The next step checks modified card bytes again, changed meaning also requires reapproval.
 
 Delivery requires `contract-cases:reported` with actual reported case IDs covering every required
 executable frame/scenario, not labels or test counts. Under default t-way coverage these are the
@@ -1156,19 +1156,17 @@ Follow [requirements](requirements.md) for approval-before-CHECKED whole-card ha
 ORACLE_READY. Confirm discovery axes with the first response's one `yes`, then obtain blind reviews, drive/record the nail,
 conditional source-aware review and actual human approval of final full Draft/semantic delta/questions.
 Unresolved dispositions block lock. Before confirmation no consumer tests, production or dependency edits.
-Preflight checks do not advance DISCOVERING. After approval strict Space check and full-card lint bind
+Preflight checks do not leave DISCOVERING. After approval strict Space check and full-card lint bind
 the same unchanged bytes. User Confirmation is part of those bytes, never a hash-excluded field.
 Use existing stage/lock tools, verify lock before each stage, never relock to pass mismatches.
-Changed policy/source set requires confirmed new revision. Changed CHECKED bytes rewind for rechecking
-(`oracle-stage.mjs rewind --dir <dir> --to DISCOVERING --reason <cause> [--note <one line>]`).
+Changed policy/source set requires confirmed new revision. The next `oracle-step.mjs` checks changed card
+bytes again; nothing rewinds.
 Design-only has no consumer execution. Delivery initialization preserves scope/milestones, labels,
 source/target identity and one ledger, never resets budgets or grants production edits before VALID_RED.
 
-Common's convergent planning applies before detailed authoring. The stage runtime shares two authoring
-rounds across card review laps; a rewind spends none. Register each independent dispatch with
-`oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <raw-input> --attempt <dispatch-id>`.
-Only transport redelivery reuses an attempt. New analysis is another attempt even on unchanged input.
-At `ITERATION_BUDGET_EXHAUSTED`, stop with the remaining findings, never reset the record or weaken approval.
-An explicit one-round extension uses `oracle-stage.mjs extend --dir <dir> --approval <file>` with JSON
-`decision: "approve-one-more-round"`, `phase: "authoring"`, exact next `round`, approving user-message
-`source` and `reason`. This is auditable self-report, not authenticated identity or permission to unlock.
+Common's convergent planning applies before detailed authoring. Run `oracle-step.mjs --dir <dir>` and do
+what NEXT FOR YOU says: cold-read first, then the user's confirmation with the conditional source-aware
+review named beside it, then the card lint. Each review kind gets at most 2 rounds, a return saved for a new
+card digest; the same card adds none, and no approval opens a third. After round 2, or when the same issues
+come back on a third edited state, stop with the remaining findings (NEEDS_DECISION), never reset the record
+or weaken approval.

@@ -62,7 +62,7 @@ test('reviewers read folded views while the locked card and packet stay the boun
   assert.match(review, /`oracle-review-view\.mjs packet` view first/)
   assert.match(review, /the packet file stays the bound input for every lookup/)
   const controller = await read('roles/controller-formal.md')
-  assert.match(controller, /round-2 confirmation continues the\s+round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`/)
+  assert.match(controller, /round-2 confirmation continues the\s+round-1 reviewer the same way, with only its finding IDs and the repair diff/)
   const packet = await read('subagent-review.md')
   assert.match(packet, /reading aid derived from the packet, not a summary input: the packet stays complete and bound/)
 })

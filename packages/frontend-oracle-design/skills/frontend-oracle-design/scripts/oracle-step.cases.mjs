@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { template } from './oracle-authoring-machine.cases.mjs'
+import { APPROVED, FORBIDDING_ROW, PACKAGE_DIR, runNode, template, WORLD_ROW } from './oracle-authoring-machine.cases.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { NEXT_LINES, nextCommandOf } from './oracle-next.mjs'
 import { bindReviewDocument, workspace } from './oracle-run.cases.mjs'
@@ -20,7 +20,6 @@ import { installedBend } from './oracle-test-bend.mjs'
 // turn and closes with the arguments a person would assemble. oracle-stage-machine.test.mjs registers them; the model
 // replays check step's plan on every state they reach (stepPlanDifference in oracle-run-machine.cases.mjs).
 const STEP = fileURLToPath(new URL('oracle-step.mjs', import.meta.url))
-const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
@@ -32,13 +31,11 @@ const SAMPLE_NEXT = {
   close: 'oracle-run.mjs close --dir d --packet <packet> --decision <implementation-decision.md> --review-point <point> --run r-001 --evidence <evidence> --check-report <report>',
   guide: 'oracle-run.mjs guide --dir d --to IMPLEMENTED_GREEN',
   report: 'oracle-run.mjs close --dir d --check-report <report>',
-  begin: 'oracle-stage.mjs begin --dir d',
-  walk: 'oracle-cycle.mjs walk --dir d',
-  walkReason: 'oracle-cycle.mjs walk --dir d --reason <cause>',
+  step: 'oracle-step.mjs --dir d',
   lock: 'oracle-lock.mjs create --oracle d/oracle.md --lock d/oracle.lock.json --source <approved-source>',
-  extend: 'oracle-stage.mjs extend --dir d --approval <explicit-user-approval.json>',
+  stop: 'NEEDS_DECISION: the same issues came back after three edits: stop and report them to the user',
   init: 'oracle-run.mjs init --dir d --lock d/oracle.lock.json --scan-root <scan-root> --required-label <repo-check>',
-  revise: 'NEEDS_DECISION: the user rewrites the sources, then oracle-stage.mjs begin --dir <new run dir>',
+  revise: 'NEEDS_DECISION: the user rewrites the sources, then oracle-step.mjs --dir <new run dir>',
 }
 const phaseLine = (next, tail = ' · stage DRAFTED 4/5') => `phase 3/6 Card review and lock · next: ${next}${tail}`
 
@@ -77,8 +74,8 @@ async function tableAndAuto(t) {
   // a directory with spaces still names its entry, and printed paths are quoted
   const spaced = join(directory, 'my oracle')
   assert.equal(nextKey(phaseLine(`oracle-run.mjs exec --dir ${spaced} --label <label> -- <command>`), spaced), 'exec')
-  const quoted = `'${relative(process.cwd(), join(spaced, 'oracle.package.json'))}'`
-  assert.ok((await planStep(spaced, { kind: 'stage', line: phaseLine(SAMPLE_NEXT.begin), key: 'begin' })).say.startsWith(`write ${quoted} `))
+  const quoted = `'${relative(process.cwd(), spaced)}'`
+  assert.ok((await planStep(spaced, { kind: 'stage', line: phaseLine(SAMPLE_NEXT.step), key: 'step' })).say.startsWith(`run oracle-step.mjs --dir ${quoted} `))
 }
 
 const line = (n) => `phase 5/6 GREEN · next: oracle-run.mjs exec --dir d${n} --label <label> -- <command> · run r-00${n}`
@@ -146,15 +143,6 @@ async function loopStops() {
   assert.match(gated.say, /commands ran/)
   // the commands step ran are one line: eight runs, the phase, a refusal and the instruction stay within a dozen lines
   assert.equal(render({ ...gated, shown: ['a', 'b', 'c'] }).split('\n').length, 6)
-
-  // a refused walk gate prints its code and the gate's own next action, on one line each
-  const walk = { script: 'oracle-cycle.mjs', args: ['walk', '--dir', 'd'] }
-  const failed = { step: 'card', code: 'CARD_LINT', detail: 'row O3 cites nothing\nmore', next: 'fix row O3, then rerun walk' }
-  const walked = await drive({ directory: 'd', read: () => ({ kind: 'stage', line: line(1) }), plan: () => ({ calls: [walk] }), run: () => ({ status: 1, stdout: JSON.stringify({ ok: false, failed }), stderr: '' }) })
-  assert.deepEqual(walked.ran, ['oracle-cycle.mjs walk CARD_LINT'])
-  assert.equal(walked.refused, true)
-  assert.deepEqual(walked.shown, ['REFUSED CARD_LINT: row O3 cites nothing'])
-  assert.equal(walked.say, 'fix row O3, then rerun walk')
 }
 
 const CLEAR = {
@@ -399,115 +387,476 @@ function answer(result) {
   return lines
 }
 
+// ---- authoring: the stale-search package and its approved card (oracle-authoring-machine.cases.mjs template), driven
+// through oracle-step.mjs as the agent would, with receipts of each test only
+
+const LOCK_SOURCES = (pkg) => pkg.sources.map((source) => /^repo:([^#]+)/.exec(source.location)?.[1]).filter(Boolean)
+const RETURN = /saved unchanged as (\S+?\.(?:md|json))\b/g
+const savedText = (path) => (path.endsWith('.json') ? '{"candidates": []}\n' : '# review\n\nno findings\n')
+const NO_ROUNDS = { 'model-analyst': 0, translation: 0, 'cold-read': 0, 'reverse-impossible': 0, 'source-aware': 0 }
+// the source-aware review is named with its condition until a return is saved for it
+const OFFER = /when card\/policy-sources\.md's trigger applies, a source-aware review — .*; save its return unchanged as (\S+);/
+/** A second round of a review kind: it continues the first reviewer, whose return it names, with the repair diff. */
+const confirmFixes = (kind) =>
+  `${kind} round 2 \\(confirm-fixes\\) — continue the round-1 reviewer with only its finding IDs \\(\\.ai/oracles/stale-search/reviews/${kind}-[0-9a-f]{12}\\.(?:md|json)\\) and the repair diff, its return saved unchanged as \\S+`
+const PENDING_APPROVAL = '- Status: pending\n- Source: none yet'
+
+/** The template in a folder of this test, and receipts of this test only. */
+async function authoringFixture(t, name) {
+  const root = await mkdtemp(join(tmpdir(), `oracle-step-${name}-`))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const fixture = await template(root)
+  const env = { ...CHILD_ENV, ORACLE_LINT_CACHE: join(root, 'receipts') }
+  await mkdir(env.ORACLE_LINT_CACHE)
+  return { ...fixture, root, env }
+}
+
+/** A copy of the template repository, and the commands an agent runs in it. */
+async function authoringRepo(fixture, name = 'repo') {
+  const repo = join(fixture.root, name)
+  await cp(fixture.base, repo, { recursive: true })
+  const dir = join(repo, PACKAGE_DIR)
+  const run = (script, args) => runNode(repo, script, args, fixture.env)
+  return {
+    repo,
+    dir,
+    run,
+    file: (file) => join(dir, file),
+    step: (...args) => run('oracle-step.mjs', ['--dir', PACKAGE_DIR, ...args]),
+    status: async () => JSON.parse((await run('oracle-stage.mjs', ['status', '--dir', PACKAGE_DIR])).stdout),
+    brief: async () => (await run('oracle-stage.mjs', ['status', '--brief', '--dir', PACKAGE_DIR])).stdout.trim(),
+    // the lock step printed, run as printed
+    lock: (say) => run('oracle-lock.mjs', say.slice(say.indexOf('oracle-lock.mjs create ') + 'oracle-lock.mjs '.length).split(' ')),
+    // every return the output asks for, saved where it says
+    save: async (stdout, text = savedText) => {
+      for (const [, path] of stdout.matchAll(RETURN)) await writeFile(join(repo, path), text(path))
+    },
+  }
+}
+
+/** The card with hand-written lines between its generated region and the User Confirmation. */
+function withHandWritten(card, lines) {
+  const at = card.indexOf('\n## User Confirmation')
+  return `${card.slice(0, at)}\n\n${lines}\n${card.slice(at)}`
+}
+const SWEEP = '## Interaction sweep\n\nno pairs yet\n'
+
 async function authoringToLock(t) {
   if (!(await installedBend(t))) return
-  const root = await mkdtemp(join(tmpdir(), 'oracle-step-authoring-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const { base } = await template(root)
-  const result = step(base, ['--dir', '.ai/oracles/stale-search'])
-  assert.equal(result.status, 0, result.stderr)
-  const lines = answer(result)
-  // the preflight finds nothing a later gate would refuse, so the walk runs; at DRAFTED step runs the read-only card
-  // lints itself before it hands the card to the reviewers
-  const lints = 'oracle-cycle.mjs card-lint ok; oracle-verify.mjs card repo-policies ok'
-  assert.deepEqual(lines.slice(0, 2), [`ran: oracle-stage.mjs begin ok; oracle-cycle.mjs preflight ok; oracle-cycle.mjs walk ok; ${lints}`, 'phase 3/6 Card review and lock'])
-  // the lock is the user's approval: step prints the pre-approval gates in order, then the approval, then the lock, and
-  // runs none of them
-  const say = lines[2]
-  const order = ['(1) cold-read', '--kind cold-read', '(2) reverse-impossible', '--ir', 'explore-input --card', '(3) source-aware', '(4) repair findings', '(5) oracle-verify.mjs card --oracle', '--path', '(6) show the user', '(7) oracle-lock.mjs create']
-  const at = order.map((text) => say.indexOf(text))
-  assert.ok(at.every((index, n) => index > (at[n - 1] ?? -1)), say)
-  assert.match(say, /^NEXT FOR YOU: before the user sees \.ai\/oracles\/stale-search\/oracle\.md, in order: /)
-  // the package file is the self source: it is listed once
-  assert.equal(say.split('--source .ai/oracles/stale-search/oracle.package.json').length, 2, say)
-  const stagePath = join(base, '.ai/oracles/stale-search/stage.json')
-  assert.equal(JSON.parse(await readFile(stagePath, 'utf8')).stage, 'DRAFTED')
+  const fixture = await authoringFixture(t, 'authoring')
+  const at = await authoringRepo(fixture)
+  // from no stage record every node passes: step asks for the three reviews at once, writes their inputs outside the
+  // repository and names where each return is saved
+  const first = await at.step()
+  assert.equal(first.status, 0, first.stderr)
+  const lines = answer(first)
+  assert.deepEqual(lines.slice(0, 2), ['ran: package ok; model ok; card ok', 'phase 3/6 Card review and lock'])
+  assert.match(lines.at(-1), /^NEXT FOR YOU: dispatch \(1\) the model analyst — .*\(2\) cold-read — .*\(3\) reverse-impossible — .*; repair what they find, then rerun oracle-step\.mjs --dir \.ai\/oracles\/stale-search$/)
+  const inputs = [...lines.at(-1).matchAll(/with only (\S+)/g)].map((match) => match[1])
+  assert.equal(inputs.length, 3, lines.at(-1))
+  assert.ok(inputs.every((path) => !path.startsWith(at.repo) && !path.startsWith('.ai/')), lines.at(-1))
+  await at.save(first.stdout)
 
-  // a review stage.json records as dispatched since the last rewind is not named again; the rest keep their order
-  const registered = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-stage.mjs'), 'review-input', '--dir', '.ai/oracles/stale-search', '--kind', 'cold-read', '--input', 'README.md', '--attempt', 'cold-1'], { cwd: base, encoding: 'utf8', env: CHILD_ENV })
-  assert.equal(registered.status, 0, registered.stderr)
-  const after = answer(step(base, ['--dir', '.ai/oracles/stale-search'])).at(-1)
-  assert.ok(!after.includes('--kind cold-read'), after)
-  assert.match(after, /in order \(dispatched since the last rewind, not again: cold-read\): \(1\) reverse-impossible: .*\(2\) source-aware .*\(6\) oracle-lock\.mjs create/)
+  // the returns saved: the lock comes last, after the source-aware review when its trigger applies, the touched-file
+  // lint and the approval; the package's own file is one of the sources, once
+  const ready = answer(await at.step()).at(-1)
+  assert.match(ready, OFFER)
+  const order = ['(1) when card/policy-sources.md', '(2) oracle-verify.mjs card --oracle', '--path', '(3) show the user', '(4) oracle-lock.mjs create']
+  const found = order.map((text) => ready.indexOf(text))
+  assert.ok(found.every((index, n) => index > (found[n - 1] ?? -1)), ready)
+  assert.equal(ready.split('--source .ai/oracles/stale-search/oracle.package.json').length, 2, ready)
+  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'cold-read': 1, 'reverse-impossible': 1 })
 
-  // an issue only a hand-written section raises is fixed in the card outside the markers: no package patch, no rewind
-  const cardPath = join(base, '.ai/oracles/stale-search/oracle.md')
-  const card = await readFile(cardPath, 'utf8')
-  await writeFile(cardPath, `${card}\n## Interaction sweep\n\nno pairs yet\n`)
-  const swept = step(base, ['--dir', '.ai/oracles/stale-search'])
+  // an issue only a hand-written section raises is fixed in oracle.md outside the markers: no package patch, nothing
+  // asked again of the analyst, whose input the card does not feed
+  const card = await readFile(at.file('oracle.md'), 'utf8')
+  await writeFile(at.file('oracle.md'), withHandWritten(card, SWEEP))
+  const swept = await at.step()
   assert.equal(swept.status, 1, swept.stdout)
   const sweptLines = answer(swept)
-  assert.equal(sweptLines[0], 'ran: oracle-cycle.mjs card-lint CARD_LINT_FAILED')
-  assert.match(sweptLines.at(-1), /^NEXT FOR YOU: the lock would refuse the card: fix in \S+oracle\.md outside the generated markers, no rewind: 1\) sweep-rows: Interaction sweep must include a Pair\/Disposition table; 2\) sweep-policy-missing: P1 .*; then rerun /)
-  assert.ok(!/package|--reason/.test(sweptLines.at(-1)), sweptLines.at(-1))
-  assert.equal(JSON.parse(await readFile(stagePath, 'utf8')).stage, 'DRAFTED')
+  assert.match(sweptLines[0], /^ran: package ok; model ok; card \d+ issues$/)
+  assert.match(sweptLines.at(-1), /^NEXT FOR YOU: fix in \.ai\/oracles\/stale-search\/oracle\.md outside the generated markers: 1\) sweep-rows: Interaction sweep must include a Pair\/Disposition table; 2\) sweep-policy-missing: P1 .*; then rerun oracle-step\.mjs/)
+  assert.ok(!/package|dispatch/.test(sweptLines.at(-1)), sweptLines.at(-1))
 
-  // a card without its generated region fails as a whole: that is the package's projection, so the remedy names the package
-  await writeFile(cardPath, '# not a card\n')
-  const failed = step(base, ['--dir', '.ai/oracles/stale-search'])
-  assert.equal(failed.status, 1, failed.stdout)
-  const refused = answer(failed)
-  assert.equal(refused[0], 'ran: oracle-cycle.mjs card-lint CARD_LINT_FAILED')
-  assert.match(refused.at(-1), /^NEXT FOR YOU: the lock would refuse the card: fix in the package, one patch \(re-projected; the walk then asks for --reason gate-failure\)/)
+  // the card as it was: the saved returns answer it again, and the lock step printed is taken
+  await writeFile(at.file('oracle.md'), card)
+  const again = answer(await at.step()).at(-1)
+  assert.equal(again, ready)
+  const locked = await at.lock(again)
+  assert.equal(locked.status, 0, locked.stderr)
+  assert.equal((await at.status()).stage, 'ORACLE_READY')
+  // the lock pins the model inputs, not the proof: a PROOF.bend edit after the lock is no drift
+  const proof = join(at.repo, 'PROOF.bend')
+  await writeFile(proof, `${await readFile(proof, 'utf8')}\n# edited after the lock\n`)
+  assert.equal((await at.status()).current, true)
+  // locked: step goes on to the Delivery run, and --check has no authoring graph left to read
+  assert.match(answer(await at.step()).at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init --dir \.ai\/oracles\/stale-search /)
+  const check = await at.step('--check')
+  assert.equal(check.status, 2)
+  assert.match(check.stderr, /--check reads the authoring graph: this oracle is locked/)
 }
 
-async function preflightSeesHandWritten(t) {
+async function handWrittenLines(t) {
   if (!(await installedBend(t))) return
-  // the preflight lints the card the lock would lint: oracle.md re-projected from the package, its hand-written sections
-  // kept. A rule a hand-written line satisfies (a sourced N/A for the auto test cases) is satisfied there too, and an
-  // issue only a hand-written section raises is listed without stopping the walk.
-  const root = await mkdtemp(join(tmpdir(), 'oracle-step-handwritten-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const { base } = await template(root)
-  const dir = join(base, '.ai/oracles/stale-search')
-  const preflight = () => {
-    const result = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-cycle.mjs'), 'preflight', '--dir', dir], { cwd: base, encoding: 'utf8', env: CHILD_ENV })
-    return JSON.parse(result.stdout)
+  // a rule a hand-written card line satisfies (a sourced N/A for the auto test cases) is satisfied there: step names both
+  // places, and the line written outside the generated markers survives the next projection
+  const fixture = await authoringFixture(t, 'handwritten')
+  const at = await authoringRepo(fixture)
+  await writeFile(at.file('oracle.package.json'), `${JSON.stringify({ ...fixture.package, notApplicable: [] }, null, 2)}\n`)
+  const without = await at.step()
+  assert.equal(without.status, 1, without.stdout)
+  assert.match(answer(without).at(-1), /^NEXT FOR YOU: dispatch the model analyst — .*; and fix all \d+ in the package \(step projects the card again\), or where the rule takes a hand-written line in oracle\.md outside the generated markers: 1\) missing-auto-tc: /)
+  const sourced = '## Outside the policy\n\n- N/A: loading, error, retry, duplicate, empty, cancel and out-of-order are outside this policy (source: S1)\n'
+  await writeFile(at.file('oracle.md'), withHandWritten(await readFile(at.file('oracle.md'), 'utf8'), sourced))
+  const settled = await at.step()
+  assert.equal(settled.status, 0, settled.stdout)
+  assert.equal(answer(settled)[0], 'ran: package ok; model ok; card ok')
+  assert.ok((await readFile(at.file('oracle.md'), 'utf8')).includes(sourced))
+}
+
+async function bClassIncidents(t) {
+  if (!(await installedBend(t))) return
+  // what cost a registration, a round or a rewind in the 0.126 runs, replayed through step: none costs anything now
+  const fixture = await authoringFixture(t, 'incidents')
+  const at = await authoringRepo(fixture)
+  const rounds = async () => (await at.status()).reviews
+  const first = await at.step()
+  // a review input built by step or by hand (a preview) registers nothing, and asking again asks the same
+  const record = await readFile(at.file('stage.json'))
+  for (const name of ['preview-1.md', 'preview-2.md']) {
+    const built = await at.run('oracle-adequacy.mjs', ['model-input', '--package', join(PACKAGE_DIR, 'oracle.package.json'), '--output', join(fixture.root, name)])
+    assert.equal(built.status, 0, built.stderr)
   }
-  const pkg = JSON.parse(await readFile(join(dir, 'oracle.package.json'), 'utf8'))
-  pkg.notApplicable = []
-  await writeFile(join(dir, 'oracle.package.json'), JSON.stringify(pkg, null, 2))
-  const without = preflight()
-  const autoCases = without.failed.issues.filter((issue) => issue.startsWith('missing-auto-tc: '))
-  assert.ok(autoCases.length > 0, JSON.stringify(without))
-  assert.equal(without.failed.beforeCard, undefined)
-  const card = await readFile(join(dir, 'oracle.md'), 'utf8')
-  // before the first projection no hand-written line can exist: step names the walk that projects the card
-  await rm(join(dir, 'oracle.md'))
-  const first = step(base, ['--dir', '.ai/oracles/stale-search'])
-  assert.equal(first.status, 1, first.stdout)
-  const firstLines = answer(first)
-  assert.equal(firstLines[0], 'ran: oracle-stage.mjs begin ok; oracle-cycle.mjs preflight PREFLIGHT_ISSUES')
-  assert.match(firstLines.at(-1), /missing-auto-tc: .*; if only issues a hand-written card line settles are left .*run oracle-cycle\.mjs walk --dir \S+ yourself: it projects oracle\.md/)
-  const sourced = '- N/A: loading, error, retry, duplicate, empty, cancel and out-of-order are outside this policy (source: S1)'
-  await writeFile(join(dir, 'oracle.md'), `${card}\n## Outside the policy\n\n${sourced}\n\n## Interaction sweep\n\nno pairs yet\n`)
-  const handWritten = preflight()
-  assert.deepEqual(handWritten.failed?.issues?.filter((issue) => issue.startsWith('missing-auto-tc: ')) ?? [], [], JSON.stringify(handWritten))
-  assert.deepEqual(handWritten.handWritten, [
-    'sweep-rows: Interaction sweep must include a Pair/Disposition table',
-    ...['P1', 'P2', 'P3'].map((policy) => `sweep-policy-missing: ${policy} does not appear in any sweep pair`),
-  ])
+  assert.deepEqual(await readFile(at.file('stage.json')), record)
+  assert.equal((await at.step()).stdout, first.stdout)
+  assert.deepEqual(await rounds(), NO_ROUNDS)
+  // a return saved again for the same input (a retry, another attempt) adds no round
+  await at.save(first.stdout)
+  await at.step()
+  await at.save(first.stdout, (path) => (path.endsWith('.json') ? '{"candidates": [], "attempt": 2}\n' : '# review\n\nno findings, second attempt\n'))
+  await at.step()
+  const once = { ...NO_ROUNDS, 'model-analyst': 1, 'cold-read': 1, 'reverse-impossible': 1 }
+  assert.deepEqual(await rounds(), once)
+  // a Bend source edit (S4, World.bend) moves the card's projection, not the analyst's input: the analyst is not asked
+  // again, and the card reviews' second round confirms the first one's fixes
+  const world = join(at.repo, 'World.bend')
+  const edited = `${fixture.world}# S4 edited\n`
+  await writeFile(world, edited)
+  const asked = answer(await at.step()).at(-1)
+  assert.match(asked, new RegExp(`^NEXT FOR YOU: dispatch \\(1\\) ${confirmFixes('cold-read')} \\(2\\) ${confirmFixes('reverse-impossible')}; `))
+  assert.ok(!asked.includes('model analyst'), asked)
+  // an edit after DRAFTED that breaks the model, then its fix: the label follows the files, nothing is rewound or spent
+  await writeFile(world, edited.replace(WORLD_ROW, FORBIDDING_ROW))
+  const broken = await at.step()
+  assert.equal(broken.status, 1, broken.stdout)
+  assert.match(answer(broken)[0], /^ran: package ok; model \d+ issues?$/)
+  assert.equal((await at.status()).stage, 'MODELED')
+  await writeFile(world, edited)
+  const fixed = await at.step()
+  assert.equal(fixed.status, 0, fixed.stdout)
+  const after = await at.status()
+  assert.deepEqual([after.stage, after.sameIssues, after.reviews], ['DRAFTED', 0, once])
+  const kept = JSON.parse(await readFile(at.file('stage.json'), 'utf8'))
+  assert.deepEqual(['stage', 'iterations', 'rewinds', 'rewindAllowance'].filter((field) => field in kept), [])
 }
 
-async function preflightFirst(t) {
+/** The issues a refused lock names: the node lines of STAGE_GATE, or the card lint's indented lines. */
+function lockIssues(stderr) {
+  const head = 'STAGE_GATE: the lock judged the current files: '
+  const at = stderr.indexOf(head)
+  if (at !== -1) return stderr.slice(at + head.length, stderr.indexOf(' — run oracle-step.mjs', at)).split(' · ')
+  return stderr.split('\n').filter((line) => line.startsWith('  ')).map((line) => line.trim())
+}
+
+/** Each file of the oracle directory and its digest. */
+async function snapshot(directory) {
+  const entries = await readdir(directory, { withFileTypes: true })
+  return Promise.all(entries.map(async (entry) => [entry.name, entry.isFile() ? sha256(await readFile(join(directory, entry.name))) : 'folder']))
+}
+
+async function checkParity(t) {
   if (!(await installedBend(t))) return
-  const root = await mkdtemp(join(tmpdir(), 'oracle-step-preflight-'))
+  // --check fails exactly when the lock refuses the same files, names every issue the lock names, and changes nothing in
+  // the oracle directory
+  const fixture = await authoringFixture(t, 'parity')
+  const world = (at, text) => writeFile(join(at.repo, 'World.bend'), text)
+  const pkg = (at, change) => writeFile(at.file('oracle.package.json'), `${JSON.stringify(change(structuredClone(fixture.package)), null, 2)}\n`)
+  const hazards = (value) => {
+    value.hazards['display-vs-commit'] = 'modeled: notAField'
+    value.hazards['carry-over'] = 'modeled: ghost'
+    return value
+  }
+  const states = {
+    clean: async () => {},
+    'stale projection': (at) => world(at, `${fixture.world}# edited\n`),
+    'broken model': (at) => world(at, fixture.world.replace(WORLD_ROW, FORBIDDING_ROW)),
+    'hand-written sweep': (at) => writeFile(at.file('oracle.md'), withHandWritten(fixture.card, SWEEP)),
+    'pending approval': (at) => writeFile(at.file('oracle.md'), fixture.card.replace(APPROVED, PENDING_APPROVAL)),
+    hazards: (at) => pkg(at, hazards),
+    'broken package': async (at) => {
+      await pkg(at, (value) => ({ ...value, intent: { ...value.intent, risk: 'Unknown' } }))
+      await world(at, `${fixture.world}# edited\n`)
+      await writeFile(at.file('oracle.md'), withHandWritten(fixture.card, SWEEP))
+    },
+  }
+  const lockArgs = ['create', '--oracle', join(PACKAGE_DIR, 'oracle.md'), '--lock', join(PACKAGE_DIR, 'oracle.lock.json'), ...LOCK_SOURCES(fixture.package).flatMap((path) => ['--source', path])]
+  const results = await Promise.all(Object.entries(states).map(async ([name, change], index) => {
+    const at = await authoringRepo(fixture, `state-${index}`)
+    await change(at)
+    const before = await snapshot(at.dir)
+    const check = await at.step('--check')
+    assert.deepEqual(await snapshot(at.dir), before, `${name}: --check wrote`)
+    const lock = await at.run('oracle-lock.mjs', lockArgs)
+    assert.equal(check.status === 0, lock.status === 0, `${name}:\n${check.stdout}\n${lock.stderr}`)
+    for (const issue of lockIssues(lock.stderr)) assert.ok(check.stdout.includes(issue), `${name}: --check does not name ${issue}\n${check.stdout}`)
+    return [name, lock.status === 0]
+  }))
+  // every state but the clean one is refused, so each one compared an issue list
+  assert.deepEqual(results.filter(([, accepted]) => accepted).map(([name]) => name), ['clean'])
+}
+
+async function stopOnThird(t) {
+  if (!(await installedBend(t))) return
+  // the same issue list on a third distinct file state stops step with the user's decision and asks for no review; the
+  // second does not stop, a step again on the same files adds no state, and a fix starts over
+  const fixture = await authoringFixture(t, 'stop')
+  const at = await authoringRepo(fixture)
+  const edit = (n) => writeFile(at.file('oracle.md'), withHandWritten(fixture.card, `<!-- edit ${n} -->\n\n${SWEEP}`))
+  for (const n of [1, 2]) {
+    await edit(n)
+    for (let again = 0; again < 2; again += 1) {
+      const result = await at.step()
+      assert.equal(result.status, 1, result.stdout)
+      assert.match(answer(result).at(-1), /^NEXT FOR YOU: dispatch the model analyst — .*; and fix in \S+oracle\.md outside the generated markers: 1\) sweep-rows: /)
+      assert.equal((await at.status()).sameIssues, n)
+    }
+  }
+  await edit(3)
+  const stopped = await at.step()
+  assert.equal(stopped.status, 1, stopped.stdout)
+  const next = answer(stopped).at(-1)
+  assert.match(next, /^NEXT FOR YOU: NEEDS_DECISION: the same issues came back after three edits: stop and report them to the user: 1\) sweep-rows: /)
+  assert.ok(!next.includes('dispatch'), next)
+  assert.equal(nextCommandOf(await at.brief()), 'stop')
+  await writeFile(at.file('oracle.md'), fixture.card)
+  const fixed = await at.step()
+  assert.equal(fixed.status, 0, fixed.stdout)
+  assert.equal((await at.status()).sameIssues, 0)
+}
+
+async function noThirdRound(t) {
+  if (!(await installedBend(t))) return
+  // a review kind runs at most two rounds, the second confirming the first one's fixes: the source-aware review is named
+  // with its condition until its first return is saved, then counted like the card reviews; after returns saved for two
+  // card versions, a third version goes to the lock without asking for any of them again, and the lock takes it
+  const fixture = await authoringFixture(t, 'rounds')
+  const at = await authoringRepo(fixture)
+  const note = (n) => writeFile(at.file('oracle.md'), withHandWritten(fixture.card, `<!-- edit ${n} -->`))
+  await at.save((await at.step()).stdout)
+  const offered = OFFER.exec(answer(await at.step()).at(-1))
+  assert.ok(offered)
+  await writeFile(join(at.repo, offered[1]), savedText(offered[1]))
+  const opened = answer(await at.step()).at(-1)
+  assert.match(opened, /every check passes; in order: \(1\) oracle-verify\.mjs card /)
+  assert.ok(!opened.includes('source-aware'), opened)
+  await note(1)
+  const second = await at.step()
+  const kinds = ['cold-read', 'reverse-impossible', 'source-aware'].map((kind, index) => `\\(${index + 1}\\) ${confirmFixes(kind)}`)
+  assert.match(answer(second).at(-1), new RegExp(`^NEXT FOR YOU: dispatch ${kinds.join(' ')}; repair what they find`))
+  await at.save(second.stdout)
+  assert.match(answer(await at.step()).at(-1), /every check passes; in order: \(1\) oracle-verify\.mjs card /)
+  await note(2)
+  const third = answer(await at.step()).at(-1)
+  assert.match(third, /every check passes; in order: \(1\) oracle-verify\.mjs card /)
+  assert.ok(!/dispatch|source-aware/.test(third), third)
+  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'cold-read': 2, 'reverse-impossible': 2, 'source-aware': 2 })
+  assert.equal(nextCommandOf(await at.brief()), 'lock')
+  const locked = await at.lock(third)
+  assert.equal(locked.status, 0, locked.stderr)
+}
+
+const PAGINATION = fileURLToPath(new URL('../../../test-fixtures/pagination/', import.meta.url))
+
+async function translationRounds(t) {
+  if (!(await installedBend(t))) return
+  // the translation reviewer disputes a mapping in each round; the agent fixes it and records the digest the reviewer
+  // read, as step says: the stale record is still a round, so the second review confirms the fixes and the third table
+  // goes to the user, never to a third review
+  const root = await mkdtemp(join(tmpdir(), 'oracle-step-translation-'))
   t.after(() => rm(root, { recursive: true, force: true }))
-  const { base } = await template(root)
-  const dir = join(base, '.ai/oracles/stale-search')
-  // two hazards modeled by fields the world does not have: only the card lint names them, after MODELED and CHECKED
-  // passed — each repair then cost a rewind. The preflight lists both before the walk records any gate.
-  const pkg = JSON.parse(await readFile(join(dir, 'oracle.package.json'), 'utf8'))
-  pkg.hazards['display-vs-commit'] = 'modeled: notAField'
-  pkg.hazards['carry-over'] = 'modeled: ghost'
-  await writeFile(join(dir, 'oracle.package.json'), JSON.stringify(pkg, null, 2))
-  const result = step(base, ['--dir', '.ai/oracles/stale-search'])
-  assert.equal(result.status, 1, result.stdout)
-  const lines = answer(result)
-  assert.equal(lines[0], 'ran: oracle-stage.mjs begin ok; oracle-cycle.mjs preflight PREFLIGHT_ISSUES')
-  assert.match(lines.at(-1), /^NEXT FOR YOU: the walk has not run: fix all 2 in one package patch .*1\) adequacy-hazard: display-vs-commit: notAField is not a field of \w+; 2\) adequacy-hazard: carry-over: ghost is not a field of \w+; then rerun /)
-  // no gate passed: the patch is free
-  assert.equal(JSON.parse(await readFile(join(dir, 'stage.json'), 'utf8')).stage, 'DISCOVERING')
+  await cp(PAGINATION, root, { recursive: true })
+  const dir = join(root, '.ai', 'oracles', 'pagination')
+  await mkdir(dir, { recursive: true })
+  const pkg = JSON.parse(await readFile(join(PAGINATION, 'oracle.package.json'), 'utf8'))
+  const cells = Object.fromEntries(['late-success-after-cancel', 'late-failure-after-success', 'older-response-after-newer', 'duplicate-completion', 'lost-response', 'retry-while-pending', 'unmount-before-settle'].map((id) => [id, { decision: 'source', ref: 'S1' }]))
+  pkg.asyncCells = [{ operation: 'load page', cells }]
+  delete pkg.crossCheck.reviewedBy
+  const writePackage = () => writeFile(join(dir, 'oracle.package.json'), `${JSON.stringify(pkg, null, 2)}\n`)
+  await writePackage()
+  const env = { ...CHILD_ENV, ORACLE_LINT_CACHE: join(root, 'receipts') }
+  await mkdir(env.ORACLE_LINT_CACHE)
+  const asked = async () => {
+    const result = await runNode(root, 'oracle-step.mjs', ['--dir', join('.ai', 'oracles', 'pagination')], env)
+    assert.equal(result.status, 1, result.stdout)
+    return answer(result).at(-1)
+  }
+  const recordIt = /record it: oracle-package\.mjs patch --package \S+ --set '\/crossCheck\/reviewedBy=\{"agent":"<reviewer>","inputDigest":"([0-9a-f]{64})"\}'/
+  const first = await asked()
+  assert.match(first, /dispatch the translation review — the analyst \(never the model's author\) with only \S+\/mapping-input\.md; fix the mappings it disputes, then record it: /)
+  let read = recordIt.exec(first)[1]
+  // disputed: the declared record is fixed, then the review recorded with the digest it read
+  const dispute = async (n) => {
+    await writeFile(join(root, 'space-discovery.md'), `${await readFile(join(root, 'space-discovery.md'), 'utf8')}\nRevision note ${n}.\n`)
+    pkg.crossCheck.reviewedBy = { agent: 'test reviewer', inputDigest: read }
+    await writePackage()
+  }
+  await dispute(1)
+  const second = await asked()
+  assert.match(second, /the translation review round 2 \(confirm-fixes\) — continue the round-1 reviewer with only the mappings it disputed and the repair diff; fix what it still disputes, then record it: /)
+  assert.ok(!second.includes('mapping-input.md'), second)
+  assert.notEqual(recordIt.exec(second)[1], read)
+  read = recordIt.exec(second)[1]
+  await dispute(2)
+  const third = await asked()
+  assert.match(third, /the translation table changed after its 2 reviews: ask the user how to settle the mappings, never a third review/)
+  assert.ok(!/translation review|mapping-input\.md/.test(third), third)
+  assert.equal(JSON.parse((await runNode(root, 'oracle-stage.mjs', ['status', '--dir', join('.ai', 'oracles', 'pagination')], env)).stdout).reviews.translation, 2)
+}
+
+async function proofEditsStop(t) {
+  if (!(await installedBend(t))) return
+  // PROOF.bend is not locked, but the model node proves it: an edit of the proof alone is a new file state, so a check
+  // recorded before it is no longer current, and a proof that keeps failing the same way stops step on the third edit
+  const fixture = await authoringFixture(t, 'proof')
+  const at = await authoringRepo(fixture)
+  const proof = join(at.repo, 'PROOF.bend')
+  const original = await readFile(proof, 'utf8')
+  await at.save((await at.step()).stdout)
+  await at.step()
+  assert.equal(nextCommandOf(await at.brief()), 'lock')
+  await writeFile(proof, `${original}\n# a comment\n`)
+  assert.match(await at.brief(), /next: oracle-step\.mjs .* · files changed since the last check$/)
+  // the witness trace stops before the response, so the kernel rejects it the same way after every edit
+  const broken = original.replace('([M.Issue{}, M.Respond{1n}], {==})', '([M.Issue{}], {==})')
+  assert.notEqual(broken, original)
+  for (const n of [1, 2]) {
+    await writeFile(proof, `${broken}\n# repair attempt ${n}\n`)
+    const result = await at.step()
+    assert.equal(result.status, 1, result.stdout)
+    assert.equal(answer(result)[0], 'ran: package ok; model 1 issue')
+    assert.equal((await at.status()).sameIssues, n)
+  }
+  await writeFile(proof, `${broken}\n# repair attempt 3\n`)
+  const stopped = await at.step()
+  assert.equal(stopped.status, 1, stopped.stdout)
+  assert.match(answer(stopped).at(-1), /^NEXT FOR YOU: NEEDS_DECISION: the same issues came back after three edits: stop and report them to the user: 1\) prove failed/)
+}
+
+async function lockNamesPackage(t) {
+  if (!(await installedBend(t))) return
+  // the lock line names the oracle's own package even when its self source names another file (here the copy at the
+  // repository root): the printed lock is refused before anything is locked, where a lock without the package would be
+  // taken and Delivery init would refuse it (PACKAGE_UNLOCKED) only after the card is immutable
+  const fixture = await authoringFixture(t, 'self')
+  const at = await authoringRepo(fixture)
+  const original = JSON.parse(await readFile(join(at.repo, 'oracle.package.json'), 'utf8'))
+  assert.ok(original.sources.some((source) => source.self && source.location === 'repo:oracle.package.json#v1'))
+  await writeFile(at.file('oracle.package.json'), `${JSON.stringify(original, null, 2)}\n`)
+  await at.save((await at.step()).stdout)
+  const ready = answer(await at.step()).at(-1)
+  assert.equal(ready.split('--source .ai/oracles/stale-search/oracle.package.json').length, 2, ready)
+  const refused = await at.lock(ready)
+  assert.equal(refused.status, 1, refused.stdout)
+  assert.match(refused.stderr, /source-lock-unregistered: \S+\/\.ai\/oracles\/stale-search\/oracle\.package\.json: --source is not referenced by Source Registry/)
+  await assert.rejects(readFile(at.file('oracle.lock.json')), { code: 'ENOENT' })
+}
+
+async function legacyRecords(t) {
+  if (!(await installedBend(t))) return
+  // a 0.126 stage.json at each stage loads: status shows its stage until the first step, step judges the files and keeps
+  // the profile, the history and the dispatches while it drops the counters that moved the stage; a locked one stays
+  // locked
+  const fixture = await authoringFixture(t, 'legacy')
+  const at = '2026-11-01T10:00:00.000Z'
+  const packageSha256 = sha256(await readFile(join(fixture.base, PACKAGE_DIR, 'oracle.package.json')))
+  const legacy = (stage, extra = {}) => ({
+    schemaVersion: 1,
+    stage,
+    packageSha256: stage === 'DISCOVERING' ? null : packageSha256,
+    iterations: { round: 2, limit: 3, extended: 0 },
+    rewinds: 1,
+    rewindAllowance: 10,
+    dispatches: [{ kind: 'model-analyst', attempt: 'analyst-1', at }],
+    history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin', at }, ...(stage === 'DISCOVERING' ? [] : [{ stage, packageSha256, evidence: 'walk', iterationRound: 1, at }])],
+    ...extra,
+  })
+  const loads = async (name, record, setup = async () => {}) => {
+    const repo = await authoringRepo(fixture, name)
+    await setup(repo)
+    await writeFile(repo.file('stage.json'), `${JSON.stringify(record, null, 2)}\n`)
+    const status = await repo.status()
+    assert.equal(status.stage, record.stage, name)
+    return repo
+  }
+  await Promise.all(['DISCOVERING', 'MODELED', 'CHECKED', 'DRAFTED'].map(async (stage) => {
+    const record = legacy(stage)
+    const repo = await loads(stage, record)
+    assert.equal(nextCommandOf(await repo.brief()), 'step', stage)
+    const stepped = await repo.step()
+    assert.equal(stepped.status, 0, stepped.stdout)
+    assert.equal((await repo.status()).stage, 'DRAFTED', stage)
+    const written = JSON.parse(await readFile(repo.file('stage.json'), 'utf8'))
+    assert.deepEqual(['stage', 'packageSha256', 'iterations', 'rewinds', 'rewindAllowance'].filter((field) => field in written), [], stage)
+    assert.deepEqual([written.dispatches, written.history.slice(0, record.history.length)], [record.dispatches, record.history], stage)
+  }))
+  // a Contract record keeps its profile
+  const contract = await loads('contract', legacy('CHECKED', { verificationProfile: 'contract/v1', packageSha256: null, cardSha256: null }), async (repo) => {
+    await rm(repo.file('oracle.package.json'))
+    await writeFile(repo.file('oracle.md'), fixture.contract)
+  })
+  assert.equal((await contract.step()).status, 0)
+  assert.deepEqual([(await contract.status()).stage, (await contract.status()).verificationProfile], ['DRAFTED', 'contract/v1'])
+  // a locked record of 0.126 is locked: step goes on to the Delivery run and --check refuses
+  const ready = await loads('ready', legacy('ORACLE_READY'))
+  assert.equal((await ready.status()).current, true)
+  assert.match(answer(await ready.step()).at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init /)
+  assert.equal((await ready.step('--check')).status, 2)
+}
+
+async function contractThroughStep(t) {
+  // contract/v1 through the same entry: cold-read first, then the user's confirmation (with the source-aware review
+  // named before it), then the card lint; --check lists both at once and changes nothing in the oracle directory; the
+  // printed lock names the card's source and is taken
+  const fixture = await authoringFixture(t, 'contract')
+  const at = await authoringRepo(fixture)
+  await rm(at.file('oracle.package.json'))
+  await writeFile(at.file('oracle.md'), fixture.contract.replace(/- Status: approved\n- Source: .*/, PENDING_APPROVAL))
+  const first = await at.step()
+  assert.equal(first.status, 1, first.stdout)
+  const lines = answer(first)
+  assert.deepEqual(lines.slice(0, 2), ['ran: confirmation 1 issue', 'phase 2/6 Model'])
+  assert.match(
+    lines.at(-1),
+    /^NEXT FOR YOU: dispatch cold-read — .*, its return saved unchanged as \S+; and when card\/policy-sources\.md's trigger applies, a source-aware review — .*; save its return unchanged as \S+; and fix all 1 in \S+oracle\.md: 1\) user-confirmation: show the user the whole card/,
+  )
+  await at.save(first.stdout)
+  assert.match(answer(await at.step()).at(-1), /^NEXT FOR YOU: when card\/policy-sources\.md's trigger applies, a source-aware review — .*; and fix all 1 in \S+oracle\.md: 1\) user-confirmation: /)
+  const before = await snapshot(at.dir)
+  const check = await at.step('--check')
+  assert.equal(check.status, 1, check.stdout)
+  assert.match(check.stdout, /^confirmation: 1\) user-confirmation: /m)
+  assert.match(check.stdout, /^card: 1\) user-confirmation-status: /m)
+  assert.deepEqual(await snapshot(at.dir), before)
+  // the approval is not part of what cold-read read: no new round, and the lock is next
+  await writeFile(at.file('oracle.md'), fixture.contract)
+  const ready = await at.step()
+  assert.equal(ready.status, 0, ready.stdout)
+  const next = answer(ready).at(-1)
+  assert.match(next, /^NEXT FOR YOU: every check passes; in order: \(1\) oracle-verify\.mjs card --oracle \S+ --path <files the change touches>; \(2\) oracle-lock\.mjs create --oracle \S+ --lock \S+ --source packages\/frontend-oracle-design\/test-fixtures\/contract-v1\/policy\.md$/)
+  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'cold-read': 1 })
+  const locked = await at.lock(next)
+  assert.equal(locked.status, 0, locked.stderr)
+  assert.match(answer(await at.step()).at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init /)
 }
 
 const SAVE_TEST = "import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { save } from './src/save.mjs'\ntest('save > pending', () => assert.ok(save > 0))\n"
@@ -585,7 +934,7 @@ async function refusalOnce(t) {
 
 export const stepCases = [
   ['step runs only the AUTO entries of the shared next table; every other next and any unknown line is printed', tableAndAuto],
-  ['step stops on a refusal, a refused walk, a line seen before, an empty plan and the step cap; FLAKINESS_GATE goes on only within the cap', loopStops],
+  ['step stops on a refusal, a line seen before, an empty plan and the step cap; FLAKINESS_GATE goes on only within the cap', loopStops],
   ['step binds a reviewer task from host receipts only when one task after the round is left; a named task wins', hostReceipts],
   ['step binds reviewer returns only when as many answer as the risk needs, and lists them otherwise', returnCounts],
   ['step asks for a new implementation decision before a new review round reuses the last one', staleDecision],
@@ -595,9 +944,17 @@ export const stepCases = [
   ['step holds a Formal first RED until the journal records the adapter-pre-red review of this lock', preRedReview],
   ['step does not run a bare label with a command no trusted adapter reports; a :exit label takes it', reportedLabels],
   ['step names the repository test label with the grade its test script can give', initLabel],
-  ['[bend] step walks a package from no stage record to DRAFTED and prints the lock for the user', authoringToLock],
-  ['[bend] step lists every issue a gate after MODELED would refuse before the walk records any gate', preflightFirst],
-  ['[bend] the preflight lints oracle.md re-projected with its hand-written sections: a sourced N/A there counts, a hand-written issue does not stop the walk', preflightSeesHandWritten],
+  ['[bend] step takes a package from no stage record to the reviews, then to a lock it prints and the lock takes; a hand-written issue is fixed in oracle.md alone', authoringToLock],
+  ['[bend] a sourced N/A written outside the generated markers settles the auto test cases and survives the projection', handWrittenLines],
+  ['[bend] each 0.126 incident that cost a registration, a round or a rewind costs nothing through step', bClassIncidents],
+  ['[bend] step --check fails exactly when the lock refuses, names every issue the lock names and changes nothing in the oracle directory', checkParity],
+  ['[bend] the same issues on a third distinct file state stop step with no review asked; the second does not', stopOnThird],
+  ['[bend] no review kind is asked for a third round, the second confirms the fixes, and source-aware opens with its first return', noThirdRound],
+  ['[bend] a translation review recorded against a mapping fixed after its dispute is a round: the third table goes to the user', translationRounds],
+  ['[bend] a PROOF.bend edit alone is a new file state: a proof failing the same way stops step on the third edit', proofEditsStop],
+  ['[bend] the lock line names the oracle package even when its self source names another file: refused before the lock, not at init', lockNamesPackage],
+  ['[bend] a 0.126 stage.json at each stage loads with its stage, and step relabels it from the files', legacyRecords],
+  ['contract/v1 goes from a pending card to its lock and the Delivery run through oracle-step.mjs', contractThroughStep],
   ['step takes a Delivery run from ORACLE_READY to a checked report, stopping only for the agent, with the close a person would assemble', deliveryToClose],
   ['a refused command stops step after one run with one action', refusalOnce],
 ]

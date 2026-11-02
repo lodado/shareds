@@ -29,7 +29,7 @@ unchanged inputs, not a smaller bound presented as the same workload.
   ordering obligations, not turn coupled axes into assumed-independent ones.
 - **Keep revision boundaries intact.** Imported files participate in source/input digests. An
   imported helper change still needs the applicable derivation, review and lock invalidation.
-  Use the shared authoring repair budget; a new module is not permission for another review round.
+  A new module is not permission for another review round.
 - **Do not trade coverage for speed.** Ordered prefixes and observations remain distinct. Adding
   branching choices or a larger bound can multiply traces; measure that separately from per-step
   copying. Do not drop events, merge histories by final state, reduce bounds or skip proofs to

@@ -2763,17 +2763,15 @@ test('two readings: the analyst writes its own state table, a reviewer on the ne
   assert.match(tool, /export async function mappingInput/)
 })
 
-test('the docs name the pre-lock stage machine, the hold and the partial state the scripts enforce', async () => {
+test('the docs name the pre-lock graph, the hold and the partial state the scripts enforce', async () => {
   const skill = await read('references/roles/controller-formal.md')
   const space = await read('references/roles/author-formal.md')
   const discovery = await read('references/discovery.md')
+  // 0.127.0: no begin/advance/walk/rewind — step checks the files as they are, the lock judges every node again
+  assert.match(skill, loose('Command: `oracle-step.mjs --dir <dir>` (`--check` lists every failing node and changes nothing in the oracle directory)'))
   assert.match(
     skill,
-    /Walk the stages with\s+`scripts\/oracle-stage\.mjs`: `begin`, then\s+`advance --to MODELED \| CHECKED \| DRAFTED`/,
-  )
-  assert.match(
-    skill,
-    /refuses a package oracle that is not at DRAFTED on the same package bytes and\s+the Bend files and registered sources CHECKED judged \(after a Bend edit, `advance --to CHECKED` judges\s+them again, even with a re-projected card\), and only the stage runtime writes stage\.json/,
+    loose('`oracle-lock.mjs create` judges every node again on the current package, Bend files, registered sources and card, refuses when one fails or a file changes while it judges, and only the scripts write stage.json'),
   )
   assert.match(
     skill,
@@ -2814,7 +2812,7 @@ test('the docs ask the open cells before modelling, design the proof by scope, a
   assert.match(lifecycle, /independent GREENs are never reported as whole-feature completion/)
 })
 
-test('the docs name the async cells the MODELED gate checks and the slice-scoped test gate', async () => {
+test('the docs name the async cells the package check refuses and the slice-scoped test gate', async () => {
   const skill = await read('references/roles/controller-formal.md')
   const bend = await read('references/bend-cross-verification.md')
   const lifecycle = await read('references/lifecycle-adaptation-formal.md')
@@ -2829,7 +2827,7 @@ test('the docs name the async cells the MODELED gate checks and the slice-scoped
     'unmount-before-settle',
   ])
     assert.match(bend, new RegExp(`\`${cell}\``))
-  assert.match(bend, /`oracle-stage\.mjs advance --to MODELED` refuses a package that leaves any cell undecided/)
+  assert.match(bend, loose('the package check of `oracle-step.mjs` refuses a package that leaves any cell undecided'))
   assert.match(lifecycle, /Give each slice its own scan root/)
   assert.match(lifecycle, /`TEST_OUTSIDE_LOCKED_SLICE`/)
   assert.match(skill, /The lock still runs card lint itself, so a hand-written\s+record skips no check/)
@@ -2844,7 +2842,7 @@ test('card review is capped at two rounds and round two never reopens the defect
   assert.match(cardFormat, /### Review round budget\s+—\s+at most 2/)
   assert.match(cardFormat, /Round 2\*\* only confirms that round 1's findings are resolved/)
   assert.match(cardFormat, /adds more than 3 model states or message kinds/)
-  assert.match(cardFormat, /A round 3 needs the user's explicit approval/)
+  assert.match(cardFormat, loose('There is no round 3: step never asks for one, and no approval or delegation opens one'))
   for (const doc of [lock, controller]) {
     assert.match(doc, /review-round-budget--at-most-2/)
   }
@@ -2874,8 +2872,10 @@ test('planning settles scope and risky premises before expensive authoring and p
   assert.match(common, /success criteria, non-goals, unresolved policy and risky assumptions/)
   assert.match(common, /before expensive model\/proof construction/i)
   assert.match(intake, /cheapest disconfirming check/)
-  assert.match(author, /shared authoring iteration budget/)
-  assert.match(card, /ITERATION_BUDGET_EXHAUSTED/)
+  // 0.127.0: the authoring iteration budget is 2 rounds per review kind and the stop on a third recurrence
+  assert.match(author, loose('Each review kind gets at most 2 rounds'))
+  assert.match(author, loose('The same issues on a third edited state stop the step for the user'))
+  assert.match(card, loose('The same issue list on a third edited state stops the step (`NEEDS_DECISION`)'))
   assert.match(card, /No supported defect/)
   assert.match(delivery, /reviewScope/)
   assert.match(delivery, /review-extend/)
@@ -3038,5 +3038,6 @@ test('0.105.0: the Draft is linted before the user reads it, and a pre-lock swee
   assert.match(bend, /\*\*Sweep before the lock, too\.\*\*/)
   assert.match(bend, /temporary directory or a git-ignored path, never a repository file/)
   assert.match(bend, /record the sweep as not run rather than changing runner configuration/)
-  assert.match(controller, /CHECKED passes\s+at once on a receipt/)
+  // 0.127.0: the CHECKED stage gate is gone; the model check keeps the receipt
+  assert.match(controller, /The model check passes\s+at once on a receipt/)
 })

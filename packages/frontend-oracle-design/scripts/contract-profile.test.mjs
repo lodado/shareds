@@ -13,13 +13,13 @@ const moduleUrl = new URL('../skills/frontend-oracle-design/scripts/oracle-profi
 const verifier = new URL('../skills/frontend-oracle-design/scripts/oracle-verify.mjs', import.meta.url)
 const profileSection = '\n## Verification Profile\n\n- Profile: contract/v1\n'
 
-test('Contract public stage and lock bind approved whole card without a package', () => {
+test('Contract public step and lock bind approved whole card without a package', () => {
   const root = mkdtempSync(join(tmpdir(), 'oracle-contract-stage-'))
   const directory = join(root, '.ai', 'oracles', 'contract')
   const scanRoot = join(root, 'src')
   mkdirSync(directory, { recursive: true })
   mkdirSync(scanRoot)
-  const stage = new URL('../skills/frontend-oracle-design/scripts/oracle-stage.mjs', import.meta.url).pathname
+  const step = new URL('../skills/frontend-oracle-design/scripts/oracle-step.mjs', import.meta.url).pathname
   const lock = new URL('../skills/frontend-oracle-design/scripts/oracle-lock.mjs', import.meta.url).pathname
   const fixture = fullProductFixture()
   for (const record of fixture.records) record.scenario.given = { enabled: false }
@@ -29,40 +29,33 @@ test('Contract public stage and lock bind approved whole card without a package'
   const loader = `data:text/javascript,${encodeURIComponent("export async function resolve(s,c,n){if(/oracle-(package|model|adequacy|discovery)\\.mjs$|ensure-bend\\.mjs$/.test(s))throw Error('FORMAL_IMPORT_DENIED:'+s);return n(s,c)}")}`
   const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: `--experimental-loader=${loader}` } })
   const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
-  const advance = (to, ...args) => run(stage, 'advance', '--dir', directory, '--to', to, ...args)
   const create = (...args) => run(lock, 'create', '--oracle', oracle, '--lock', manifest, ...args)
   try {
     writeFileSync(oracle, fixture.render())
     const denied = run(verifier.pathname, 'card', '--oracle', oracle)
     assert.notEqual(denied.status, 0)
     assert.match(denied.stderr, /FORMAL_IMPORT_DENIED/)
+    // without the user's approval the confirmation node fails: the step and its --check refuse, and nothing locks
     writeFileSync(oracle, card.replace('- Status: approved', '- Status: pending'))
-    let result = run(stage, 'begin', '--dir', directory, '--profile', 'contract/v1')
-    assert.equal(result.status, 0, result.stderr)
-    assert.notEqual(advance('DRAFTED').status, 0)
-    assert.notEqual(advance('MODELED').status, 0)
-    assert.notEqual(advance('CHECKED').status, 0)
+    let result = run(step, '--dir', directory)
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stdout, /FAILED confirmation: user-confirmation: /)
+    assert.equal(run(step, '--dir', directory, '--check').status, 1)
     assert.notEqual(create().status, 0)
     writeFileSync(oracle, card)
-    assert.notEqual(advance('CHECKED', '--profile', 'formal-bend/v1').status, 0)
-    result = advance('CHECKED')
+    result = run(step, '--dir', directory)
     assert.equal(result.status, 0, result.stderr)
     const checked = JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8'))
-    assert.equal(checked.cardSha256, digest(card))
+    assert.equal(checked.checks.at(-1).label, 'DRAFTED')
     assert.equal(checked.verificationProfile, 'contract/v1')
-    writeFileSync(oracle, `${card}\n`)
-    assert.notEqual(run(stage, 'rewind', '--dir', directory, '--to', 'CHECKED', '--reason', 'source-change').status, 0)
-    assert.notEqual(advance('DRAFTED').status, 0)
-    writeFileSync(oracle, card)
-    result = advance('DRAFTED')
-    assert.equal(result.status, 0, result.stderr)
-    assert.notEqual(advance('ORACLE_READY').status, 0)
     result = create('--profile', 'contract/v1')
     assert.equal(result.status, 0, result.stderr)
     const lockedBytes = readFileSync(manifest)
     assert.equal(JSON.parse(lockedBytes).verificationProfile, 'contract/v1')
     assert.equal(JSON.parse(lockedBytes).oracle.sha256, digest(card))
-    assert.equal(JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8')).stage, 'ORACLE_READY')
+    const lockedStage = JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8'))
+    assert.equal(lockedStage.stage, 'ORACLE_READY')
+    assert.equal(lockedStage.cardSha256, digest(card))
     result = create()
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(readFileSync(manifest), lockedBytes)
@@ -166,11 +159,11 @@ test('Contract public stage and lock bind approved whole card without a package'
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
-test('a Contract card cannot carry the Formal pre-authorized approval: lint refuses it and the stage stops before DRAFTED', () => {
+test('a Contract card cannot carry the Formal pre-authorized approval: lint refuses it and the step stops at the card', () => {
   const root = mkdtempSync(join(tmpdir(), 'oracle-contract-preauthorized-'))
   const directory = join(root, '.ai', 'oracles', 'contract')
   mkdirSync(directory, { recursive: true })
-  const stage = new URL('../skills/frontend-oracle-design/scripts/oracle-stage.mjs', import.meta.url).pathname
+  const step = new URL('../skills/frontend-oracle-design/scripts/oracle-step.mjs', import.meta.url).pathname
   const lock = new URL('../skills/frontend-oracle-design/scripts/oracle-lock.mjs', import.meta.url).pathname
   const fixture = fullProductFixture()
   for (const record of fixture.records) record.scenario.given = { enabled: false }
@@ -185,13 +178,11 @@ test('a Contract card cannot carry the Formal pre-authorized approval: lint refu
     const linted = run(verifier.pathname, 'card', '--oracle', oracle)
     assert.equal(linted.status, 1)
     assert.match(linted.stderr, /user-confirmation-preauthorized: the Contract profile needs the user's actual approval of the final card/)
-    // full-product CHECKED audits only the Space, so the refusal lands at DRAFTED, still before any lock
-    assert.equal(run(stage, 'begin', '--dir', directory, '--profile', 'contract/v1').status, 0)
-    const checked = run(stage, 'advance', '--dir', directory, '--to', 'CHECKED')
-    assert.equal(checked.status, 0, checked.stderr)
-    const drafted = run(stage, 'advance', '--dir', directory, '--to', 'DRAFTED')
-    assert.equal(drafted.status, 1)
-    assert.match(drafted.stderr, /^STAGE_GATE:[\s\S]*user-confirmation-preauthorized/)
+    // the confirmation node audits the approval line and the Space only, so the refusal lands at the card, before any lock
+    const stepped = run(step, '--dir', directory)
+    assert.equal(stepped.status, 1)
+    assert.equal(JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8')).checks.at(-1).label, 'CHECKED')
+    assert.match(run(step, '--dir', directory, '--check').stdout, /^card: [\s\S]*user-confirmation-preauthorized/m)
     assert.notEqual(run(lock, 'create', '--oracle', oracle, '--lock', join(directory, 'oracle.lock.json')).status, 0)
     assert.equal(existsSync(join(directory, 'oracle.lock.json')), false)
   } finally { rmSync(root, { recursive: true, force: true }) }
@@ -220,10 +211,8 @@ test('Contract public init derives type-contract unless an approved investigated
       const oracle = join(directory, 'oracle.md')
       const lock = join(directory, 'oracle.lock.json')
       writeFileSync(oracle, card)
-      for (const args of [['begin', '--profile', 'contract/v1'], ['advance', '--to', 'CHECKED'], ['advance', '--to', 'DRAFTED']]) {
-        const result = run('oracle-stage.mjs', ...args, '--dir', directory)
-        assert.equal(result.status, 0, `${mode}: ${result.stderr}`)
-      }
+      const stepped = run('oracle-step.mjs', '--dir', directory)
+      assert.equal(stepped.status, 0, `${mode}: ${stepped.stdout}${stepped.stderr}`)
       const locked = run('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock)
       assert.equal(locked.status, 0, `${mode}: ${locked.stderr}`)
       const lockBytes = readFileSync(lock)

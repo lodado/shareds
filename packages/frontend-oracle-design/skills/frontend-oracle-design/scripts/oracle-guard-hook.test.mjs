@@ -52,8 +52,9 @@ test('denies a hand write of the pre-lock stage record, before any run-state exi
   await mkdir(join(root, '.ai', 'oracles', 'sample'), { recursive: true })
   const denied = hook(write(root, '.ai/oracles/sample/stage.json', '{"stage":"DRAFTED"}\n'))
   assert.equal(denied.decision?.permissionDecision, 'deny')
-  assert.match(denied.decision.permissionDecisionReason, /^STAGE_PROTECTED: stage\.json moves only through oracle-stage\.mjs/)
-  assert.match(denied.decision.permissionDecisionReason, /rewind --reason <cause>/)
+  // the record is written by the check and the lock only; the remedy is the one entry, never a verb that moved a stage
+  assert.match(denied.decision.permissionDecisionReason, /^STAGE_PROTECTED: stage\.json is written only by oracle-step\.mjs and oracle-lock\.mjs/)
+  assert.match(denied.decision.permissionDecisionReason, /run oracle-step\.mjs --dir <dir> and do what NEXT FOR YOU says\.$/)
   // another stage.json outside an oracle folder is not ours
   assert.equal(hook(write(root, 'src/stage.json', '{}\n')).decision, null)
 })

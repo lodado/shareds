@@ -1,16 +1,24 @@
 /**
  * oracle-step.mjs — the one command the controller runs: `oracle-step.mjs --dir <oracle dir>`.
  *
- * It reads the phase line `status --brief` prints (the Delivery run once run-state.json exists, else the authoring
- * stage) and runs the `next:` command itself when it is mechanical (AUTO), assembling every argument from the oracle
- * directory and the ledger; then it reads the phase line again and repeats. It stops with one instruction when the next
- * step is the agent's work (a file to write, a reviewer to dispatch, a choice between files), the user's approval or
- * decision, or a refusal. At DRAFTED it runs the read-only card lints before it prints the reviews, the approval and the
- * lock in order. It never runs lock, extend, init, rewind, budget or `walk --reason`. Besides the reports/
- * folder for the test reports it names, it writes only what the commands it runs write. At most MAX_AUTO_STEPS
- * commands per call; a refusal, or a phase line already seen in this call, stops it.
+ * Before the lock it evaluates the authoring graph (oracle-stage.mjs) on the files as they are: the deterministic nodes
+ * in order — Formal: package, model, card (projected into oracle.md, its hand-written sections kept); Contract: the
+ * user's confirmation, the card — with the independent reviews between them. It prints the first failing node's issues,
+ * or the reviews to dispatch (it writes their inputs outside the repository and names where each return is saved), or,
+ * when every node passes, the approval and the lock. Editing is free: nothing advances or rewinds, and the lock judges
+ * the whole graph again. Each review kind runs at most REVIEW_ROUNDS rounds; the same issues coming back on a third
+ * edited state stop it (NEEDS_DECISION). `--check` lists every failing node at once and changes nothing in the oracle
+ * directory (it may fill the model receipt cache, which only spares the lock the same model check).
  *
- *   oracle-step.mjs --dir <dir> [--label <label> -- <test command>] [--findings <file>] [--intersect <file>]
+ * After the lock it reads the phase line `status --brief` prints (the Delivery run once run-state.json exists) and runs
+ * the `next:` command itself when it is mechanical (AUTO), assembling every argument from the oracle directory and the
+ * ledger; then it reads the phase line again and repeats. It stops with one instruction when the next step is the
+ * agent's work (a file to write, a reviewer to dispatch, a choice between files), the user's approval or decision, or a
+ * refusal. It never runs lock, init or budget. Besides stage.json, the projected card and the reports/ folder for the
+ * test reports it names, it writes only what the commands it runs write. At most MAX_AUTO_STEPS commands per call; a
+ * refusal, or a phase line already seen in this call, stops it.
+ *
+ *   oracle-step.mjs --dir <dir> [--check] [--label <label> -- <test command>] [--findings <file>] [--intersect <file>]
  *                   [--task-id <id>] [--intersect-task-id <id>] [--blind-task-id <id>]
  *
  * `--label … -- <command>` names the test command of a label the ledger has never run; `--findings`/`--intersect` pick
@@ -19,30 +27,34 @@
  */
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { TRUSTED_ADAPTERS } from './oracle-adapters.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { nextCommandOf, nextOf } from './oracle-next.mjs'
 import { canonicalReviewPoints, deliveryBrief, requiredLabelsNotPassing, sameDigests } from './oracle-run.mjs'
-import { briefStatus, dispatchedSinceLastRewind, STAGE_FILE } from './oracle-stage.mjs'
+import { markdownLines, sectionLines } from './oracle-space.mjs'
+import {
+  bindingOf, briefStatus, evaluateGraph, filesDigest, GRAPH, issuesDigest, phaseLine, readStage, recordCheck, REVIEW_ROUNDS, reviewRounds,
+  SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
+} from './oracle-stage.mjs'
 
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 export const MAX_AUTO_STEPS = 8
 /**
- * The next commands step runs itself. Each is the model's next event and decides nothing the user owns: begin opens
- * the stage record, walk runs the authoring gates, red/green/exec run the tests and record what they show, close makes
- * the packet and binds the reviewer returns the agent saved, guide and report only read. Every other next is printed.
+ * The next commands step runs itself. Each is the model's next event and decides nothing the user owns: red/green/exec
+ * run the tests and record what they show, close makes the packet and binds the reviewer returns the agent saved, guide
+ * and report only read. Every other next is printed.
  */
-export const AUTO = new Set(['begin', 'walk', 'red', 'green', 'exec', 'close', 'guide', 'report'])
+export const AUTO = new Set(['red', 'green', 'exec', 'close', 'guide', 'report'])
 /** The script and subcommand each AUTO next runs. */
 export const AUTO_COMMAND = Object.freeze({
-  begin: ['oracle-stage.mjs', 'begin'], walk: ['oracle-cycle.mjs', 'walk'], red: ['oracle-run.mjs', 'red'], green: ['oracle-run.mjs', 'green'],
+  red: ['oracle-run.mjs', 'red'], green: ['oracle-run.mjs', 'green'],
   exec: ['oracle-run.mjs', 'exec'], close: ['oracle-run.mjs', 'close'], guide: ['oracle-run.mjs', 'guide'], report: ['oracle-run.mjs', 'close'],
 })
-const REASONS = '<review-finding|gate-failure|user-answer|source-change>'
 
 const exists = (path) => stat(path).then(() => true, () => false)
 const rel = (path) => relative(process.cwd(), path) || '.'
@@ -399,7 +411,8 @@ function writeReport(directory, phase, report) {
 async function packageSources(directory) {
   const root = directory.includes('/.ai/') ? directory.slice(0, directory.lastIndexOf('/.ai/')) : process.cwd()
   const pkg = await readJson(join(directory, 'oracle.package.json'))
-  const paths = (pkg?.sources ?? []).map((source) => /^repo:(.+)$/.exec(source.location ?? '')?.[1]).filter(Boolean)
+  // a `repo:` location may name a section (`README.md#policy`): the source the lock snapshots is the file
+  const paths = (pkg?.sources ?? []).map((source) => /^repo:([^#]+)/.exec(source.location ?? '')?.[1]).filter(Boolean)
   const present = []
   for (const path of paths) if (await exists(join(root, path))) present.push(join(root, path))
   const tops = [...new Set(paths.filter((path) => !path.startsWith('.ai/')).map((path) => path.split('/')[0]))]
@@ -419,127 +432,380 @@ async function repoTestLabel(root) {
   return { label: 'repo-test:exit', how: `${command} reports no test results to the oracle, so its exit code is the grade` }
 }
 
-/**
- * The DRAFTED card checks step runs itself, both read-only: the lock's Draft lint with each failure placed in the generated
- * region or a hand-written section (oracle-cycle.mjs card-lint), and the repository policy candidates a reviewer reads.
- */
-function draftChecks(directory, root) {
-  const card = join(directory, 'oracle.md')
-  return [
-    { script: 'oracle-cycle.mjs', args: ['card-lint', '--dir', directory] },
-    { script: 'oracle-verify.mjs', args: ['card', '--oracle', card, '--repo-policies'], cwd: root, label: 'repo-policies' },
-  ]
-}
-
-/** The `failed` record of an oracle-cycle.mjs result, or null when the output is not its JSON (another check failed). */
-function failedOf(result) {
-  try {
-    return JSON.parse(result.stdout || 'null')?.failed ?? null
-  } catch {
-    return null
-  }
-}
-
 const numberedList = (issues) => issues.map((issue, index) => `${index + 1}) ${issue}`).join('; ')
+const numberedSteps = (steps) => steps.map((text, index) => `(${index + 1}) ${text}`).join(' ')
+const plural = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`
+
+// ---- authoring: the graph oracle-stage.mjs evaluates on the files as they are, and the reviews between its nodes
+
+/** A path outside the working directory (a review input) printed whole. */
+const qa = (path) => sh(path)
+/** Where a review's input is written: outside the repository, one folder per oracle, review kind and input digest. */
+const inputFolder = (directory, kind, digest) => join(tmpdir(), 'oracle-review-inputs', `${basename(directory)}-${kind}-${digest.slice(0, 12)}`)
+/** Where the agent saves a review's return unchanged: in the oracle directory, named by the input digest it read. */
+export const reviewReturn = (directory, kind, digest) =>
+  join(directory, 'reviews', `${kind}-${digest.slice(0, 12)}.${kind === 'reverse-impossible' ? 'json' : 'md'}`)
+
+/** The card a card review reads: the user's approval is not part of it, so recording the approval asks for no new round. */
+function reviewedCard(text) {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => /^## User Confirmation\s*$/.test(line))
+  if (start === -1) return text
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '))
+  return [...lines.slice(0, start), ...(end === -1 ? [] : lines.slice(end))].join('\n')
+}
+
+const cardDigest = async (directory) => {
+  const text = await readFile(join(directory, 'oracle.md'), 'utf8').catch(() => null)
+  return text === null ? null : sha256(reviewedCard(text))
+}
+
+/** A CLI's stdout saved as a file of the input folder; a failed builder leaves its first line there instead. */
+function saveOutput(script, args, cwd) {
+  const result = spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd, encoding: 'utf8', maxBuffer: 1 << 26 })
+  return result.status === 0 ? result.stdout : `${script} ${args[0]} failed: ${(result.stderr || result.stdout).split('\n')[0]}\n`
+}
 
 /**
- * A failed DRAFTED lint as one instruction. An issue of the generated region is a package patch (re-projected, so the
- * walk asks for --reason) unless the rule takes a hand-written line; one only the hand-written sections raise is a card
- * edit outside the markers, which check-card does not read: no rewind.
+ * Each review kind: the digest of what it reads (a round is a saved return for a new digest), the input files step
+ * writes for its first round, and how that round is dispatched; a second round confirms the first one's fixes
+ * (reviewClause). The model analyst reads the sources only, never the model. A conditional kind (source-aware: whether
+ * card/policy-sources.md's trigger applies is the author's call) is named with its condition until a return is saved.
  */
-function cardLintSay(directory, result) {
-  const failed = failedOf(result)
-  if (failed?.code !== 'CARD_LINT_FAILED') return failed?.next ?? `fix the cause above, then rerun ${rerun(directory)}`
-  const card = q(join(directory, 'oracle.md'))
+const REVIEW_KINDS = {
+  'model-analyst': {
+    name: 'the model analyst',
+    async text(directory, root) {
+      const { modelInput } = await import('./oracle-adequacy.mjs')
+      return modelInput({ package: join(directory, 'oracle.package.json'), cwd: root }).catch(() => null)
+    },
+    async digest(directory, root) {
+      const text = await this.text(directory, root)
+      return text === null ? null : sha256(text)
+    },
+    async write(directory, root, folder) {
+      await writeFile(join(folder, 'model-input.md'), await this.text(directory, root))
+      return [join(folder, 'model-input.md')]
+    },
+    say: (files, saved) => `the model analyst — $oracle-review in a fresh context with only ${files} (keep writing the model while it runs; join its world, goals and State Model into the package), its return saved unchanged as ${saved}`,
+  },
+  'cold-read': {
+    name: 'cold-read',
+    digest: cardDigest,
+    async write(directory, root, folder) {
+      const card = join(directory, 'oracle.md')
+      await writeFile(join(folder, 'view.md'), saveOutput('oracle-review-view.mjs', ['card', '--oracle', card], root))
+      await copyFile(card, join(folder, 'oracle.md'))
+      return [join(folder, 'view.md'), join(folder, 'oracle.md')]
+    },
+    say: (files, saved) => `cold-read — $oracle-review in a fresh context with only ${files}, its return saved unchanged as ${saved}`,
+  },
+  'reverse-impossible': {
+    name: 'reverse-impossible',
+    digest: cardDigest,
+    async write(directory, root, folder) {
+      const card = join(directory, 'oracle.md')
+      const files = [join(folder, 'ir.json')]
+      await writeFile(files[0], saveOutput('oracle-verify.mjs', ['card', '--oracle', card, '--ir'], root))
+      if (/^## Adequacy\s*$/m.test(await readFile(card, 'utf8'))) {
+        files.push(join(folder, 'explore-input.md'))
+        const built = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-adequacy.mjs'), 'explore-input', '--card', card, '--output', files[1]], { cwd: root, encoding: 'utf8' })
+        if (built.status !== 0) await writeFile(files[1], `explore-input failed: ${(built.stderr || built.stdout).split('\n')[0]}\n`)
+      }
+      return files
+    },
+    say: (files, saved) => `reverse-impossible — a second fresh $oracle-review with only ${files}, its candidates JSON saved unchanged as ${saved}`,
+  },
+  'source-aware': {
+    name: 'source-aware',
+    conditional: true,
+    digest: cardDigest,
+    async write(directory, root, folder) {
+      await copyFile(join(directory, 'oracle.md'), join(folder, 'oracle.md'))
+      return [join(folder, 'oracle.md')]
+    },
+    say: (files, saved) =>
+      `when card/policy-sources.md's trigger applies, a source-aware review — $oracle-review in a fresh context with only ${files} and the original inputs card/policy-sources.md lists (verbatim user messages, approved source excerpts); save its return unchanged as ${saved}`,
+  },
+}
+
+/**
+ * One review node now: its input digest, the rounds it ran (saved returns, recorded or on disk), whether step asks for
+ * it, and whether it is a conditional review step only names (no return saved for it yet).
+ */
+async function reviewState(directory, root, record, kind) {
+  const digest = await REVIEW_KINDS[kind].digest(directory, root)
+  if (!digest) return null
+  const saved = await exists(reviewReturn(directory, kind, digest))
+  const rounds = await reviewRounds(directory, record, kind)
+  const offered = Boolean(REVIEW_KINDS[kind].conditional) && rounds === 0
+  return { kind, digest, saved, rounds, offered, wanted: !offered && !saved && rounds < REVIEW_ROUNDS }
+}
+
+/** The review nodes that come before `failed` in the graph (all of them when every node passes). */
+async function reviewStates(directory, root, record, profile, failed) {
+  const order = GRAPH[profile]
+  const reach = failed ? order.findIndex(({ id }) => id === failed.id) : order.length
+  const states = []
+  for (const node of order.slice(0, reach).filter(({ review }) => review)) {
+    const state = await reviewState(directory, root, record, node.id)
+    if (state) states.push(state)
+  }
+  return states
+}
+
+/** The return a second round continues: the kind's other saved return, or the path its recorded digest names. */
+async function roundOneReturn(directory, record, kind, digest) {
+  const own = basename(reviewReturn(directory, kind, digest))
+  const names = await readdir(join(directory, 'reviews')).catch(() => [])
+  const saved = names.find((name) => name.startsWith(`${kind}-`) && name !== own && !name.endsWith('.triage.json'))
+  if (saved) return join(directory, 'reviews', saved)
+  const recorded = (record?.reviews ?? []).find((entry) => entry.kind === kind && entry.digest.slice(0, 12) !== digest.slice(0, 12))
+  return recorded ? reviewReturn(directory, kind, recorded.digest) : null
+}
+
+/**
+ * One review as a clause: round 1 reads its whole input, written outside the repository; round 2 confirms round 1's
+ * fixes, so it continues that reviewer with only its finding IDs and the repair diff (card/card-format.md).
+ */
+async function reviewClause(directory, root, record, { kind, digest, rounds }) {
+  const review = REVIEW_KINDS[kind]
+  const saved = q(reviewReturn(directory, kind, digest))
+  if (rounds > 0) {
+    const previous = await roundOneReturn(directory, record, kind, digest)
+    return `${review.name} round 2 (confirm-fixes) — continue the round-1 reviewer with only its finding IDs (${previous ? q(previous) : 'its round-1 return'}) and the repair diff, its return saved unchanged as ${saved}`
+  }
+  const folder = inputFolder(directory, kind, digest)
+  await mkdir(folder, { recursive: true })
+  const files = (await review.write(directory, root, folder)).map(qa).join(' and ')
+  return review.say(files, saved)
+}
+
+/** The reviews step asks for: one clause each, dispatched together. */
+async function dispatchSay(directory, root, record, wanted) {
   const parts = []
-  if (failed.generated.length > 0)
-    parts.push(
-      `in the package, one patch (re-projected; the walk then asks for --reason gate-failure), or where the rule takes a hand-written line (a sourced N/A, the Interaction sweep) in ${card} outside the generated markers: ${numberedList(failed.generated)}`,
-    )
-  if (failed.handWritten.length > 0) parts.push(`in ${card} outside the generated markers, no rewind: ${numberedList(failed.handWritten)}`)
-  return `the lock would refuse the card: fix ${parts.join('; and ')}; then rerun ${rerun(directory)}`
+  for (const state of wanted) parts.push(await reviewClause(directory, root, record, state))
+  if (parts.length === 0) return null
+  await mkdir(join(directory, 'reviews'), { recursive: true })
+  return `dispatch ${parts.length === 1 ? parts[0] : numberedSteps(parts)}`
 }
 
-/** The review kinds stage.json lists as dispatched since the last rewind (none before the first stage record). */
-async function reviewsSent(directory) {
-  const record = await readJson(join(directory, STAGE_FILE))
-  if (!Array.isArray(record?.history)) return []
-  return dispatchedSinceLastRewind(record)
+/** A conditional review no saved return has opened (source-aware): named with its condition, before the user's approval. */
+async function offerSay(directory, root, record, states) {
+  const offered = states.find((state) => state.offered)
+  if (!offered) return null
+  await mkdir(join(directory, 'reviews'), { recursive: true })
+  return reviewClause(directory, root, record, offered)
 }
 
 /**
- * What comes after DRAFTED, in order: the card reviews, the touched-file lint, the user's approval, then the lock. A
- * review stage.json lists as dispatched since the last rewind is not named again: a second dispatch of the same card
- * counts as another dispatch, and a repair (a rewind) makes the next one the round-2 review it should be.
+ * The translation review: round 1 reads the mapping input written outside the repository, a reviewer who did not write
+ * the model; round 2 confirms round 1's fixes. Its verdict is recorded in the package by hand with the digest the
+ * reviewer read. After REVIEW_ROUNDS reviews the table is the user's to settle.
  */
-async function lockSay(directory) {
-  const { sources } = await packageSources(directory)
+async function translationSay(directory, root, record) {
+  const { loadPackage } = await import('./oracle-package.mjs')
+  const { mappingInput } = await import('./oracle-discovery.mjs')
+  const text = await mappingInput({ loaded: await loadPackage(join(directory, 'oracle.package.json'), { root }) }).catch(() => null)
+  if (text === null) return null
+  const rounds = await reviewRounds(directory, record, 'translation')
+  if (rounds >= REVIEW_ROUNDS) return `the translation table changed after its ${REVIEW_ROUNDS} reviews: ask the user how to settle the mappings, never a third review`
+  const pkg = q(join(directory, 'oracle.package.json'))
+  const recordIt = `record it: oracle-package.mjs patch --package ${pkg} --set '/crossCheck/reviewedBy={"agent":"<reviewer>","inputDigest":"${sha256(text)}"}'`
+  if (rounds > 0) return `the translation review round 2 (confirm-fixes) — continue the round-1 reviewer with only the mappings it disputed and the repair diff; fix what it still disputes, then ${recordIt}`
+  const folder = inputFolder(directory, 'translation', sha256(text))
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, 'mapping-input.md'), text)
+  return `dispatch the translation review — the analyst (never the model's author) with only ${qa(join(folder, 'mapping-input.md'))}; fix the mappings it disputes, then ${recordIt}`
+}
+
+/**
+ * The translation review the package records: a round for the digest the reviewer read. A mapping fixed after a dispute
+ * leaves that record stale, and it is still the round that ran.
+ */
+async function translationReviewed(directory) {
+  const digest = (await readJson(join(directory, 'oracle.package.json')))?.crossCheck?.reviewedBy?.inputDigest
+  if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) return []
+  return [{ kind: 'translation', digest }]
+}
+
+/**
+ * A failing node as one instruction. A card issue the generated region raises is fixed in the package (step projects
+ * the card again) unless the rule takes a hand-written line; one only the hand-written sections raise is an oracle.md
+ * edit outside the generated markers.
+ */
+function nodeSay(directory, node) {
+  if (node.id === 'card' && node.handWritten?.length > 0) {
+    const card = q(join(directory, 'oracle.md'))
+    const generated = node.issues.filter((issue) => !node.handWritten.includes(issue))
+    const parts = []
+    if (generated.length > 0) parts.push(`in the package (step projects the card again), or where the rule takes a hand-written line (a sourced N/A, the Interaction sweep) in ${card} outside the generated markers: ${numberedList(generated)}`)
+    parts.push(`in ${card} outside the generated markers: ${numberedList(node.handWritten)}`)
+    return `fix ${parts.join('; and ')}`
+  }
+  const where = {
+    package: `the package (${q(join(directory, 'oracle.package.json'))}, one oracle-package.mjs patch)`,
+    model: 'the package, its Bend files or sources',
+    card: 'the package (step projects the card again), or where the rule takes a hand-written line in oracle.md outside the generated markers',
+    confirmation: q(join(directory, 'oracle.md')),
+  }[node.id] ?? q(join(directory, 'oracle.md'))
+  return `fix all ${node.issues.length} in ${where}: ${numberedList(node.issues)}`
+}
+
+/** The repository's policy candidates a reviewer reads as sweep counterparts — read-only, before the approval. */
+function repoPolicyLead(directory, root) {
+  const card = join(directory, 'oracle.md')
+  const result = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-verify.mjs'), 'card', '--oracle', card, '--repo-policies'], { cwd: root, encoding: 'utf8' })
+  const candidates = Number(/^REPO_POLICY_CANDIDATES (\d+)/m.exec(result.stdout ?? '')?.[1] ?? 0)
+  return candidates > 0 ? `disposition the ${candidates} repository policy candidates \`oracle-verify.mjs card --oracle ${q(card)} --repo-policies\` lists as sweep counterparts; then ` : ''
+}
+
+/** The reverse-impossible return triaged once per digest (oracle-adequacy.mjs triage), saved beside it. */
+async function triageLead(directory, root, states) {
+  const state = states.find(({ kind, saved }) => kind === 'reverse-impossible' && saved)
+  if (!state) return ''
+  const saved = reviewReturn(directory, state.kind, state.digest)
+  const triaged = saved.replace(/\.json$/, '.triage.json')
+  if (!(await exists(triaged))) {
+    const args = ['triage', '--card', join(directory, 'oracle.md'), '--candidates', saved]
+    const result = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-adequacy.mjs'), ...args], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 })
+    if (result.status !== 0) return `the reverse-impossible return does not triage (${(result.stderr || result.stdout).split('\n')[0]}): save the reviewer's candidates JSON unchanged as ${q(saved)}; then `
+    await writeFile(triaged, result.stdout)
+  }
+  return `record one journal line per candidate ${q(triaged)} triages (a non-covered one goes to the package or the user); then `
+}
+
+/** The `repo:` sources a Contract card's Source Registry names that exist: a Contract oracle has no package. */
+async function cardSources(directory, root) {
+  const text = await readFile(join(directory, 'oracle.md'), 'utf8').catch(() => '')
+  const paths = sectionLines(markdownLines(text), 'Source Registry').flatMap((line) => [...line.matchAll(/repo:([^#\s|]+)/g)].map((match) => match[1]))
+  const present = []
+  for (const path of paths) if (await exists(join(root, path))) present.push(join(root, path))
+  return present
+}
+
+/**
+ * When every node passes and no review waits, in order: the source-aware review while it is only offered (Formal: the
+ * approval is in this list), the touched-file lint, the user's approval (Formal: the lock lint waits for these
+ * answers), then the lock.
+ */
+async function lockSay(directory, { pending = [], offer = null } = {}) {
+  // every `repo:` source the package registers and the package file itself (Delivery init refuses a lock without it,
+  // whatever its self source names) or, for Contract, the card's Source Registry names, each path once
+  const { root, sources } = await packageSources(directory)
+  const contract = (await bindingOf(directory)).profile === 'contract/v1'
   const card = q(join(directory, 'oracle.md'))
-  const dir = q(directory)
-  const sent = new Set(await reviewsSent(directory))
-  // the self source of the package is the package file itself: list each path once
-  const paths = [...new Set([...sources, join(directory, 'oracle.package.json')])]
-  const sourceFlags = paths.map((path) => `--source ${q(path)}`).join(' ')
-  const reviews = [
-    [
-      'cold-read',
-      `cold-read: $oracle-review in a fresh context with only \`oracle-review-view.mjs card --oracle ${card}\` and a byte copy of the card, both outside the run directory, registered with oracle-stage.mjs review-input --dir ${dir} --kind cold-read --input <that file> --attempt <dispatch id>;`,
-    ],
-    [
-      'reverse-impossible',
-      `reverse-impossible: a second fresh $oracle-review with \`oracle-verify.mjs card --oracle ${card} --ir\` and \`oracle-adequacy.mjs explore-input --card ${card} --output <file outside the repository>\`, registered with --kind reverse-impossible;`,
-    ],
-    ['source-aware', 'source-aware review when card/policy-sources.md applies (--kind source-aware);'],
-  ].filter(([kind]) => !sent.has(kind))
+  const paths = [...new Set(contract ? await cardSources(directory, root) : [...sources, join(directory, 'oracle.package.json')])]
+  const sourceFlags = paths.length > 0 ? paths.map((path) => `--source ${q(path)}`).join(' ') : '--source <approved-source>'
+  const waiting = pending.length > 0 ? ` (the lock waits for: ${pending.join('; ')})` : ''
   const steps = [
-    ...reviews.map(([, text]) => text),
-    'repair findings in the package, rerun this step to lint the repair before any round-2 input;',
+    ...(offer ? [`${offer};`] : []),
     `oracle-verify.mjs card --oracle ${card} --path <files the change touches>;`,
-    'show the user the card and get explicit approval;',
+    ...(contract ? [] : [`show the user the card and record their explicit approval in its User Confirmation${waiting};`]),
     `oracle-lock.mjs create --oracle ${card} --lock ${q(join(directory, 'oracle.lock.json'))} ${sourceFlags}`,
   ]
-  const numbered = steps.map((text, index) => `(${index + 1}) ${text}`).join(' ')
-  const done = sent.size > 0 ? ` (dispatched since the last rewind, not again: ${[...sent].join(', ')})` : ''
-  return `before the user sees ${card}, in order${done}: ${numbered}`
+  return `every check passes; in order: ${numberedSteps(steps)}`
 }
 
-/** The preflight's issues as one instruction: all of them in one patch, before the walk records a gate. */
-function preflightSay(directory, result) {
-  const failed = failedOf(result)
-  if (failed?.code !== 'PREFLIGHT_ISSUES') return failed?.next ?? `fix the cause above, then rerun ${rerun(directory)}`
-  // before the first projection a rule a hand-written card line satisfies cannot be satisfied: the walk itself projects the card
-  const beforeCard = failed.beforeCard
-    ? `; if only issues a hand-written card line settles are left (a sourced N/A, the Interaction sweep, an Open question), run oracle-cycle.mjs walk --dir ${q(directory)} yourself: it projects oracle.md, then write those lines there`
-    : ''
-  return `the walk has not run: fix all ${failed.issues.length} in one package patch (a card-lint issue may instead take a hand-written line in oracle.md outside the generated markers), each refused by a gate after MODELED (repaired after that gate passes, one costs a rewind): ${numberedList(failed.issues)}; then rerun ${rerun(directory)}${beforeCard}`
+const nodeLine = ({ id, issues }) => `${id} ${issues.length === 0 ? 'ok' : plural(issues.length, 'issue')}`
+const writePackage = (directory) =>
+  `write ${q(join(directory, 'oracle.package.json'))} with $oracle-intake (sources, requirements, Space discovery), then rerun ${rerun(directory)}`
+
+/**
+ * A failing node as one instruction: the reviews waiting before it, the translation review its model issues ask for,
+ * the source-aware review offered before the Contract approval it waits for, then its issues.
+ */
+async function failedSay(directory, root, { failed, dispatch, record, recorded, states }) {
+  const translation = failed.issues.some((issue) => issue.startsWith('cross-check-unreviewed')) ? await translationSay(directory, root, recorded) : null
+  const offer = failed.issues.some((issue) => issue.startsWith('user-confirmation:')) ? await offerSay(directory, root, record, states) : null
+  return [dispatch, translation, offer, nodeSay(directory, failed)].filter(Boolean).join('; and ')
 }
 
-/** Each next of the table: what step runs (`calls`), the one instruction it prints (`say`), and the read-only `checks` it runs first. */
+/** The phase line's next after this call: the stop, another step (a node fails or a review waits), or the lock. */
+function nextKeyOf(stop, failed, wanted) {
+  if (stop) return 'stop'
+  if (failed || wanted.length > 0) return 'step'
+  return 'lock'
+}
+
+/**
+ * One authoring call: the graph in order, the check recorded (files, issues, label, next) and the one instruction —
+ * the reviews waiting before the first failing node with that node's issues, or the reviews after the last node, or
+ * the lock. The same issues on a third edited state stop it.
+ */
+export async function authoringStep(directory) {
+  if (!(await exists(join(directory, 'oracle.package.json'))) && !(await exists(join(directory, 'oracle.md'))))
+    return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: writePackage(directory) }
+  const { root } = await packageSources(directory)
+  const binding = await bindingOf(directory)
+  const graph = await evaluateGraph(directory, { binding, project: 'write' })
+  const failed = graph.nodes.find(({ issues }) => issues.length > 0) ?? null
+  const record = await readStage(directory)
+  const states = await reviewStates(directory, root, record, graph.profile, failed)
+  const wanted = states.filter((state) => state.wanted)
+  const files = await filesDigest(directory)
+  const issues = issuesDigest(graph.nodes)
+  const stop = issues !== null && sameIssuesRun([...(record?.checks ?? []), { files, issues }]) >= SAME_ISSUES_STOP
+  const next = nextKeyOf(stop, failed, wanted)
+  const reviews = [...states.filter((state) => state.saved), ...(await translationReviewed(directory))]
+  const recorded = await recordCheck(directory, { binding, label: graph.label, files, issues, next, reviews })
+  const outcome = { ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) } }
+  const shown = failed ? [`FAILED ${failed.id}: ${failed.issues[0].slice(0, 300)}`] : []
+  if (stop) return { ...outcome, refused: true, shown, say: `${STOP_NEXT}: ${numberedList(failed.issues)}` }
+  const dispatch = await dispatchSay(directory, root, record, wanted)
+  if (failed) return { ...outcome, refused: true, shown, say: `${await failedSay(directory, root, { failed, dispatch, record, recorded, states })}; then rerun ${rerun(directory)}` }
+  if (dispatch) return { ...outcome, say: `${dispatch}; repair what they find, then rerun ${rerun(directory)}` }
+  const pending = graph.nodes.flatMap((node) => node.pending ?? [])
+  // Contract recorded the approval at its confirmation node: its lock line names no review that comes before it
+  const offer = graph.profile === 'contract/v1' ? null : await offerSay(directory, root, record, states)
+  return { ...outcome, say: `${repoPolicyLead(directory, root)}${await triageLead(directory, root, states)}${await lockSay(directory, { pending, offer })}` }
+}
+
+/** A failing node in `--check`: its issues, and how many only the hand-written card sections raise. */
+function failingLine({ id, issues, handWritten = [] }) {
+  const own = handWritten.length > 0 ? [`(in hand-written card sections only: ${handWritten.length})`] : []
+  return [`${id}: ${numberedList(issues)}`, ...own].join(' ')
+}
+
+/** `--check`'s instruction: the failing issues in one pass, the user's answers the lock waits for, or step. */
+function checkSay(directory, count, pending) {
+  if (count > 0) return `fix all ${count} in one pass, then run ${rerun(directory)}`
+  if (pending.length > 0) return `no node fails; the lock waits for the user: show them the card, record their answer in its User Confirmation, then run ${rerun(directory)}`
+  return `no node fails: run ${rerun(directory)}`
+}
+
+/**
+ * `--check`: every deterministic node with its inputs, even after an earlier one fails, on a scratch projection of the
+ * card (oracle.md is not written), the answers the lock lint waits for, and the reviews waiting. Changes nothing in the
+ * oracle directory (a passing model check may fill the receipt cache), and fails exactly when the lock would refuse
+ * these files (a failing node or an answer it waits for).
+ */
+export async function checkAll(directory) {
+  if (!(await exists(join(directory, 'oracle.package.json'))) && !(await exists(join(directory, 'oracle.md'))))
+    return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: writePackage(directory) }
+  const { root } = await packageSources(directory)
+  const graph = await evaluateGraph(directory, { binding: await bindingOf(directory), deep: true, project: 'scratch' })
+  const failing = graph.nodes.filter(({ issues }) => issues.length > 0)
+  const shown = failing.map(failingLine)
+  const pending = graph.nodes.flatMap((node) => node.pending ?? [])
+  if (pending.length > 0) shown.push(`lock waits for: ${numberedList(pending)}`)
+  const record = await readStage(directory)
+  const waiting = (await reviewStates(directory, root, record, graph.profile, null)).filter((state) => state.wanted).map(({ kind }) => kind)
+  if (waiting.length > 0) shown.push(`reviews waiting: ${waiting.join(', ')}`)
+  const count = failing.reduce((total, { issues }) => total + issues.length, 0)
+  const say = checkSay(directory, count, pending)
+  return { ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) }, refused: count > 0 || pending.length > 0, shown, shownLimit: shown.length, say }
+}
+
+/**
+ * Each next of the table: what step runs (`calls`) or the one instruction it prints (`say`). Before the lock step runs
+ * the authoring graph itself (authoringStep); these entries are what the phase line names there.
+ */
 const PLANS = {
-  async begin(directory) {
-    if ((await exists(join(directory, 'oracle.package.json'))) || (await exists(join(directory, 'oracle.md')))) return { calls: [{ script: 'oracle-stage.mjs', args: ['begin', '--dir', directory] }] }
-    return { say: `write ${q(join(directory, 'oracle.package.json'))} with $oracle-intake (sources, requirements, Space discovery), then rerun ${rerun(directory)}` }
-  },
-  // preflight first: every issue a gate after MODELED would refuse, while a package patch still costs no rewind
-  walk: (directory) => ({
-    checks: [{ script: 'oracle-cycle.mjs', args: ['preflight', '--dir', directory] }],
-    calls: [{ script: 'oracle-cycle.mjs', args: ['walk', '--dir', directory] }],
-    failed: (result) => preflightSay(directory, result),
-  }),
-  walkReason: (directory) => ({ say: `the package or Bend inputs changed after a passed gate: run oracle-cycle.mjs walk --dir ${q(directory)} --reason ${REASONS} naming why` }),
-  // the lock is the user's approval: step runs the card lints, then prints the reviews, the approval and the lock in order
-  async lock(directory) {
-    const { root } = await packageSources(directory)
-    return {
-      checks: draftChecks(directory, root),
-      say: await lockSay(directory),
-      failed: (result) => cardLintSay(directory, result),
-    }
-  },
-  extend: (directory) => {
-    const approval = q(join(directory, 'explicit-user-approval.json'))
-    return { say: `ask the user to approve more authoring rounds, save it as ${approval}, then run oracle-stage.mjs extend --dir ${q(directory)} --approval ${approval}` }
-  },
+  step: (directory) => ({ say: `run ${rerun(directory)} and do what NEXT FOR YOU says` }),
+  lock: async (directory) => ({ say: await lockSay(directory) }),
+  // NEEDS_DECISION is the user's: step names the choice and runs nothing
+  stop: () => ({ say: `${STOP_NEXT}: the issues the last oracle-step.mjs printed` }),
   async init(directory) {
     const { root, scanRoot } = await packageSources(directory)
     const lock = q(join(directory, 'oracle.lock.json'))
@@ -547,7 +813,7 @@ const PLANS = {
     return { say: `start the Delivery run: oracle-run.mjs init --dir ${q(directory)} --lock ${lock} --scan-root ${scanRoot} --required-label ${label} (${label}: ${how}), then rerun ${rerun(directory)}` }
   },
   // NEEDS_DECISION is the user's: step names the choice and runs nothing
-  revise: () => ({ say: 'NEEDS_DECISION, the user decides: rewrite the sources and start the revision in a new oracle directory (oracle-stage.mjs begin on it), or stop here' }),
+  revise: () => ({ say: 'NEEDS_DECISION, the user decides: rewrite the sources and start the revision in a new oracle directory (oracle-step.mjs on it), or stop here' }),
   guide: (directory, phase) => ({ calls: [{ script: 'oracle-run.mjs', args: ['guide', '--dir', directory, '--to', /--to (\S+)/.exec(nextOf(phase.line))[1]] }], read: true }),
   async report(directory, phase) {
     const report = join(directory, 'final-report.md')
@@ -581,7 +847,7 @@ function reviewerSay(directory, flags, targets) {
 }
 
 /** The action that answers a refusal: step's own words where it chose the files, else the command's `next:` line. */
-function refusalAction(directory, phase, { call, head, walked, lines, targets }) {
+function refusalAction(directory, phase, { call, head, lines, targets }) {
   const waiting = /waiting for reviewer output: (.*)/.exec(head)
   if (waiting) return reviewerSay(directory, waiting[1], targets)
   if (head.includes('does not answer')) return reviewerSay(directory, '--findings', targets)
@@ -589,22 +855,14 @@ function refusalAction(directory, phase, { call, head, walked, lines, targets })
   // the CLI's remedy is a new --packet path; that sends the review out again, so step prints it and does not run it
   if (head.startsWith('REVIEW_PACKET_INVALID') && targets.freshPacket)
     return `after an exec on the current bytes if none passed since the last edit, run ${commandText(call, { '--packet': targets.freshPacket })}`
-  if (walked?.code === 'STAGE_STALE') return `run oracle-cycle.mjs walk --dir ${q(directory)} --reason ${REASONS} naming why`
-  return walked?.next ?? lines.find((text) => text.startsWith('next: '))?.slice(6) ?? `fix the cause above, then rerun ${rerun(directory)}`
-}
-
-/** A walk gate's detail on one line: its text's first line, or the failed checks it lists. */
-function firstLine(detail) {
-  if (typeof detail === 'string') return detail.split('\n')[0]
-  return JSON.stringify(detail)
+  return lines.find((text) => text.startsWith('next: '))?.slice(6) ?? `fix the cause above, then rerun ${rerun(directory)}`
 }
 
 /** A refused command: its first lines and the one action that answers it. */
 function refusal(directory, phase, call, result, targets = {}) {
-  const walked = call.script === 'oracle-cycle.mjs' ? JSON.parse(result.stdout || 'null')?.failed : null
-  const lines = walked ? [`${walked.code}: ${firstLine(walked.detail)}`] : (result.stderr || result.stdout || '').trim().split('\n')
+  const lines = (result.stderr || result.stdout || '').trim().split('\n')
   const head = lines[0] || `exit ${result.status}`
-  const say = refusalAction(directory, phase, { call, head, walked, lines, targets })
+  const say = refusalAction(directory, phase, { call, head, lines, targets })
   // close waits for a reviewer or the report: that is the agent's turn, not a refusal
   const waiting = head.startsWith('CLOSE_PENDING')
   const shown = lines.filter((text) => !text.startsWith('next: ')).slice(0, 2)
@@ -612,11 +870,10 @@ function refusal(directory, phase, call, result, targets = {}) {
 }
 
 const callText = (call) => [call.script, call.args[0], call.label].filter(Boolean).join(' ')
-/** ok, or the code a command stopped with (walk reports its failed gate on stdout). */
+/** ok, or the code a command stopped with. */
 function outcomeText(result) {
   if (result.status === 0) return 'ok'
-  const walked = /"failed":\{"step":"[^"]*","code":"(\w+)"/.exec(result.stdout ?? '')?.[1]
-  return walked ?? /^([A-Z][A-Z0-9_]+):/.exec(result.stderr ?? '')?.[1] ?? `exit ${result.status}`
+  return /^([A-Z][A-Z0-9_]+):/.exec(result.stderr ?? '')?.[1] ?? `exit ${result.status}`
 }
 const grew = (before, after) => (after.ledger?.length ?? 0) > (before.ledger?.length ?? 0)
 // the consecutive-pass gate asks for the same run again: a pass it recorded is progress even when the line stays
@@ -662,22 +919,6 @@ function stopAfter(directory, { step, phase, after, seen, call, result }) {
 }
 
 /**
- * After read-only checks that move no phase: a failed check is the refusal with the plan's own remedy; passing checks
- * go on to the plan's calls, or hand over its instruction led by the repository policy candidates the last check listed.
- */
-function checked(directory, phase, step, ran, last) {
-  if (!last) return { ran, phase, say: `${ran.length} commands ran, the most one call runs; rerun ${rerun(directory)} to go on` }
-  if (last.result.status !== 0) {
-    const say = typeof step.failed === 'function' ? step.failed(last.result) : step.failed
-    return { ran, phase, ...refusal(directory, phase, last.call, last.result), say }
-  }
-  if (step.calls) return null
-  const candidates = Number(/^REPO_POLICY_CANDIDATES (\d+)/m.exec(last.result.stdout ?? '')?.[1] ?? 0)
-  const lead = candidates > 0 ? `disposition the ${candidates} repository policy candidates \`${commandText(last.call)}\` lists as sweep counterparts; then ` : ''
-  return { ran, phase, say: `${lead}${step.say}` }
-}
-
-/**
  * The loop: plan, run the calls, read the phase line again — until an instruction, a stop, a line already seen in
  * this call, or `limit` commands. Calling step again and again is the agent's loop; step keeps no state between calls.
  */
@@ -687,10 +928,6 @@ export async function drive({ directory, read, plan, run, limit = MAX_AUTO_STEPS
   const seen = new Set([phaseOf(phase.line)])
   for (;;) {
     const step = await plan(phase)
-    if (step.checks) {
-      const stop = checked(directory, phase, step, ran, await runCalls(step.checks, run, ran, limit))
-      if (stop) return stop
-    }
     if (step.say) return { ran, phase, say: step.say, shown: step.shown }
     if (step.calls.length === 0) return { ran, phase, say: `step found nothing to run for this next step: read ${readNext(directory, phase)} and do what it names` }
     const last = await runCalls(step.calls, run, ran, limit)
@@ -711,13 +948,18 @@ const FLAGS = {
   '--dir': 'dir', '--label': 'label', '--findings': 'findings', '--intersect': 'intersect',
   '--task-id': 'taskId', '--intersect-task-id': 'intersectTaskId', '--blind-task-id': 'blindTaskId',
 }
-const USAGE = 'usage: oracle-step.mjs --dir <oracle dir> [--label <label> -- <test command>] [--findings <file>] [--intersect <file>] [--task-id <id>] [--intersect-task-id <id>] [--blind-task-id <id>]'
+const USAGE = 'usage: oracle-step.mjs --dir <oracle dir> [--check] [--label <label> -- <test command>] [--findings <file>] [--intersect <file>] [--task-id <id>] [--intersect-task-id <id>] [--blind-task-id <id>]'
 
 function parse(argv) {
   const split = argv.indexOf('--')
   const own = split === -1 ? argv : argv.slice(0, split)
   const options = split === -1 ? {} : { command: argv.slice(split + 1) }
   for (let index = 0; index < own.length; index += 2) {
+    if (own[index] === '--check') {
+      options.check = true
+      index -= 1
+      continue
+    }
     if (!FLAGS[own[index]] || own[index + 1] === undefined) throw new Error(USAGE)
     options[FLAGS[own[index]]] = own[index + 1]
   }
@@ -725,26 +967,39 @@ function parse(argv) {
   return options
 }
 
-/** The printed answer, at most six lines: the commands step ran, the phase, up to three shown lines, and the one instruction last. */
+/**
+ * The printed answer, at most about six lines: what step ran, the phase, the shown lines (three, or every failing node
+ * for `--check`), and the one instruction last.
+ */
 export function render(outcome) {
   const phase = phaseOf(outcome.phase.line).split(' · next:')[0]
   const ran = outcome.ran.length > 0 ? [`ran: ${outcome.ran.join('; ')}`] : []
-  return [...ran, phase, ...(outcome.shown ?? []).slice(0, 3), `NEXT FOR YOU: ${outcome.say}`].join('\n')
+  return [...ran, phase, ...(outcome.shown ?? []).slice(0, outcome.shownLimit ?? 3), `NEXT FOR YOU: ${outcome.say}`].join('\n')
+}
+
+/** Authoring until the lock: no Delivery run yet and no locked stage record. */
+async function authoring(directory) {
+  if (await exists(join(directory, 'run-state.json'))) return false
+  return (await readStage(directory).catch(() => null))?.stage !== 'ORACLE_READY'
 }
 
 async function main() {
   const given = parse(process.argv.slice(2))
   const directory = resolve(given.dir)
-  const outcome = await drive({
-    directory,
-    read: () => readPhase(directory),
-    plan: (phase) => planStep(directory, phase, given),
-    run: async (call) => {
-      const report = call.args.indexOf('--report')
-      if (report !== -1) await mkdir(dirname(call.args[report + 1]), { recursive: true })
-      return runCall(call)
-    },
-  })
+  const before = await authoring(directory)
+  if (given.check && !before) throw new Error('--check reads the authoring graph: this oracle is locked')
+  const outcome = before
+    ? await (given.check ? checkAll(directory) : authoringStep(directory))
+    : await drive({
+      directory,
+      read: () => readPhase(directory),
+      plan: (phase) => planStep(directory, phase, given),
+      run: async (call) => {
+        const report = call.args.indexOf('--report')
+        if (report !== -1) await mkdir(dirname(call.args[report + 1]), { recursive: true })
+        return runCall(call)
+      },
+    })
   process.stdout.write(`${render(outcome)}\n`)
   process.exitCode = outcome.refused ? 1 : 0
 }

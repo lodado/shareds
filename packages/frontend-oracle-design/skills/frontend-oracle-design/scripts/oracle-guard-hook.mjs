@@ -418,10 +418,10 @@ async function deniedBeforeLock(payload, cwd, absolutePath) {
   return true
 }
 
-/** 단계 기록은 oracle-stage.mjs가 걸음마다 검사를 돌린 뒤에만 쓴다 — 손으로 고쳐 단계를 건너뛰지 못하게 한다. */
+/** 단계 기록은 oracle-step.mjs(검사)와 oracle-lock.mjs(잠금)만 쓴다 — 손으로 고쳐 잠금 기록이나 반복 감지를 꾸미지 못하게 한다. */
 function deniedStageWrite(absolutePath) {
   if (basename(absolutePath) !== STAGE_FILE || !absolutePath.split(sep).includes('oracles')) return false
-  deny(`STAGE_PROTECTED: ${STAGE_FILE} moves only through oracle-stage.mjs (begin, advance, rewind --reason <cause>) — each step runs its gate.`)
+  deny(`STAGE_PROTECTED: ${STAGE_FILE} is written only by oracle-step.mjs and oracle-lock.mjs — run oracle-step.mjs --dir <dir> and do what NEXT FOR YOU says.`)
   return true
 }
 

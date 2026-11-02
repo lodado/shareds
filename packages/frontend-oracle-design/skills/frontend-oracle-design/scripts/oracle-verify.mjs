@@ -69,7 +69,7 @@ const FLAG_NAMES = [
   'blind-map',
   'baseline-root',
   'repaired',
-  // card: the repository root a card outside it is linted against (oracle-cycle.mjs lints a scratch copy)
+  // card: the repository root a card outside it is linted against (oracle-step.mjs --check lints a scratch copy)
   'root',
 ]
 

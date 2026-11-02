@@ -75,10 +75,10 @@ function workspace(t, { formal = false } = {}) {
   mkdirSync(join(root, 'packages/frontend-oracle-design/test-fixtures/contract-v1'), { recursive: true })
   copyFileSync(new URL('policy.md', fixture), join(root, registered))
   const author = () => {
-    ok(cli('stage', 'begin', '--dir', directory, '--profile', 'contract/v1'))
-    for (const to of ['CHECKED', 'DRAFTED']) ok(cli('stage', 'advance', '--dir', directory, '--to', to))
+    ok(cli('step', '--dir', directory))
     ok(cli('lock', 'create', '--oracle', oracle, '--lock', lock, '--source', registered, '--profile', 'contract/v1'))
-    assert.deepEqual(json(join(directory, 'stage.json')).history.map((entry) => entry.stage), ['DISCOVERING', 'CHECKED', 'DRAFTED', 'ORACLE_READY'])
+    // the record keeps the positions the step saw and the lock, not a walk through every stage
+    assert.deepEqual(json(join(directory, 'stage.json')).history.map((entry) => entry.stage), ['DRAFTED', 'ORACLE_READY'])
   }
   const init = () => {
     ok(cli('run', 'init', '--dir', directory, '--lock', lock, '--scan-root', source, '--required-label', 'contract-cases:reported', '--harness-path', 'product.test.mjs'))
@@ -128,16 +128,15 @@ test('approval and Design-only authoring write no product tests, tampered card a
   const bytes = Object.fromEntries([w.product, w.tests].map((path) => [path, readFileSync(path)]))
   const card = readFileSync(w.oracle, 'utf8')
   writeFileSync(w.oracle, card.replace('- Status: approved', '- Status: pending'))
-  ok(w.cli('stage', 'begin', '--dir', w.directory, '--profile', 'contract/v1'))
-  const before = readFileSync(join(w.directory, 'stage.json'))
-  assert.notEqual(w.cli('stage', 'advance', '--dir', w.directory, '--to', 'CHECKED').status, 0)
-  assert.deepEqual(readFileSync(join(w.directory, 'stage.json')), before)
+  const pending = w.cli('step', '--dir', w.directory)
+  assert.equal(pending.status, 1)
+  assert.match(pending.stdout, /FAILED confirmation: user-confirmation: /)
   assert.equal(existsSync(w.lock), false)
   assert.notEqual(w.cli('lock', 'create', '--oracle', w.oracle, '--lock', w.lock).status, 0)
   assert.equal(existsSync(w.state), false)
   assert.equal(existsSync(w.ledger), false)
   writeFileSync(w.oracle, card)
-  for (const to of ['CHECKED', 'DRAFTED']) ok(w.cli('stage', 'advance', '--dir', w.directory, '--to', to))
+  ok(w.cli('step', '--dir', w.directory))
   ok(w.cli('lock', 'create', '--oracle', w.oracle, '--lock', w.lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md'))
   // Design-only is the approved authoring endpoint, not a invented CLI switch.
   assert.equal(existsSync(w.state), false)
@@ -212,11 +211,6 @@ test('legacy actual public init and read/resume preserve original card and lock 
   assert.equal(Object.hasOwn(json(w.lock), 'verificationProfile'), false)
   // Resume reads the actual existing run, rather than initializing a new Contract revision.
   for (const path of [w.oracle, w.lock]) assert.deepEqual(readFileSync(path), path === w.oracle ? card : lock)
-  const promoted = w.cli('stage', 'begin', '--dir', w.directory, '--profile', 'contract/v1')
-  assert.notEqual(promoted.status, 0)
-  assert.match(promoted.stderr, /PROFILE_MISMATCH/)
-  assert.deepEqual(readFileSync(w.state), state)
-  assert.deepEqual(readFileSync(w.ledger), ledger)
 })
 
 function formalCopy(w) {
@@ -233,15 +227,12 @@ test('Formal unavailable Bend fails with genuine download cause and cannot fall 
   const preload = join(w.root, 'deny-download.mjs')
   writeFileSync(preload, "globalThis.fetch = async () => { throw Error('ACCEPTANCE_NETWORK_DENIED: Bend unavailable') }\n")
   w.env.NODE_OPTIONS = `--import=${preload}`
-  ok(w.cli('stage', 'begin', '--dir', w.directory, '--profile', 'formal-bend/v1'))
-  ok(w.cli('stage', 'advance', '--dir', w.directory, '--to', 'MODELED'))
-  const before = readFileSync(join(w.directory, 'stage.json'))
-  const failed = w.cli('stage', 'advance', '--dir', w.directory, '--to', 'CHECKED')
-  assert.notEqual(failed.status, 0)
+  // the package passes, so the step reaches the model, which needs Bend: the download cause is the refusal, and no check
+  // is recorded for a model that could not run
+  const failed = w.cli('step', '--dir', w.directory)
+  assert.equal(failed.status, 2)
   assert.match(failed.stderr, /BEND_DOWNLOAD_FAILED.*ACCEPTANCE_NETWORK_DENIED/)
-  assert.deepEqual(readFileSync(join(w.directory, 'stage.json')), before)
-  assert.equal(json(join(w.directory, 'stage.json')).verificationProfile, 'formal-bend/v1')
-  for (const path of [w.lock, w.state, w.ledger]) assert.equal(existsSync(path), false)
+  for (const path of [join(w.directory, 'stage.json'), w.lock, w.state, w.ledger]) assert.equal(existsSync(path), false)
 })
 
 function prepareFormalWitnesses(w, packagePath, formalTests) {
@@ -344,12 +335,13 @@ test('explicit Formal real pinned Bend package projection and initialization pre
   console.log(`BEND_PROVENANCE ${JSON.stringify({ bin, version: version.stdout.trim(), sha256: digest(readFileSync(bin)) })}`)
   formalCopy(w)
   const packagePath = relative(w.root, join(w.directory, 'oracle.package.json'))
-  ok(w.cli('stage', 'begin', '--dir', w.directory, '--profile', 'formal-bend/v1'))
-  ok(w.cli('stage', 'advance', '--dir', w.directory, '--to', 'MODELED'))
-  const checked = w.cli('stage', 'advance', '--dir', w.directory, '--to', 'CHECKED', '--timeout-ms', '300000')
-  if (checked.status !== 0) {
-    console.log(`FORMAL_POSITIVE_NOT_RUN ${JSON.stringify({ gate: 'CHECKED', exit: checked.status, stderr: checked.stderr, bin })}`)
-    t.skip(`explicit Formal positive blocked at real CHECKED: ${checked.stderr.trim()}`)
+  // the first step judges the package and the real model (Bend); the card after them waits for the approval below
+  const checked = w.cli('step', '--dir', w.directory)
+  const position = existsSync(join(w.directory, 'stage.json')) ? json(join(w.directory, 'stage.json')).checks.at(-1).label : null
+  assert.notEqual(position, 'DISCOVERING', checked.stdout)
+  if (position !== 'CHECKED' && position !== 'DRAFTED') {
+    console.log(`FORMAL_POSITIVE_NOT_RUN ${JSON.stringify({ gate: 'model', exit: checked.status, stdout: checked.stdout, stderr: checked.stderr, bin })}`)
+    t.skip(`explicit Formal positive blocked at the real model: ${(checked.stderr || checked.stdout).trim()}`)
     return
   }
   const projected = join(w.directory, 'projected.md')
@@ -358,7 +350,7 @@ test('explicit Formal real pinned Bend package projection and initialization pre
   if (!card.includes('## Verification Profile')) card += '\n## Verification Profile\n\n- Profile: formal-bend/v1\n'
   writeFileSync(w.oracle, card)
   assert.match(card, /- Profile: formal-bend\/v1/)
-  ok(w.cli('stage', 'advance', '--dir', w.directory, '--to', 'DRAFTED'))
+  ok(w.cli('step', '--dir', w.directory))
   const formalTests = join(w.source, '__test__/formal')
   const fastCheck = fileURLToPath(new URL('../node_modules/fast-check', import.meta.url))
   if (!existsSync(fastCheck)) {
