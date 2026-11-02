@@ -680,6 +680,24 @@ test('reflect points each budget kind at the place that owns its fix', async (t)
   assert.match(policy.suggest, /before lock/)
 })
 
+test('reflect counts the spend a ledger shows without a budget record, never on top of an old record of it', async (t) => {
+  const root = await reflectedRuns(t)
+  // since 0.129 no command records a spend: a resume after a decision is one policy spend read off the ledger
+  const resumed = [
+    { type: 'transition', state: 'NEEDS_DECISION', reason: 'refund window unsourced' },
+    { type: 'transition', state: 'ORACLE_READY', evidenceRunId: 'r-001' },
+  ]
+  const write = (id, ledger) =>
+    writeFile(join(root, '.ai', 'oracles', id, 'runs.jsonl'), `${ledger.map((entry) => JSON.stringify(entry)).join('\n')}\n`)
+  await write('checkout', resumed)
+  await write('pagination', [{ type: 'budget', budget: 'policy', reason: 'refund window unsourced' }, ...resumed])
+  const report = JSON.parse(reflect(root, '--root', root).stdout)
+  assert.deepEqual(report.budgets, { policy: 2 }, 'the old record and the resume it stands for count once')
+  const policy = report.candidates.find((candidate) => candidate.signal === 'budget:policy')
+  assert.deepEqual(policy.runs, ['checkout', 'pagination'])
+  assert.deepEqual(policy.notes, ['refund window unsourced'])
+})
+
 test('reflect counts a CHECKED judged again in place as rework, with or without its reason', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'oracle-reflect-recheck-'))
   t.after(() => rm(root, { recursive: true, force: true }))

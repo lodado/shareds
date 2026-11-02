@@ -285,14 +285,14 @@ these routes. An unconfirmed problem candidate stays in the existing investigati
 `needs-evidence`, not a guessed defect classification. Current implementation, test observations,
 and reviewer preference are classification evidence, not policy sources.
 
-| Classification       | Meaning                                                                                             | Routing                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
-| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
-| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
-| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
-| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
+| Classification       | Meaning                                                                                             | Routing                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                |
+| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                 |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (one per new RED binding) |
+| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`            |
+| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                         |
+| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy           |
 
 - A revision mismatch is not a feedback classification. Stop using existing evidence for the changed
   revision and move to `NEEDS_DECISION` or `FAIL` per the lock rules. Preserve past artifacts and
@@ -963,7 +963,8 @@ sequence test (`SEQUENCE_EVIDENCE_MISSING`), and every `covered()` `F*` frame ne
 `needs-decision` frames are exempt. `oracle-verify.mjs evidence-scaffold` emits both
 keys when the card declares them, and the `VALID_RED` transition freezes them alongside the row
 mapping — swapping a `PATH*` or `sequence` name for another passing test after RED is
-`HARNESS_BUDGET_REQUIRED`·`EVIDENCE_STALE`, the same gate the row mapping already had.
+`EVIDENCE_STALE` until a fresh RED binds it (one harness spend), the same gate the row mapping
+already had.
 
 <!-- node:contract-space path:references/contract/space.md -->
 

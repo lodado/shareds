@@ -1,3 +1,106 @@
+# 0.129.0: step runs the Delivery ceremony, one Formal card review, and a finding blocks only when it changes a verdict
+
+## Why
+
+Wave W4 of `.ai/plans/fod-simplify/PLAN.md` (data in `W4-PREP.md`). Of the 36 Delivery refusals in the field runs, 27
+were command shape or order (`ADAPTER_COMMAND_INVALID` in 5 of 5 runs, a green refused 7 of 13 times): refusals a
+script that runs the commands itself never meets. `budget --spend` recorded what the ledger already shows, and
+`review-extend` always refused. Of 34 reviewer spawns (112 minutes), cold-read and reverse-impossible read the same
+card digest; the blind mapper raised no blocking finding in 3 runs; repair regressions came only from the round-2
+confirmation. Findings that changed no test verdict (a doubt about a test's own verdict, an approved narrowing) still
+blocked and cost rounds.
+
+## Change
+
+- Step assembles the Delivery commands (oracle-step.mjs `sourceOf`, `derivedSource`, `commandIssue`, `redLabel`). A
+  label's command is the `--label L -- cmd` override, the ledger's last run of it, or derived: the scan root's test
+  file named `<name>.<stem>.test.<ext>` (fast-check→oracle, world-conformance→world, bend-proof→proof,
+  bend-adequacy→adequacy, type-contract→type, contract-cases→cases, otherwise the label), run with `npx vitest run`
+  for TS, JSX or a vitest import and with this node's `--test` otherwise; `repo-test` from package.json's test
+  script, `repo-test:exit` as `npm test`. A command the CLI would refuse (`REQUIRED_LABEL_GRADE`,
+  `ADAPTER_COMMAND_INVALID`) is named instead of run. The RED label is the named one, then the VALID_RED label, the
+  last failing reported product run, then the first candidate label with a command.
+- Close cites the GREEN label's own pass after GREEN (`citedRun`); with none, step runs the GREEN command on the
+  current bytes first (`witnessCall`) and plans close again. `REVIEW_RERUN_REQUIRED` and `REVIEW_COMMAND_CHANGED`
+  no longer reach the agent through step.
+- Spend is read off the ledger (oracle-transition-guards.mjs `ledgerSpend`, oracle-run.mjs `applyLedgerSpend`):
+  harness = the distinct test bindings after the first VALID_RED, product = worker dispatches plus distinct failing
+  production states after VALID_RED, policy = ORACLE_READY resumes; spent = max(an old recorded spend, the derived
+  one). The caps (policy 2, harness 2, product 3) and their enforcement points stay. A refresh that rebinds nothing is
+  `TRANSITION_NOT_ALLOWED`; a worker run is recorded before its post-run refusals so its spend is in the ledger.
+- Deleted: `budget` (and `HARNESS_BUDGET_REQUIRED`, `BUDGET_NOT_NEEDED`), `review-extend`, init's amendment of a
+  started run (a second init is `RUN_ARTIFACTS_EXIST`; `AMEND_SCOPE_CHANGED` gone), `HARNESS_PATH_MODIFIED` and
+  `HARNESS_PATH_NEW_SOURCE` (nothing raised them). oracle-workflow.graph.json's review-dispatch task no longer
+  describes a user-approved third round. `review-packet`, `review-receipt` and `blind-input` remain close's internal
+  steps. Old ledgers' budget, amend and review-extension entries still verify and replay.
+- Refusal classes (oracle-run.mjs `FIX_CLASSES`, `REFUSALS`, `refusalLine`): every code a Delivery script can print
+  maps to one of 9 classes by where the fix goes (command, order, tests, production, review, card, environment,
+  state, stop) and one prescription line; the agent reads `next: [class] line`. Codes forwarded from the verifier
+  and the lock check keep their own words under a class.
+- One Formal card review (oracle-stage.mjs GRAPH, oracle-step.mjs `REVIEW_KINDS`): the cold-read and
+  reverse-impossible nodes are one `card-review` node with one input folder (view.md, oracle.md, ir.json, and
+  explore-input.md for a card with Adequacy), one JSON return
+  `{"coldRead": {"root", "nail", "findings"}, "candidates": [...]}` at `reviews/card-review-<digest12>.json` and
+  one round count (at most 2). The cold read is written before the reviewer opens the reverse-impossible inputs;
+  triage reads `.candidates`. An older run's reverse-impossible returns count as card-review rounds (`roundKinds`),
+  answer the node for their digest and are continued by round 2. Contract keeps its cold-read node.
+- A finding blocks only when it changes a verdict (oracle-iterations.mjs `changesVerdict`, applied in
+  oracle-verify.mjs findingsResult after the intersection and before the round-2 split): a `PRODUCT_DEFECT`,
+  `EVIDENCE_GAP` or `HARNESS_DEFECT` blocks with `wrongPasses` (the wrong implementation every locked test passes, a
+  non-empty string) or a reproduction, and is otherwise recorded as a proposal with that reason; `POLICY_GAP`,
+  `ENVIRONMENT_DEFECT` and a rowless critical/high finding block as before. A round-2 `previous` claim cites only a
+  round-1 claim that blocked. In the card review a finding blocks only when every row lets through a behavior the
+  approved sources forbid or never decided; a doubt about a test's own verdict and an approved narrowing are
+  proposals (controller-formal no longer promotes every disagreement to needs-decision).
+- Kept: the analyst before the card review in the graph, the adapter pre-RED review, the round-2 confirm-fixes
+  review, Delivery reviewers Medium 1 and High 2, and the blind mapper: whether a hand-written test enforces its row
+  is a semantic reading no script decides. The only decidable part, a generated test (drift-checked, named
+  `[ROW]`) mapped to its own ROW, would need each test bound to its file at the five call sites of the
+  REVIEW_VERIFIED gate; it is left as a proposal.
+- Models: test-fixtures/delivery without the budget, amend and extend commands and with the policy-resume count,
+  which closes the old `red_cycle_returns` loop; test-fixtures/review-lap gains `Note` (a claim without
+  `wrongPasses`) and the law `note_proposes`. Both proofs and CLI replays pass.
+- Docs: common, delivery/ledger, red, green-review (both profiles), risk-grill, case-space-frames,
+  graph-orchestration-formal, controller-formal, author-formal, review, review-formal, card-format, adequacy,
+  subagent-review (`wrongPasses`; close generates the review packet); bundles regenerated.
+
+Measured, 0.128.0 → 0.129.0:
+
+- oracle-run.mjs subcommands 19 → 17 (`budget`, `review-extend`), and the subcommands the skill docs name 19 → 17.
+- Refusal codes a Delivery script can print 185 → 181; classes 0 → 9, every code mapped (182 table entries with the
+  status blocker `EVIDENCE_MISSING_ROWS`). Codes that no longer reach the agent through step: the command-shape
+  five (`ADAPTER_COMMAND_INVALID`, `INPUT_UNREADABLE`, `REPORT_PATH_EXISTS`, `REQUIRED_LABEL_GRADE`,
+  `REVIEW_POINTS_REQUIRED`) and the order five (`EVIDENCE_STALE`, `REQUIRED_RUN_MISSING`, `FLAKINESS_GATE`,
+  `REVIEW_RERUN_REQUIRED`, `REVIEW_COMMAND_CHANGED`).
+- Reviewer kinds, Formal authoring 5 → 4 (model analyst, its translation review, card review, conditional
+  source-aware); Formal Delivery 3 (adapter pre-RED, Delivery reviewer Medium 1 / High 2, blind mapper) and Contract
+  unchanged.
+- Bend: delivery 39,032 → 37,099 B (type space 15,552 → 11,664 states, 19 → 17 commands; 1,295 → 1,335 reachable
+  with the resume count); review lap 22,340 → 22,786 B (`Note`; 13 → 14 commands, 229 → 252 reachable); together
+  61,372 → 59,885 B.
+- role-review bundle 61,988 → 61,995 B (cap 62,000); Formal Delivery closure 444,227 → 444,724 B (cap 446,000).
+
+## Tests
+
+- New: oracle-step.cases commandRefusals, orderRefusals (the field refusals do not reach the agent), citedGreenRun
+  and legacyCardRounds; oracle-run.cases the refusal-class enumeration (fails on a code no class names and on a
+  class entry nothing prints), the derived-budget tests (O11 harness, product and policy caps; one binding counts
+  once) and a round-1 claim without `wrongPasses` recorded as a proposal; oracle-verify.test the `wrongPasses`
+  replay (H3's unnamed and named claims, stop classes, reproduction, rowless); oracle-stage.test reflect counting a
+  ledger's spend once.
+- Deleted with the behavior: the `budget` CLI tests (spend per digest, run numbers, `BUDGET_EXHAUSTED` by spend,
+  policy and implicit harness spend by digest), the init amendment tests (three; a second init is now refused before
+  VALID_RED too), transition-guards' RED refresh budget check.
+- Changed on purpose: the harness-budget and O6/O10 tests read the spend off the ledger, and the O6 concurrency test
+  checks that state writes hold the state lock with no budget write left to race; blocking finding fixtures
+  carry `wrongPasses` (oracle-verify.test O13, O22, O23, citations; oracle-run.cases O17 and round 2); the step
+  authoring cases ask for two reviews (the model analyst and the card review) and count `card-review` rounds; the
+  authoring replay maps the card node's rounds to `card-review`; the lap replay counts (50 traces, 617 items) and
+  the delivery replay; closeFixture gets a GREEN history; the skill-contract pins on budget and review-extend (now
+  their absence) and profile-reference-isolation's reverse-impossible pin (inside the one card review).
+- Held-out: H1–H10 and E1–E6 mapped to their catchers in `.ai/plans/fod-simplify/W4-RESULT.md` §2 (H5 by the model
+  node's adequacy check, H8 and H10 as proposals); live reviewer replays not run.
+
 # 0.128.0: one rule table; the package starts as a skeleton and is filled with `set`
 
 ## Why

@@ -13,8 +13,9 @@ import Base
 # - current: the worktree is the revision of the latest round's packet.
 # - bound: a reviewer receipt is bound to the latest round's packet.
 # - blocked: the findings of that receipt block under its round's rule (round 1: any claim; round 2: a claim backed
-#   as previous, regression or security). noted: they hold a round-2 improvement proposal.
-# - prior: the round-1 findings the round-2 packet carries hold a claim, so a round-2 `previous` claim can cite it.
+#   as previous, regression or security; a note never). noted: they hold an improvement proposal.
+# - prior: the round-1 findings the round-2 packet carries hold a blocking claim, so a round-2 `previous` claim can
+#   cite it.
 # - ran: a passing run came after the GREEN entry. fresh: the latest run is on the current bytes.
 # - witnessed: the latest round's packet was made while a passing run on its bytes was in the ledger, which the
 #   verifier needs before it reads the findings.
@@ -46,9 +47,12 @@ type Basis is Data:
   Security{backed: Bool}
   Plain{}
 
+# A claim names the wrong implementation every locked test passes; a note names none, so it is a proposal in every
+# round and never blocks.
 type Find is Data:
   Clear{}
   Claim{kind: Basis}
+  Note{}
 
 type Target is Data:
   ToVerified{}
@@ -267,10 +271,10 @@ def Lap.backed(k: Basis, prior: Bool) -> Bool:
 
 def Lap.is_claim(f: Find) -> Bool:
   match f:
-    case Clear{}:
-      False{}
     case Claim{k}:
       True{}
+    case _:
+      False{}
 
 def Lap.claim_blocks(r: Round, k: Basis, prior: Bool) -> Bool:
   match r:
@@ -281,21 +285,23 @@ def Lap.claim_blocks(r: Round, k: Basis, prior: Bool) -> Bool:
     case R2{}:
       Lap.backed(k, prior)
 
-# Round 1 blocks on every claim; round 2 only on a backed class.
+# Round 1 blocks on every claim; round 2 only on a backed class; a note never.
 def Lap.blocks(+r: Round, f: Find, prior: Bool) -> Bool:
   match f:
-    case Clear{}:
-      False{}
     case Claim{k}:
       Lap.claim_blocks(r, k, prior)
+    case _:
+      False{}
 
-# A round-2 claim the packet does not back is an improvement proposal.
+# A note, and a round-2 claim the packet does not back, is an improvement proposal.
 def Lap.proposes(+r: Round, f: Find, prior: Bool) -> Bool:
   match f:
     case Clear{}:
       False{}
     case Claim{k}:
       Bool.and(Lap.is_r2(r), Bool.not(Lap.backed(k, prior)))
+    case Note{}:
+      True{}
 
 def Lap.is_security_backed(f: Find) -> Bool:
   match f:
@@ -427,7 +433,7 @@ def Lap.run_all(ms: List<Msg>, s: Lap) -> Lap:
       Lap.run_all(rest, Lap.step(s, m))
 
 def Lap.verdicts() -> List<Msg>:
-  [Packet{}, Attest{Clear{}}, Attest{Claim{Previous{}}}, Attest{Claim{Regression{True{}}}}, Attest{Claim{Regression{False{}}}}, Attest{Claim{Security{True{}}}}, Attest{Claim{Security{False{}}}}, Attest{Claim{Plain{}}}, Review{ToVerified{}}, Review{ToPartial{}}, Stop{}]
+  [Packet{}, Attest{Clear{}}, Attest{Claim{Previous{}}}, Attest{Claim{Regression{True{}}}}, Attest{Claim{Regression{False{}}}}, Attest{Claim{Security{True{}}}}, Attest{Claim{Security{False{}}}}, Attest{Claim{Plain{}}}, Attest{Note{}}, Review{ToVerified{}}, Review{ToPartial{}}, Stop{}]
 
 def Lap.enabled_at(a: Stage) -> List<Msg>:
   match a:
@@ -506,12 +512,12 @@ def Lap.Q_no_third_round(+s: Lap, +m: Msg, t: Lap, +o: Last) -> Bool:
 def Lap.Q_current_only_by_packet(+s: Lap, +m: Msg, +t: Lap, +o: Last) -> Bool:
   Lap.imp(Bool.and(Bool.not(Lap.current(s)), Lap.current(t)), Bool.and(Lap.took(o), Lap.is_packet(m)))
 
-# Q_proposal_inert: a round-2 finding the packet does not back ends exactly where a clear finding ends, except that
-# it is noted as an improvement proposal; once accepted it never blocks
+# Q_proposal_inert: a note, or a round-2 claim the packet does not back, ends exactly where a clear finding ends,
+# except that it is noted as an improvement proposal; once accepted it never blocks
 def Lap.Q_proposal_inert(+s: Lap, +m: Msg, +t: Lap, +o: Last) -> Bool:
   Lap.imp(Bool.and(Lap.is_attest(m), Lap.proposes(Lap.round(s), Lap.find_of(m), Lap.prior(s))), Bool.and(Lap.same_but_noted(t, Lap.step(s, Attest{Clear{}})), Lap.imp(Lap.took(o), Bool.not(Lap.blocked(t)))))
 
-# Q_attest_classes: an accepted attest blocks exactly on its round's rule and notes exactly the round-2 proposals
+# Q_attest_classes: an accepted attest blocks exactly on its round's rule and notes exactly the proposals
 def Lap.Q_attest_classes(+s: Lap, +m: Msg, +t: Lap, +o: Last) -> Bool:
   Lap.imp(Bool.and(Lap.took(o), Lap.is_attest(m)), Bool.and(Lap.iff(Lap.blocked(t), Lap.blocks(Lap.round(s), Lap.find_of(m), Lap.prior(s))), Lap.iff(Lap.noted(t), Lap.proposes(Lap.round(s), Lap.find_of(m), Lap.prior(s)))))
 
@@ -554,10 +560,10 @@ def Lap.all_ok(+s: Lap, ms: List<Msg>) -> Bool:
     case Con{m, rest}:
       Bool.and(Lap.cell_ok(s, m), Lap.all_ok(s, rest))
 
-# Reached-state facts: a recorded round has a packet, so only round 0 has no current packet; a proposal is noted
-# only in round 2; prior is set only by the round-2 packet.
+# Reached-state facts: a recorded round has a packet, so only round 0 has no current packet and nothing noted; prior
+# is set only by the round-2 packet.
 def Lap.shape(+s: Lap) -> Bool:
-  Bool.and(Lap.imp(Lap.is_r0(Lap.round(s)), Bool.and(Bool.not(Lap.current(s)), Bool.not(Lap.bound(s)))), Bool.and(Lap.imp(Lap.noted(s), Lap.is_r2(Lap.round(s))), Lap.imp(Lap.prior(s), Lap.is_r2(Lap.round(s)))))
+  Bool.and(Lap.imp(Lap.is_r0(Lap.round(s)), Bool.and(Bool.not(Lap.current(s)), Bool.and(Bool.not(Lap.bound(s)), Bool.not(Lap.noted(s))))), Lap.imp(Lap.prior(s), Lap.is_r2(Lap.round(s))))
 
 # The every-trace safety def: in every state a trace reaches, every law holds for every command the environment
 # allows. `oracle-model.mjs prove-reach --safe safe` proves it.

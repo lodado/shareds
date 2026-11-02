@@ -285,14 +285,14 @@ these routes. An unconfirmed problem candidate stays in the existing investigati
 `needs-evidence`, not a guessed defect classification. Current implementation, test observations,
 and reviewer preference are classification evidence, not policy sources.
 
-| Classification       | Meaning                                                                                             | Routing                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
-| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
-| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
-| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
-| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
+| Classification       | Meaning                                                                                             | Routing                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                |
+| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                 |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (one per new RED binding) |
+| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`            |
+| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                         |
+| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy           |
 
 - A revision mismatch is not a feedback classification. Stop using existing evidence for the changed
   revision and move to `NEEDS_DECISION` or `FAIL` per the lock rules. Preserve past artifacts and
@@ -681,38 +681,33 @@ Fresh reviewers load their own dependencies; a same-context switch is not indepe
 return to the controller without invented approval, state or runId. Return findings only: no product/test/
 model/policy/lock edits, receipts, transitions or approvals. The controller owns acceptance and human decisions.
 
-## Contract cold-read
+## Card review: cold read, then reverse-impossible
 
-Read the Cold-read gate criteria in [`card/card-format.md`](../card/card-format.md), with procedural
-dependencies. Round 1 receives the card bytes alone as task input: the `oracle-review-view.mjs card`
+One context-free reviewer per card digest reads one input folder and returns one JSON. Read the Cold-read
+gate criteria in [`card/card-format.md`](../card/card-format.md), with procedural dependencies. Round 1
+reads the card bytes alone first: the `oracle-review-view.mjs card`
 reading view plus a byte copy of the card, both outside the run directory; a folded Derived Axes cell
-is looked up in the copy by its line. Round 2
+is looked up in the copy by its line. No repo path, conversation, rationale or intended reading. A forced
+guess is a card defect, not a reader failure. Apply the five questions per row. Collapse to one root
+assumption plus the first nail, the cheapest falsifying observation, and write both as `coldRead` before
+opening the rest: the impossible dispositions (`oracle-verify.mjs card --ir`), the witness
+falsifier table of [`card/interaction-sweep.md`](../card/interaction-sweep.md) and the
+`oracle-adequacy.mjs explore-input` file. Then "one of these is wrong: build the counterexample", without
+author rationale; its `candidates` sit beside `coldRead`. A finding blocks only when it names a behavior
+every row lets through that the approved sources forbid or never decided; any other, such as an approved
+narrowing or a doubt about a test's own verdict, is a proposal. Round 2
 continues the round-1 reviewer context with the prior finding IDs and repair diff for confirmation only;
-a fresh context gets the same input only when the host cannot continue it. No repo path, conversation,
-rationale or intended reading. A forced guess is a card defect, not a reader failure. Apply the five questions per row.
-Collapse to one root assumption plus the first nail, the cheapest falsifying observation. Return both,
-not a list of opinions. The controller must drive that nail and record the observation/result in journal.md
-before presenting the Draft. Do not claim naming the nail proves it was driven.
-A same-context read is the fallback, never the target, only where the existing card-format contract allows
-it and with its limitation recorded. The author cannot un-see the conversation. A fallback cannot be
-presented as actual independence or substitute for High delivery's independent samples.
-
-## Reverse-impossible
-
-In a second context-free review once per card, receive the impossible dispositions extracted with
-`scripts/oracle-verify.mjs card --ir`, the witness falsifier table from
-[`card/interaction-sweep.md`](../card/interaction-sweep.md) and the `oracle-adequacy.mjs explore-input`
-file. The framing is "one of these is wrong:
-build the counterexample". Do not import author rationale to defend an exclusion. Return counterexamples
-and disagreements. Every disagreement is promoted to needs-decision, not dismissed as taste.
-It supplements, never replaces, the cold-read gate.
+a fresh context gets the same input only when the host cannot continue it. A same-context read is the
+fallback, never the target, only where the card-format contract allows it and with its limitation
+recorded. The author cannot un-see the conversation. A fallback cannot be presented as actual
+independence or substitute for High delivery's independent samples.
 
 ## Source-aware fresh review
 
 When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies before the Draft is shown, compare
 verbatim user messages and approved source excerpts with every affected card decision. Record each item
 as a linked P/O/D row, Open question or justified N/A. Preserve the raw source inputs, not an author's
-summary. It supplements, never replaces, card-only cold-read and reverse-impossible review.
+summary. It supplements, never replaces, the card review.
 If independence is unavailable, record the same-context fallback and limitation where that source review
 contract permits it. Unresolved policy findings return to the author/controller as Draft Open questions.
 Neither reviewer inference nor production observations become product policy authority.
@@ -788,7 +783,8 @@ findings with source/row/evidence links and raw results. POLICY_GAP goes to huma
 EVIDENCE_GAP to actual missing evidence; HARNESS_DEFECT to $test allowances; PRODUCT_DEFECT to applicable
 RED-gated implementation; environment failure reports the actual cause; NON_ORACLE_OPINION is recorded,
 never a new policy or completion blocker. A missing card row alone does not establish NON_ORACLE_OPINION.
-No reviewer can spend a separate budget, fabricate a runId, issue a receipt or return its own approval.
+A repair class blocks only with `wrongPasses` or a reproduction (subagent-review); others are proposals.
+No reviewer can fabricate a runId, issue a receipt or return its own approval.
 
 <!-- node:role-review path:references/roles/review.md -->
 
@@ -800,8 +796,9 @@ dependencies in independent context. Procedure reads grant no access to excluded
 
 Card-only cold-read sees card bytes alone, not sources, implementation, author conclusions or Delivery
 packets. Apply five questions per row and return one root and cheapest falsifying nail.
-Reverse-impossible sees only impossible dispositions and the approved witness/falsifier table, asks
-for a counterexample, and returns disagreements without deciding policy. Source-aware review sees
+Reverse-impossible, after that cold read in the same Formal card review, adds only impossible
+dispositions, the approved witness/falsifier table and the explore input, asks for a counterexample, and
+returns disagreements without deciding policy. Source-aware review sees
 approved source excerpts and card decisions, distinct from blind review. Formal `adapter-pre-red` follows
 delivery/red without a Delivery packet/receipt. Delivery review sees only
 the matching locked packet, raw reported evidence, final snapshot and mode-appropriate criteria.

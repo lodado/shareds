@@ -7,23 +7,25 @@ import Base
 # State, as the guards see it:
 # - at: the run state (references/delivery.protocol.json), with the review packet of this IMPLEMENTED_GREEN visit
 #   (none, one with no receipt bound to it, one with a receipt bound to it).
-# - red: a VALID_RED was ever recorded (redRecorded). Before it, init can be amended and harness spends are free.
+# - red: a VALID_RED was ever recorded, so a GREEN keeps the test bytes it bound.
 # - touched: production differs from the init snapshot.
 # - run: the latest run (every run is the required `behavior` label): whether it passed, whether the worktree is
 #   unchanged since it (fresh), and whether it came after the gate baseline of the current state (since: after the
 #   last VALID_RED entry, or the last ORACLE_READY entry when no VALID_RED exists; at IMPLEMENTED_GREEN after the
 #   GREEN entry; at NEEDS_DECISION what ORACLE_READY will see after a resume).
 # - dirty: test bytes changed since the last VALID_RED binding.
-# - harness: the harness budget: spends counted (limit 2), whether one was counted since the last VALID_RED
-#   (renewed), and whether the current test bytes were already spent (covered: a repeat spend is a duplicate).
+# - spent: the harness spends the ledger shows (limit 2): one per VALID_RED refresh, which binds changed tests. A
+#   VALID_RED from ORACLE_READY binds for free.
+# - resumes: the policy spends the ledger shows (limit 2): one per resume (NEEDS_DECISION → ORACLE_READY).
 # - greened: an IMPLEMENTED_GREEN was ever recorded.
 #
 # Abstracted away: risk (the fixture is Low: one passing run, no intersect, mutation or blind mapping), lock and
-# source drift, milestones, registered harness paths, report and adapter errors, test weakening, the product and
-# policy budgets (same spendBudget code, digest of production or lock bytes, no other guard reads them), the review
-# repair loop after GREEN (edits after a GREEN, round-2 packets, closure, review-extend, review-brief, workers), the
-# findings verdict (always clear), and `close`, `status` and `guide`, which read the state. Edits are the
-# environment: they happen before any GREEN, at ORACLE_READY, VALID_RED or NEEDS_DECISION.
+# source drift, milestones, registered harness paths, report and adapter errors, test weakening, the product budget
+# (counted from failed runs, refused only at a worker dispatch, which the model leaves out), a test edit back to bytes
+# bound before (the ledger counts one binding once; every edit here makes new bytes), the review repair loop after
+# GREEN (edits after a GREEN, round-2 packets, closure, review-brief, workers), the findings verdict (always clear),
+# and `status` and `guide`, which read the state. Edits are the environment: they happen before any GREEN, at
+# ORACLE_READY, VALID_RED or NEEDS_DECISION.
 
 type Packet is Data:
   NoPacket{}
@@ -48,11 +50,8 @@ type Spent is Data:
   Spent1{}
   Spent2{}
 
-type Harness is Data:
-  Harness{spent: Spent, renewed: Bool, covered: Bool}
-
 type Del is Data:
-  Del{at: Phase, red: Bool, touched: Bool, run: Run, dirty: Bool, harness: Harness, greened: Bool}
+  Del{at: Phase, red: Bool, touched: Bool, run: Run, dirty: Bool, spent: Spent, resumes: Spent, greened: Bool}
 
 # One refusal class per group of error codes; the test maps each code to its class.
 type Why is Data:
@@ -67,10 +66,8 @@ type Why is Data:
   Rerun{}
   PacketMissing{}
   ReceiptMissing{}
-  BudgetRequired{}
   EvidenceStale{}
   Exhausted{}
-  AmendClosed{}
   WrongState{}
   NoReason{}
 
@@ -87,16 +84,14 @@ type StopAt is Data:
   StopFail{}
 
 # Exec: `exec --label behavior` of a passing or failing reported test. EditProd/EditTest: a production or test file
-# changes. Spend: `budget --spend harness`. Amend: `init` again with --reason. MarkRed/MarkGreen/Review/Stop/Resume:
-# `transition --to` VALID_RED, IMPLEMENTED_GREEN, REVIEW_VERIFIED|PARTIAL_VERIFIED (holds: a hold is open),
-# NEEDS_DECISION|FAIL (reason: --reason given) and ORACLE_READY, each citing the latest run. MakePacket:
-# `review-packet`. Attest: `review-receipt` for the latest packet of this GREEN visit.
+# changes. MarkRed/MarkGreen/Review/Stop/Resume: `transition --to` VALID_RED, IMPLEMENTED_GREEN,
+# REVIEW_VERIFIED|PARTIAL_VERIFIED (holds: a hold is open), NEEDS_DECISION|FAIL (reason: --reason given) and
+# ORACLE_READY, each citing the latest run. MakePacket and Attest: the packet and the receipt `close` records for the
+# latest packet of this GREEN visit (`review-packet`, `review-receipt`).
 type Msg is Data:
   Exec{pass: Bool}
   EditProd{}
   EditTest{}
-  Spend{}
-  Amend{}
   MarkRed{}
   MarkGreen{}
   Review{to: Target, holds: Bool}
@@ -106,7 +101,7 @@ type Msg is Data:
   Resume{}
 
 def Del.init() -> Del:
-  Del{AtReady{}, False{}, False{}, NoRun{}, False{}, Harness{Spent0{}, False{}, False{}}, False{}}
+  Del{AtReady{}, False{}, False{}, NoRun{}, False{}, Spent0{}, Spent0{}, False{}}
 
 # ---- names shared by the machine and the laws
 def Del.imp(a: Bool, b: Bool) -> Bool:
@@ -120,37 +115,42 @@ def Del.same_bool(+a: Bool, +b: Bool) -> Bool:
 
 def Del.at(s: Del) -> Phase:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       p
 
 def Del.red(s: Del) -> Bool:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       r
 
 def Del.touched(s: Del) -> Bool:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       t
 
 def Del.run(s: Del) -> Run:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       n
 
 def Del.dirty(s: Del) -> Bool:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       d
 
-def Del.harness(s: Del) -> Harness:
+def Del.harness(s: Del) -> Spent:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       h
+
+def Del.policy(s: Del) -> Spent:
+  match s:
+    case Del{p, r, t, n, d, h, v, g}:
+      v
 
 def Del.greened(s: Del) -> Bool:
   match s:
-    case Del{p, r, t, n, d, h, g}:
+    case Del{p, r, t, n, d, h, v, g}:
       g
 
 def Del.is_ready(p: Phase) -> Bool:
@@ -328,23 +328,11 @@ def Del.spent_rank(n: Spent) -> Nat:
     case Spent2{}:
       2n
 
-def Del.spent_of(h: Harness) -> Spent:
-  match h:
-    case Harness{n, r, c}:
-      n
-
-def Del.renewed(h: Harness) -> Bool:
-  match h:
-    case Harness{n, r, c}:
-      r
-
-def Del.covered(h: Harness) -> Bool:
-  match h:
-    case Harness{n, r, c}:
-      c
-
 def Del.spent(s: Del) -> Nat:
-  Del.spent_rank(Del.spent_of(Del.harness(s)))
+  Del.spent_rank(Del.harness(s))
+
+def Del.resumes(s: Del) -> Nat:
+  Del.spent_rank(Del.policy(s))
 
 def Del.is_full(n: Spent) -> Bool:
   match n:
@@ -353,13 +341,8 @@ def Del.is_full(n: Spent) -> Bool:
     case _:
       False{}
 
-def Del.same_harness(a: Harness, b: Harness) -> Bool:
-  match a b:
-    case Harness{x, +r, +c} Harness{y, +q, +d}:
-      Bool.and(Nat.is_eq(Del.spent_rank(x), Del.spent_rank(y)), Bool.and(Del.same_bool(r, q), Del.same_bool(c, d)))
-
 def Del.same(+a: Del, +b: Del) -> Bool:
-  Bool.and(Del.same_phase(Del.at(a), Del.at(b)), Bool.and(Del.same_bool(Del.red(a), Del.red(b)), Bool.and(Del.same_bool(Del.touched(a), Del.touched(b)), Bool.and(Del.same_run(Del.run(a), Del.run(b)), Bool.and(Del.same_bool(Del.dirty(a), Del.dirty(b)), Bool.and(Del.same_harness(Del.harness(a), Del.harness(b)), Del.same_bool(Del.greened(a), Del.greened(b))))))))
+  Bool.and(Del.same_phase(Del.at(a), Del.at(b)), Bool.and(Del.same_bool(Del.red(a), Del.red(b)), Bool.and(Del.same_bool(Del.touched(a), Del.touched(b)), Bool.and(Del.same_run(Del.run(a), Del.run(b)), Bool.and(Del.same_bool(Del.dirty(a), Del.dirty(b)), Bool.and(Nat.is_eq(Del.spent(a), Del.spent(b)), Bool.and(Nat.is_eq(Del.resumes(a), Del.resumes(b)), Del.same_bool(Del.greened(a), Del.greened(b)))))))))
 
 def Del.same_why(a: Why, b: Why) -> Bool:
   match a b:
@@ -385,13 +368,9 @@ def Del.same_why(a: Why, b: Why) -> Bool:
       True{}
     case ReceiptMissing{} ReceiptMissing{}:
       True{}
-    case BudgetRequired{} BudgetRequired{}:
-      True{}
     case EvidenceStale{} EvidenceStale{}:
       True{}
     case Exhausted{} Exhausted{}:
-      True{}
-    case AmendClosed{} AmendClosed{}:
       True{}
     case WrongState{} WrongState{}:
       True{}
@@ -436,10 +415,6 @@ def Del.holds_mismatch(to: Target, holds: Bool) -> Bool:
     case ToPartial{}:
       Bool.not(holds)
 
-# Before VALID_RED nothing is frozen, so a harness spend at ORACLE_READY records nothing.
-def Del.free_spend(+p: Phase, red: Bool) -> Bool:
-  Bool.and(Del.is_ready(p), Bool.not(red))
-
 # Edits are the environment before any GREEN, in the states where work happens.
 def Del.editable(+p: Phase, greened: Bool) -> Bool:
   Bool.and(Bool.not(greened), Bool.or(Del.is_ready(p), Bool.or(Del.is_red(p), Del.is_decision(p))))
@@ -452,44 +427,33 @@ def Del.refuse(c: Bool, w: Why, rest: Last) -> Last:
     case False{}:
       rest
 
-def Del.spend_last(free: Bool, h: Harness) -> Last:
-  match free:
-    case True{}:
-      Took{}
-    case False{}:
-      match h:
-        case Harness{n, r, c}:
-          Del.refuse(Bool.and(Bool.not(c), Del.is_full(n)), Exhausted{}, Took{})
-
-# A refresh (VALID_RED → VALID_RED) needs a harness spend since the last VALID_RED, then a fresh failing run; the
-# first VALID_RED needs production as init left it, then a fresh failing run.
-def Del.red_guard(refresh: Bool, touched: Bool, +r: Run, h: Harness) -> Last:
+# A refresh (VALID_RED → VALID_RED) binds changed tests: it needs test bytes changed since the last VALID_RED and a
+# harness spend left, then a fresh failing run. A VALID_RED from ORACLE_READY needs production as init left it, then a
+# fresh failing run.
+def Del.red_guard(refresh: Bool, touched: Bool, dirty: Bool, n: Spent, +r: Run) -> Last:
   match refresh:
     case True{}:
-      Del.refuse(Bool.not(Del.renewed(h)), BudgetRequired{}, Del.refuse(Bool.not(Del.failed(r)), NotRed{}, Del.refuse(Bool.not(Del.fresh(r)), Stale{}, Took{})))
+      Del.refuse(Bool.not(dirty), NotAllowed{}, Del.refuse(Del.is_full(n), Exhausted{}, Del.refuse(Bool.not(Del.failed(r)), NotRed{}, Del.refuse(Bool.not(Del.fresh(r)), Stale{}, Took{}))))
     case False{}:
       Del.refuse(touched, ProdTouched{}, Del.refuse(Bool.not(Del.failed(r)), NotRed{}, Del.refuse(Bool.not(Del.fresh(r)), Stale{}, Took{})))
 
-def Del.red_last(+p: Phase, touched: Bool, +r: Run, h: Harness) -> Last:
-  Del.refuse(Bool.not(Del.red_edge(p)), NotAllowed{}, Del.refuse(Bool.not(Del.has_run(r)), RunMissing{}, Del.red_guard(Del.is_red(p), touched, r, h)))
+def Del.red_last(+p: Phase, touched: Bool, +r: Run, dirty: Bool, n: Spent) -> Last:
+  Del.refuse(Bool.not(Del.red_edge(p)), NotAllowed{}, Del.refuse(Bool.not(Del.has_run(r)), RunMissing{}, Del.red_guard(Del.is_red(p), touched, dirty, n, r)))
 
-# Tests changed after the binding: without a new harness spend the budget is required, with one a fresh RED is.
-def Del.drift_last(renewed: Bool) -> Last:
-  match renewed:
-    case True{}:
-      Refused{EvidenceStale{}}
-    case False{}:
-      Refused{BudgetRequired{}}
+# Tests changed after the binding: GREEN asks for a fresh RED to bind them. At VALID_RED that RED is a refresh, so GREEN
+# says now when no harness spend is left for it.
+def Del.drift_last(p: Phase, n: Spent) -> Last:
+  Del.refuse(Bool.and(Del.is_red(p), Del.is_full(n)), Exhausted{}, Refused{EvidenceStale{}})
 
-def Del.bound_tests(drifted: Bool, renewed: Bool, rest: Last) -> Last:
+def Del.bound_tests(drifted: Bool, p: Phase, n: Spent, rest: Last) -> Last:
   match drifted:
     case True{}:
-      Del.drift_last(renewed)
+      Del.drift_last(p, n)
     case False{}:
       rest
 
-def Del.green_last(+p: Phase, red: Bool, touched: Bool, +r: Run, dirty: Bool, h: Harness) -> Last:
-  Del.refuse(Bool.not(Del.green_edge(p)), NotAllowed{}, Del.refuse(Bool.not(Del.has_run(r)), RunMissing{}, Del.refuse(Bool.not(Del.passed(r)), NotGreen{}, Del.refuse(Bool.not(Del.fresh(r)), Stale{}, Del.bound_tests(Bool.and(red, dirty), Del.renewed(h), Del.refuse(Bool.and(Del.is_ready(p), touched), ProdTouched{}, Del.refuse(Bool.not(Del.since(r)), Flaky{}, Took{})))))))
+def Del.green_last(+p: Phase, red: Bool, touched: Bool, +r: Run, dirty: Bool, n: Spent) -> Last:
+  Del.refuse(Bool.not(Del.green_edge(p)), NotAllowed{}, Del.refuse(Bool.not(Del.has_run(r)), RunMissing{}, Del.refuse(Bool.not(Del.passed(r)), NotGreen{}, Del.refuse(Bool.not(Del.fresh(r)), Stale{}, Del.bound_tests(Bool.and(red, dirty), p, n, Del.refuse(Bool.and(Del.is_ready(p), touched), ProdTouched{}, Del.refuse(Bool.not(Del.since(r)), Flaky{}, Took{})))))))
 
 def Del.packet_last(k: Packet) -> Last:
   match k:
@@ -514,9 +478,10 @@ def Del.attest_last(p: Phase) -> Last:
     case _:
       Refused{WrongState{}}
 
+# A resume needs the policy spend left, then a run to cite.
 def Del.decide(s: Del, m: Msg) -> Last:
   match s:
-    case Del{+p, +red, +touched, +r, +dirty, +h, g}:
+    case Del{+p, +red, +touched, +r, +dirty, +h, +v, g}:
       match m:
         case Exec{pass}:
           Took{}
@@ -524,12 +489,8 @@ def Del.decide(s: Del, m: Msg) -> Last:
           Took{}
         case EditTest{}:
           Took{}
-        case Spend{}:
-          Del.spend_last(Del.free_spend(p, red), h)
-        case Amend{}:
-          Del.refuse(Bool.not(Del.free_spend(p, red)), AmendClosed{}, Took{})
         case MarkRed{}:
-          Del.red_last(p, touched, r, h)
+          Del.red_last(p, touched, r, dirty, h)
         case MarkGreen{}:
           Del.green_last(p, red, touched, r, dirty, h)
         case Review{to, holds}:
@@ -541,7 +502,7 @@ def Del.decide(s: Del, m: Msg) -> Last:
         case Stop{to, reason}:
           Del.refuse(Bool.not(Del.stop_edge(p, to)), NotAllowed{}, Del.refuse(Bool.not(reason), NoReason{}, Took{}))
         case Resume{}:
-          Del.refuse(Bool.not(Del.is_decision(p)), NotAllowed{}, Del.refuse(Bool.not(Del.has_run(r)), RunMissing{}, Took{}))
+          Del.refuse(Bool.not(Del.is_decision(p)), NotAllowed{}, Del.refuse(Del.is_full(v), Exhausted{}, Del.refuse(Bool.not(Del.has_run(r)), RunMissing{}, Took{})))
 
 # ---- the effect of an accepted command
 def Del.stale(r: Run) -> Run:
@@ -583,16 +544,6 @@ def Del.exec_since(+p: Phase, red: Bool) -> Bool:
     case _:
       True{}
 
-def Del.uncover(h: Harness) -> Harness:
-  match h:
-    case Harness{n, r, c}:
-      Harness{n, r, False{}}
-
-def Del.rebase(h: Harness) -> Harness:
-  match h:
-    case Harness{n, r, c}:
-      Harness{n, False{}, c}
-
 def Del.bump(n: Spent) -> Spent:
   match n:
     case Spent0{}:
@@ -602,21 +553,13 @@ def Del.bump(n: Spent) -> Spent:
     case Spent2{}:
       Spent2{}
 
-def Del.charge(h: Harness) -> Harness:
-  match h:
-    case Harness{n, r, c}:
-      match c:
-        case True{}:
-          Harness{n, r, True{}}
-        case False{}:
-          Harness{Del.bump(n), True{}, True{}}
-
-def Del.spend(free: Bool, h: Harness) -> Harness:
-  match free:
-    case True{}:
-      h
-    case False{}:
-      Del.charge(h)
+# A refresh spends one harness change; a VALID_RED from ORACLE_READY spends nothing.
+def Del.refresh_spend(+p: Phase, n: Spent) -> Spent:
+  match p:
+    case AtRed{}:
+      Del.bump(n)
+    case _:
+      n
 
 def Del.verdict(to: Target) -> Phase:
   match to:
@@ -641,32 +584,28 @@ def Del.stop_run(+p: Phase, red: Bool, +r: Run, to: StopAt) -> Run:
 
 def Del.apply(s: Del, m: Msg) -> Del:
   match s:
-    case Del{+p, +red, +touched, +r, +dirty, +h, +g}:
+    case Del{+p, +red, +touched, +r, +dirty, +h, +v, +g}:
       match m:
         case Exec{pass}:
-          Del{p, red, touched, Ran{pass, True{}, Del.exec_since(p, red)}, dirty, h, g}
+          Del{p, red, touched, Ran{pass, True{}, Del.exec_since(p, red)}, dirty, h, v, g}
         case EditProd{}:
-          Del{p, red, True{}, Del.stale(r), dirty, h, g}
+          Del{p, red, True{}, Del.stale(r), dirty, h, v, g}
         case EditTest{}:
-          Del{p, red, touched, Del.stale(r), True{}, Del.uncover(h), g}
-        case Spend{}:
-          Del{p, red, touched, r, dirty, Del.spend(Del.free_spend(p, red), h), g}
-        case Amend{}:
-          Del{p, red, touched, r, dirty, h, g}
+          Del{p, red, touched, Del.stale(r), True{}, h, v, g}
         case MarkRed{}:
-          Del{AtRed{}, True{}, touched, Del.rebased(r), False{}, Del.rebase(h), g}
+          Del{AtRed{}, True{}, touched, Del.rebased(r), False{}, Del.refresh_spend(p, h), v, g}
         case MarkGreen{}:
-          Del{AtGreen{NoPacket{}}, red, touched, Del.rebased(r), dirty, h, True{}}
+          Del{AtGreen{NoPacket{}}, red, touched, Del.rebased(r), dirty, h, v, True{}}
         case Review{to, holds}:
-          Del{Del.verdict(to), red, touched, r, dirty, h, g}
+          Del{Del.verdict(to), red, touched, r, dirty, h, v, g}
         case MakePacket{}:
-          Del{AtGreen{Unbound{}}, red, touched, r, dirty, h, g}
+          Del{AtGreen{Unbound{}}, red, touched, r, dirty, h, v, g}
         case Attest{}:
-          Del{AtGreen{Bound{}}, red, touched, r, dirty, h, g}
+          Del{AtGreen{Bound{}}, red, touched, r, dirty, h, v, g}
         case Stop{+to, reason}:
-          Del{Del.stopped(to), red, touched, Del.stop_run(p, red, r, to), dirty, h, g}
+          Del{Del.stopped(to), red, touched, Del.stop_run(p, red, r, to), dirty, h, v, g}
         case Resume{}:
-          Del{AtReady{}, red, touched, r, dirty, h, g}
+          Del{AtReady{}, red, touched, r, dirty, h, Del.bump(v), g}
 
 def Del.settle(o: Last, s: Del, m: Msg) -> Del:
   match o:
@@ -689,19 +628,19 @@ def Del.run_all(ms: List<Msg>, s: Del) -> Del:
       Del.run_all(rest, Del.step(s, m))
 
 def Del.commands() -> List<Msg>:
-  [Exec{True{}}, Exec{False{}}, Spend{}, Amend{}, MarkRed{}, MarkGreen{}, Review{ToVerified{}, False{}}, Review{ToVerified{}, True{}}, Review{ToPartial{}, False{}}, Review{ToPartial{}, True{}}, MakePacket{}, Attest{}, Stop{StopDecision{}, True{}}, Stop{StopDecision{}, False{}}, Stop{StopFail{}, True{}}, Stop{StopFail{}, False{}}, Resume{}]
+  [Exec{True{}}, Exec{False{}}, MarkRed{}, MarkGreen{}, Review{ToVerified{}, False{}}, Review{ToVerified{}, True{}}, Review{ToPartial{}, False{}}, Review{ToPartial{}, True{}}, MakePacket{}, Attest{}, Stop{StopDecision{}, True{}}, Stop{StopDecision{}, False{}}, Stop{StopFail{}, True{}}, Stop{StopFail{}, False{}}, Resume{}]
 
 def Del.with_edits(e: Bool) -> List<Msg>:
   match e:
     case True{}:
-      [EditProd{}, EditTest{}, Exec{True{}}, Exec{False{}}, Spend{}, Amend{}, MarkRed{}, MarkGreen{}, Review{ToVerified{}, False{}}, Review{ToVerified{}, True{}}, Review{ToPartial{}, False{}}, Review{ToPartial{}, True{}}, MakePacket{}, Attest{}, Stop{StopDecision{}, True{}}, Stop{StopDecision{}, False{}}, Stop{StopFail{}, True{}}, Stop{StopFail{}, False{}}, Resume{}]
+      [EditProd{}, EditTest{}, Exec{True{}}, Exec{False{}}, MarkRed{}, MarkGreen{}, Review{ToVerified{}, False{}}, Review{ToVerified{}, True{}}, Review{ToPartial{}, False{}}, Review{ToPartial{}, True{}}, MakePacket{}, Attest{}, Stop{StopDecision{}, True{}}, Stop{StopDecision{}, False{}}, Stop{StopFail{}, True{}}, Stop{StopFail{}, False{}}, Resume{}]
     case False{}:
       Del.commands()
 
 # Environment: every command at any time; file edits only where `editable` allows them.
 def Del.enabled(s: Del) -> List<Msg>:
   match s:
-    case Del{+p, r, t, n, d, h, g}:
+    case Del{+p, r, t, n, d, h, v, g}:
       Del.with_edits(Del.editable(p, g))
 
 def Del.next(h: List<Msg>) -> List<Msg>:
@@ -717,8 +656,8 @@ type Hint is Data:
   HintReport{}
 
 # The phase's own command (`red`, `green`, `close`) unless its guard refuses it on the state: production touched
-# before VALID_RED names `guide`; test bytes changed after VALID_RED name a fresh `red` once a harness spend renewed
-# the budget, else `guide`; at IMPLEMENTED_GREEN without a fresh passing run after the GREEN entry, `exec`.
+# before VALID_RED names `guide`; test bytes changed after VALID_RED name a fresh `red` while a harness spend is left,
+# else `guide`; at IMPLEMENTED_GREEN without a fresh passing run after the GREEN entry, `exec`.
 def Del.ready_hint(touched: Bool) -> Hint:
   match touched:
     case True{}:
@@ -726,17 +665,17 @@ def Del.ready_hint(touched: Bool) -> Hint:
     case False{}:
       HintRed{}
 
-def Del.drift_hint(renewed: Bool) -> Hint:
-  match renewed:
+def Del.drift_hint(full: Bool) -> Hint:
+  match full:
     case True{}:
-      HintRed{}
-    case False{}:
       HintGuide{}
+    case False{}:
+      HintRed{}
 
-def Del.red_hint(dirty: Bool, renewed: Bool) -> Hint:
+def Del.red_hint(dirty: Bool, full: Bool) -> Hint:
   match dirty:
     case True{}:
-      Del.drift_hint(renewed)
+      Del.drift_hint(full)
     case False{}:
       HintGreen{}
 
@@ -749,12 +688,12 @@ def Del.close_hint(ready: Bool) -> Hint:
 
 def Del.hint(s: Del) -> Hint:
   match s:
-    case Del{p, red, touched, +r, dirty, h, g}:
+    case Del{p, red, touched, +r, dirty, h, v, g}:
       match p:
         case AtReady{}:
           Del.ready_hint(touched)
         case AtRed{}:
-          Del.red_hint(dirty, Del.renewed(h))
+          Del.red_hint(dirty, Del.is_full(h))
         case AtGreen{k}:
           Del.close_hint(Bool.and(Del.passed(r), Bool.and(Del.fresh(r), Del.since(r))))
         case _:
@@ -814,20 +753,6 @@ def Del.claims_holds(m: Msg) -> Bool:
   match m:
     case Review{to, holds}:
       holds
-    case _:
-      False{}
-
-def Del.is_spend(m: Msg) -> Bool:
-  match m:
-    case Spend{}:
-      True{}
-    case _:
-      False{}
-
-def Del.is_amend(m: Msg) -> Bool:
-  match m:
-    case Amend{}:
-      True{}
     case _:
       False{}
 
@@ -906,20 +831,21 @@ def Del.is_decision_stop(m: Msg) -> Bool:
     case _:
       False{}
 
-# The back edges: a resume, a VALID_RED refresh and an init amendment.
+# A VALID_RED refresh: VALID_RED again from VALID_RED.
+def Del.is_refresh(+s: Del, m: Msg) -> Bool:
+  Bool.and(Del.is_mark_red(m), Del.is_red(Del.at(s)))
+
+# The back edges: a resume and a VALID_RED refresh.
 def Del.back_edge(+s: Del, +m: Msg) -> Bool:
-  Bool.or(Del.is_resume(m), Bool.or(Del.is_amend(m), Bool.and(Del.is_mark_red(m), Del.is_red(Del.at(s)))))
+  Bool.or(Del.is_resume(m), Del.is_refresh(s, m))
 
-def Del.flag(b: Bool) -> Nat:
-  match b:
-    case True{}:
-      1n
-    case False{}:
-      0n
+# A count that never decreases, grows by at most one, and changes only when `by` holds.
+def Del.counts_up(+a: Nat, +b: Nat, by: Bool) -> Bool:
+  Bool.and(Nat.is_le(a, b), Bool.and(Nat.is_le(b, Nat.add(a, 1n)), Del.imp(Bool.not(Nat.is_eq(a, b)), by)))
 
-# What a VALID_RED refresh consumes: two per uncounted harness spend, one for a spend not yet used by a refresh.
+# What the back edges consume: one harness spend per refresh, one policy spend per resume.
 def Del.credit(+s: Del) -> Nat:
-  Nat.add(Nat.mul(2n, Nat.sub(2n, Del.spent(s))), Del.flag(Del.renewed(Del.harness(s))))
+  Nat.add(Nat.sub(2n, Del.spent(s)), Nat.sub(2n, Del.resumes(s)))
 
 # ---- the laws: Q(s, m, t, o) with t = step(s, m) and o = decide(s, m)
 # Q_refused_keeps: a refused command changes nothing (frame)
@@ -950,13 +876,13 @@ def Del.Q_red_needs_fresh_failure(+s: Del, +m: Msg, t: Del, +o: Last) -> Bool:
 def Del.Q_red_needs_untouched_production(+s: Del, +m: Msg, t: Del, +o: Last) -> Bool:
   Del.imp(Bool.and(Del.took(o), Bool.and(Del.is_mark_red(m), Del.is_ready(Del.at(s)))), Bool.not(Del.touched(s)))
 
-# Q_refresh_needs_spend: refreshing VALID_RED needs a harness spend since the last VALID_RED
-def Del.Q_refresh_needs_spend(+s: Del, +m: Msg, t: Del, +o: Last) -> Bool:
-  Del.imp(Bool.and(Del.took(o), Bool.and(Del.is_mark_red(m), Del.is_red(Del.at(s)))), Del.renewed(Del.harness(s)))
+# Q_refresh_needs_change: refreshing VALID_RED needs test bytes changed since the last VALID_RED
+def Del.Q_refresh_needs_change(+s: Del, +m: Msg, t: Del, +o: Last) -> Bool:
+  Del.imp(Bool.and(Del.took(o), Del.is_refresh(s, m)), Del.dirty(s))
 
-# Q_red_entry: only a VALID_RED transition enters VALID_RED, and it binds the tests and the harness baseline
+# Q_red_entry: only a VALID_RED transition enters VALID_RED, and it binds the tests
 def Del.Q_red_entry(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Bool.and(Del.imp(Bool.and(Del.is_red(Del.at(t)), Bool.not(Del.is_red(Del.at(s)))), Del.is_mark_red(m)), Del.imp(Bool.and(Del.took(o), Del.is_mark_red(m)), Bool.and(Bool.not(Del.dirty(t)), Bool.and(Del.red(t), Bool.not(Del.renewed(Del.harness(t)))))))
+  Bool.and(Del.imp(Bool.and(Del.is_red(Del.at(t)), Bool.not(Del.is_red(Del.at(s)))), Del.is_mark_red(m)), Del.imp(Bool.and(Del.took(o), Del.is_mark_red(m)), Bool.and(Bool.not(Del.dirty(t)), Del.red(t))))
 
 # Q_green_needs_fresh_pass: IMPLEMENTED_GREEN needs a passing run, fresh, after the gate baseline
 def Del.Q_green_needs_fresh_pass(+s: Del, +m: Msg, t: Del, +o: Last) -> Bool:
@@ -983,21 +909,15 @@ def Del.Q_review_entry(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
 def Del.Q_packet_rebinds(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
   Bool.and(Del.imp(Bool.and(Del.took(o), Bool.or(Del.is_packet(m), Del.is_attest(m))), Del.is_green(Del.at(s))), Bool.and(Del.imp(Bool.and(Del.took(o), Del.is_packet(m)), Del.is_unbound(Del.packet_of(Del.at(t)))), Del.imp(Bool.and(Del.took(o), Del.is_attest(m)), Del.is_bound(Del.packet_of(Del.at(t))))))
 
-# Q_amend_before_red: init is amended only at ORACLE_READY before any VALID_RED, and changes no state the guards read
-def Del.Q_amend_before_red(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Del.imp(Bool.and(Del.took(o), Del.is_amend(m)), Bool.and(Del.is_ready(Del.at(s)), Bool.and(Bool.not(Del.red(s)), Del.same(s, t))))
+# Q_budget_monotone: each spent count never decreases and grows by at most one: the harness count only on an accepted
+# VALID_RED refresh, the policy count only on an accepted resume
+def Del.Q_budget_monotone(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
+  Bool.and(Del.counts_up(Del.spent(s), Del.spent(t), Bool.and(Del.took(o), Del.is_refresh(s, m))), Del.counts_up(Del.resumes(s), Del.resumes(t), Bool.and(Del.took(o), Del.is_resume(m))))
 
-# Q_pre_red_spend_free: a harness spend before VALID_RED at ORACLE_READY is accepted and records nothing
-def Del.Q_pre_red_spend_free(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Del.imp(Bool.and(Del.is_spend(m), Del.free_spend(Del.at(s), Del.red(s))), Bool.and(Del.took(o), Del.same(s, t)))
-
-# Q_budget_monotone: the spent count never decreases, grows by at most one, and only on a spend
-def Del.Q_budget_monotone(+s: Del, +m: Msg, +t: Del, o: Last) -> Bool:
-  Bool.and(Nat.is_le(Del.spent(s), Del.spent(t)), Bool.and(Nat.is_le(Del.spent(t), Nat.add(Del.spent(s), 1n)), Del.imp(Bool.not(Nat.is_eq(Del.spent(s), Del.spent(t))), Del.is_spend(m))))
-
-# Q_budget_exhausted: a counted spend at the limit is refused as exhausted
+# Q_budget_exhausted: a refresh with changed tests at the harness limit, and a resume at the policy limit, are refused
+# as exhausted
 def Del.Q_budget_exhausted(+s: Del, +m: Msg, t: Del, +o: Last) -> Bool:
-  Del.imp(Bool.and(Del.is_spend(m), Bool.and(Bool.not(Del.free_spend(Del.at(s), Del.red(s))), Bool.and(Bool.not(Del.covered(Del.harness(s))), Nat.is_eq(Del.spent(s), 2n)))), Del.refused_as(o, Exhausted{}))
+  Bool.and(Del.imp(Bool.and(Del.is_refresh(s, m), Bool.and(Del.dirty(s), Bool.and(Del.has_run(Del.run(s)), Nat.is_eq(Del.spent(s), 2n)))), Del.refused_as(o, Exhausted{})), Del.imp(Bool.and(Del.is_resume(m), Bool.and(Del.is_decision(Del.at(s)), Nat.is_eq(Del.resumes(s), 2n))), Del.refused_as(o, Exhausted{})))
 
 # Q_history_kept: a VALID_RED, a GREEN and a production change, once recorded, stay recorded
 def Del.Q_history_kept(+s: Del, m: Msg, +t: Del, o: Last) -> Bool:
@@ -1007,13 +927,14 @@ def Del.Q_history_kept(+s: Del, m: Msg, +t: Del, o: Last) -> Bool:
 def Del.Q_forward(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
   Del.imp(Bool.and(Del.took(o), Bool.and(Del.is_transition(m), Bool.and(Bool.not(Del.is_resume(m)), Bool.not(Nat.is_eq(Del.rank(Del.at(s)), Del.rank(Del.at(t))))))), Nat.is_lt(Del.rank(Del.at(s)), Del.rank(Del.at(t))))
 
-# Q_refresh_bounded: no command raises the refresh credit, and an accepted refresh lowers it, so refreshes are finite
-def Del.Q_refresh_bounded(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Bool.and(Nat.is_le(Del.credit(t), Del.credit(s)), Del.imp(Bool.and(Del.took(o), Bool.and(Del.is_mark_red(m), Del.is_red(Del.at(s)))), Nat.is_lt(Del.credit(t), Del.credit(s))))
+# Q_back_edges_bounded: no command raises the credit, and an accepted refresh or resume lowers it, so refreshes and the
+# NEEDS_DECISION → ORACLE_READY → VALID_RED cycle are finite
+def Del.Q_back_edges_bounded(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
+  Bool.and(Nat.is_le(Del.credit(t), Del.credit(s)), Del.imp(Bool.and(Del.took(o), Del.back_edge(s, m)), Nat.is_lt(Del.credit(t), Del.credit(s))))
 
-# Q_back_edges_keep: a resume, refresh or amendment never lowers the budget or forgets recorded history
+# Q_back_edges_keep: a resume or a refresh never changes recorded history
 def Del.Q_back_edges_keep(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Del.imp(Bool.and(Del.took(o), Del.back_edge(s, m)), Bool.and(Nat.is_eq(Del.spent(s), Del.spent(t)), Bool.and(Del.same_bool(Del.touched(s), Del.touched(t)), Del.same_bool(Del.greened(s), Del.greened(t)))))
+  Del.imp(Bool.and(Del.took(o), Del.back_edge(s, m)), Bool.and(Del.same_bool(Del.touched(s), Del.touched(t)), Del.same_bool(Del.greened(s), Del.greened(t))))
 
 # Q_resume_only_decision: ORACLE_READY is re-entered only from NEEDS_DECISION
 def Del.Q_resume_only_decision(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
@@ -1024,7 +945,7 @@ def Del.Q_edits_stale_runs(+s: Del, +m: Msg, +t: Del, o: Last) -> Bool:
   Bool.and(Del.imp(Del.is_edit(m), Bool.not(Del.fresh(Del.run(t)))), Del.imp(Del.is_exec(m), Del.fresh(Del.run(t))))
 
 def Del.cell_with(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Bool.and(Del.Q_refused_keeps(s, m, t, o), Bool.and(Del.Q_fail_absorbs(s, m, t, o), Bool.and(Del.Q_fail_refuses_transitions(s, m, t, o), Bool.and(Del.Q_fail_always_open(s, m, t, o), Bool.and(Del.Q_decision_open(s, m, t, o), Bool.and(Del.Q_red_needs_fresh_failure(s, m, t, o), Bool.and(Del.Q_red_needs_untouched_production(s, m, t, o), Bool.and(Del.Q_refresh_needs_spend(s, m, t, o), Bool.and(Del.Q_red_entry(s, m, t, o), Bool.and(Del.Q_green_needs_fresh_pass(s, m, t, o), Bool.and(Del.Q_green_skip_untouched(s, m, t, o), Bool.and(Del.Q_green_keeps_binding(s, m, t, o), Bool.and(Del.Q_review_needs_receipt(s, m, t, o), Bool.and(Del.Q_review_entry(s, m, t, o), Bool.and(Del.Q_packet_rebinds(s, m, t, o), Bool.and(Del.Q_amend_before_red(s, m, t, o), Bool.and(Del.Q_pre_red_spend_free(s, m, t, o), Bool.and(Del.Q_budget_monotone(s, m, t, o), Bool.and(Del.Q_budget_exhausted(s, m, t, o), Bool.and(Del.Q_history_kept(s, m, t, o), Bool.and(Del.Q_forward(s, m, t, o), Bool.and(Del.Q_refresh_bounded(s, m, t, o), Bool.and(Del.Q_back_edges_keep(s, m, t, o), Bool.and(Del.Q_resume_only_decision(s, m, t, o), Del.Q_edits_stale_runs(s, m, t, o)))))))))))))))))))))))))
+  Bool.and(Del.Q_refused_keeps(s, m, t, o), Bool.and(Del.Q_fail_absorbs(s, m, t, o), Bool.and(Del.Q_fail_refuses_transitions(s, m, t, o), Bool.and(Del.Q_fail_always_open(s, m, t, o), Bool.and(Del.Q_decision_open(s, m, t, o), Bool.and(Del.Q_red_needs_fresh_failure(s, m, t, o), Bool.and(Del.Q_red_needs_untouched_production(s, m, t, o), Bool.and(Del.Q_refresh_needs_change(s, m, t, o), Bool.and(Del.Q_red_entry(s, m, t, o), Bool.and(Del.Q_green_needs_fresh_pass(s, m, t, o), Bool.and(Del.Q_green_skip_untouched(s, m, t, o), Bool.and(Del.Q_green_keeps_binding(s, m, t, o), Bool.and(Del.Q_review_needs_receipt(s, m, t, o), Bool.and(Del.Q_review_entry(s, m, t, o), Bool.and(Del.Q_packet_rebinds(s, m, t, o), Bool.and(Del.Q_budget_monotone(s, m, t, o), Bool.and(Del.Q_budget_exhausted(s, m, t, o), Bool.and(Del.Q_history_kept(s, m, t, o), Bool.and(Del.Q_forward(s, m, t, o), Bool.and(Del.Q_back_edges_bounded(s, m, t, o), Bool.and(Del.Q_back_edges_keep(s, m, t, o), Bool.and(Del.Q_resume_only_decision(s, m, t, o), Del.Q_edits_stale_runs(s, m, t, o)))))))))))))))))))))))
 
 def Del.cell_ok(+s: Del, +m: Msg) -> Bool:
   Del.cell_with(s, m, Del.step(s, m), Del.decide(s, m))

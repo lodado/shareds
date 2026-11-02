@@ -515,7 +515,8 @@ test('O26: backs reported verification with a run ledger, machine transitions an
   assert.match(skill, /append-only\s+ledger and reports cite runIds instead of free-form claims/)
   assert.match(skill, /Never report an execution\s+that is not in\s+the ledger as passing/)
   assert.match(skill, /recorded only via `scripts\/oracle-run\.mjs transition`/)
-  assert.match(skill, /counted by `oracle-run\.mjs budget`/)
+  assert.match(skill, /`oracle-run\.mjs` reads each spend off\s+the ledger/)
+  assert.doesNotMatch(skill, /oracle-run\.mjs budget/)
   assert.match(skill, /checked against actual run results with\s+`scripts\/oracle-verify\.mjs evidence`/)
   // 인용은 Verification 그룹이 단독 소유한다 — 별도 runs 필드는 같은 runId를 두 번 적게 만들었다
   assert.match(report, /- <label> <runId> exit <n> <grade>/)
@@ -567,7 +568,9 @@ test('O28: routes delivery runs through exec and gates GREEN on flakiness and te
   assert.match(implementationLoop, /oracle-run\.mjs exec/)
   assert.match(implementationLoop, /oracle-run\.mjs transition/)
   assert.match(implementationLoop, /PRODUCTION_TOUCHED_BEFORE_RED/)
-  assert.match(implementationLoop, /HARNESS_BUDGET_REQUIRED/)
+  // 0.129.0: no command spends a budget — the binding a fresh RED records is the harness spend the ledger counts
+  assert.match(implementationLoop, /that\s+binding\s+is\s+one\s+harness\s+spend/)
+  assert.doesNotMatch(implementationLoop, /HARNESS_BUDGET_REQUIRED|budget --spend/)
   assert.match(implementationLoop, /HARNESS_RED_REQUIRED/)
   assert.match(implementationLoop, /MILESTONE_RED_MISSING/)
   assert.match(implementationLoop, /red:<name>/)
@@ -1300,7 +1303,10 @@ test('pins the system-design grill phases and the conditional API contract forma
   assert.match(oracleCard, /Example Mapping/)
   assert.match(oracleCard, /frontend-system-design.*into P4·P5 questions/s)
   assert.match(oracleCard, /one-question-at-a-time\s*interview.*without a round cap/s)
-  assert.match(oracleCard, /Policy questions during Delivery still follow the 2 rounds of\s*`oracle-run\.mjs budget`/)
+  assert.match(
+    oracleCard,
+    /Policy questions during Delivery still follow the 2-resume policy\s+budget `oracle-run\.mjs` reads off the ledger/,
+  )
   assert.match(architectureContract, /## API contract/)
   assert.match(architectureContract, /Request parameters/)
   assert.match(architectureContract, /Request body/)
@@ -2879,7 +2885,9 @@ test('planning settles scope and risky premises before expensive authoring and p
   assert.match(card, loose('The same issue list on a third edited state stops the step (`NEEDS_DECISION`)'))
   assert.match(card, /No supported defect/)
   assert.match(delivery, /reviewScope/)
-  assert.match(delivery, /review-extend/)
+  // 0.129.0: review-extend is gone; no command opens a third round
+  assert.match(delivery, loose('No command opens a third round'))
+  assert.doesNotMatch(delivery, /review-extend/)
 })
 
 test('event order comes from the model, and identity and session changes are model events', async () => {

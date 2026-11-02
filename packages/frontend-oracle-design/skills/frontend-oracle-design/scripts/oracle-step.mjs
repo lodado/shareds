@@ -14,14 +14,16 @@
  * the `next:` command itself when it is mechanical (AUTO), assembling every argument from the oracle directory and the
  * ledger; then it reads the phase line again and repeats. It stops with one instruction when the next step is the
  * agent's work (a file to write, a reviewer to dispatch, a choice between files), the user's approval or decision, or a
- * refusal. It never runs lock, init or budget. Besides stage.json, the projected card and the reports/ folder for the
- * test reports it names, it writes only what the commands it runs write. At most MAX_AUTO_STEPS commands per call; a
- * refusal, or a phase line already seen in this call, stops it.
+ * refusal. It never runs lock or init, and spends no budget by hand: the ledger shows each spend. Besides stage.json,
+ * the projected card and the reports/ folder for the test reports it names, it writes only what the commands it runs
+ * write. At most MAX_AUTO_STEPS commands per call; a refusal, or a phase line already seen in this call, stops it.
  *
  *   oracle-step.mjs --dir <dir> [--check] [--label <label> -- <test command>] [--findings <file>] [--intersect <file>]
  *                   [--task-id <id>] [--intersect-task-id <id>] [--blind-task-id <id>]
  *
- * `--label … -- <command>` names the test command of a label the ledger has never run; `--findings`/`--intersect` pick
+ * A label the ledger has never run runs its test files named for it under the scan root (labelStem), `repo-test` the
+ * package.json test script; `--label … -- <command>` names the command of tests named otherwise. Before close cites a
+ * run it runs the GREEN command on the current bytes when no pass of it came after GREEN. `--findings`/`--intersect` pick
  * the saved reviewer returns when more than one answers the packet; a task id names the reviewer task that returned a
  * saved file, and wins over the host's receipts.
  */
@@ -32,14 +34,14 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { TRUSTED_ADAPTERS } from './oracle-adapters.mjs'
+import { forbiddenArgument, TRUSTED_ADAPTERS } from './oracle-adapters.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { nextCommandOf, nextOf } from './oracle-next.mjs'
 import { canonicalReviewPoints, deliveryBrief, requiredLabelsNotPassing, sameDigests } from './oracle-run.mjs'
 import { markdownLines, sectionLines } from './oracle-space.mjs'
 import {
   bindingOf, briefStatus, evaluateGraph, filesDigest, GRAPH, issuesDigest, lockTodos, phaseLine, readStage, recordCheck, REVIEW_ROUNDS,
-  reviewRounds, SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
+  reviewRounds, roundKinds, SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
 } from './oracle-stage.mjs'
 
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
@@ -111,21 +113,88 @@ function typedCommand(command) {
   return { command: typed, adapter: adapter ?? null, cwd: process.cwd(), note: '' }
 }
 
-/** The command that runs `label`: the one given to step for it, else the latest run of that label in the ledger. */
-function sourceOf(phase, label, given) {
-  if (given.command && given.label === label) return typedCommand(given.command)
-  const run = runsOf(phase.ledger).findLast((entry) => entry.label === label)
-  return run ? { command: run.command, adapter: run.adapter ?? null, cwd: run.cwd, note: run.env?.note ?? '' } : null
+/**
+ * A label's tests are the test files named for it under the scan root, `<name>.<stem>.test.<ext>` or `<stem>.test.<ext>`:
+ * the stem is the label without its grade, or a stack label's short stem (fast-check runs the generated `*.oracle.test.*`).
+ */
+const LABEL_STEMS = { 'fast-check': 'oracle', 'world-conformance': 'world', 'bend-proof': 'proof', 'bend-adequacy': 'adequacy', 'type-contract': 'type', 'contract-cases': 'cases' }
+export const labelStem = (label) => {
+  const base = label.replace(/:(?:reported|exit)$/, '')
+  return LABEL_STEMS[base] ?? base
+}
+const TEST_FILE = /^(.+)\.(?:test|spec)\.[cm]?[jt]sx?$/
+const SKIPPED_FOLDERS = new Set(['node_modules', 'dist', 'build', 'coverage'])
+function namedFor(name, stem) {
+  const prefix = TEST_FILE.exec(name)?.[1]
+  return prefix !== undefined && (prefix === stem || ['.', '-', '_'].some((separator) => prefix.endsWith(`${separator}${stem}`)))
+}
+
+/** The test files under `folder` named for `stem`; dependency, build and dot folders are skipped. */
+async function stemFiles(folder, stem, found = []) {
+  for (const entry of await readdir(folder, { withFileTypes: true }).catch(() => [])) {
+    const path = join(folder, entry.name)
+    const skipped = entry.name.startsWith('.') || SKIPPED_FOLDERS.has(entry.name)
+    if (entry.isDirectory() && !skipped) await stemFiles(path, stem, found)
+    if (entry.isFile() && namedFor(entry.name, stem)) found.push(path)
+  }
+  return found
+}
+
+/** vitest for TypeScript, JSX or a file that imports vitest, else node --test; null when the files need both. */
+async function runnerOf(files) {
+  const runners = new Set()
+  for (const path of files) {
+    const vitest = /\.(?:[cm]?tsx?|jsx)$/.test(path) || /\bfrom\s+['"]vitest['"]/.test(await readFile(path, 'utf8').catch(() => ''))
+    runners.add(vitest ? 'vitest' : 'node-test')
+  }
+  return runners.size === 1 ? [...runners][0] : null
 }
 
 /**
- * A label without `:exit` is graded on a reported run: a command no trusted adapter reports (`npm test`) would pass
- * exit-only and the transition would refuse it as REQUIRED_LABEL_GRADE. Step says so instead of spending the run.
+ * The repository test command the repo-test label names (PLANS.init picked its grade from it): the package.json test
+ * script when it is node --test or vitest, `npm test` for `repo-test:exit`. A script a shell would expand is the agent's.
  */
-function unreported(directory, label, source) {
-  if (label.endsWith(':exit') || source.adapter) return null
+async function repoTestSource(root, label) {
+  const script = (await readJson(join(root, 'package.json')))?.scripts?.test
+  if (typeof script !== 'string' || /[|&;<>$`()\\]/.test(script)) return null
+  if (label.endsWith(':exit')) return { command: ['npm', 'test'], adapter: null, cwd: root, note: '' }
+  const words = script.trim().split(/\s+/).map((word) => word.replace(/^(['"])(.*)\1$/, '$2'))
+  if (words[0] === 'node' && words.includes('--test')) return { command: [process.execPath, ...words.slice(1)], adapter: 'node-test', cwd: root, note: '' }
+  if (words[0] !== 'vitest') return null
+  return { command: ['npx', 'vitest', 'run', ...words.slice(1).filter((word) => word !== 'run' && word !== '--run')], adapter: 'vitest', cwd: root, note: '' }
+}
+
+/** The command of a label the ledger never ran: its named test files, run from the repository with its trusted runner. */
+async function derivedSource(directory, phase, label) {
+  const { root } = await packageSources(directory)
+  if (/^repo-test(?::(?:reported|exit))?$/.test(label)) return repoTestSource(root, label)
+  const files = (await stemFiles(resolve(directory, phase.state?.scanRoot ?? '.'), labelStem(label))).sort()
+  const runner = files.length > 0 ? await runnerOf(files) : null
+  if (!runner) return null
+  const paths = files.map((path) => relative(root, path))
+  return { command: runner === 'vitest' ? ['npx', 'vitest', 'run', ...paths] : [process.execPath, '--test', ...paths], adapter: runner, cwd: root, note: '' }
+}
+
+/** The command that runs `label`: the one given to step for it, the latest run of it in the ledger, else its named files. */
+async function sourceOf(directory, phase, label, given) {
+  if (given.command && given.label === label) return typedCommand(given.command)
+  const run = runsOf(phase.ledger).findLast((entry) => entry.label === label)
+  if (run) return { command: run.command, adapter: run.adapter ?? null, cwd: run.cwd, note: run.env?.note ?? '' }
+  return derivedSource(directory, phase, label)
+}
+
+/**
+ * What the CLI would refuse or misgrade, said before the run: a label without `:exit` is graded on a reported run, which
+ * only a trusted adapter gives (`npm test` would pass exit-only and the transition refuse REQUIRED_LABEL_GRADE), and the
+ * adapter owns the reporter, destination and leniency arguments (ADAPTER_COMMAND_INVALID).
+ */
+function commandIssue(directory, label, source) {
+  if (label.endsWith(':exit')) return null
   const shown = source.command.map((word) => (word === process.execPath ? 'node' : word)).join(' ')
-  return { say: `${label} is graded on a reported run and \`${shown}\` reports no test results to the oracle: rerun ${rerun(directory)} --label ${label} -- <node --test <test files> | npx vitest run <test files>>` }
+  const again = `rerun ${rerun(directory)} --label ${label} -- <node --test <test files> | npx vitest run <test files>>`
+  if (!source.adapter) return { say: `${label} is graded on a reported run and \`${shown}\` reports no test results to the oracle: ${again}` }
+  if (forbiddenArgument(TRUSTED_ADAPTERS[source.adapter], source.command)) return { say: `\`${shown}\` passes reporter, destination or leniency arguments the ${source.adapter} adapter owns: drop them and ${again}` }
+  return null
 }
 
 /** A path `<stem>-<n>.<extension>` in `folder` that does not exist yet — a trusted adapter refuses an existing report. */
@@ -154,19 +223,25 @@ async function workingDirectory(cwd) {
   return process.cwd()
 }
 
-function askCommand(directory, labels) {
-  const label = labels.length === 1 ? labels[0] : `<${labels.join('|')}>`
-  return `write or fix the tests, then rerun: ${rerun(directory)} --label ${label} -- <the command that runs them>`
+/** The labels step finds no test for: the file names it runs, or the command to name for tests named otherwise. */
+function scanRootShown(directory, phase) {
+  if (!phase.state?.scanRoot) return 'the scan root'
+  return q(resolve(directory, phase.state.scanRoot))
+}
+function askCommand(directory, phase, labels) {
+  const where = scanRootShown(directory, phase)
+  const named = labels.map((label) => (/^repo-test\b/.test(label) ? `${label}: package.json's test script, node --test or vitest` : `${label}: <name>.${labelStem(label)}.test.<mjs|ts>`))
+  return `write the tests in files named for their label under ${where} (${named.join('; ')}), then rerun ${rerun(directory)}; for tests named otherwise rerun ${rerun(directory)} --label <label> -- <the command that runs them>`
 }
 
 /** exec calls for `labels`, or the instruction naming a label step has no command for. */
 async function labelCalls(directory, phase, labels, given) {
   const calls = []
   for (const label of labels) {
-    const source = sourceOf(phase, label, given)
-    if (!source) return { say: askCommand(directory, [label]) }
-    const graded = unreported(directory, label, source)
-    if (graded) return graded
+    const source = await sourceOf(directory, phase, label, given)
+    if (!source) return { say: askCommand(directory, phase, [label]) }
+    const issue = commandIssue(directory, label, source)
+    if (issue) return issue
     calls.push(await testCall(directory, phase, 'exec', label, source, [], calls.length))
   }
   return { calls }
@@ -203,16 +278,28 @@ function preRedReview(directory, phase, given) {
   ].join(' ')
 }
 
+// a RED is a product test failing on its assertion: the conformance labels first, never a proof, adequacy or type check
+const RED_FIRST = ['fast-check:reported', 'world-conformance:reported', 'contract-cases:reported']
+const NOT_RED = new Set(['bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported'])
+const redCandidates = (labels) => [...RED_FIRST.filter((label) => labels.includes(label)), ...labels.filter((label) => !RED_FIRST.includes(label) && !NOT_RED.has(label))]
+
+/** The RED's label: the one given, VALID_RED's, the last failing reported product run's, else the first candidate step can run. */
+async function redLabel(directory, phase, given, labels) {
+  const red = historyRun(phase, 'VALID_RED') ?? runsOf(phase.ledger).findLast((run) => run.exitCode !== 0 && run.grade === 'reported' && !NOT_RED.has(run.label))
+  if (given.label ?? red?.label) return given.label ?? red.label
+  for (const label of redCandidates(labels)) if (await sourceOf(directory, phase, label, given)) return label
+  return null
+}
+
 async function planRed(directory, phase, given) {
   const evidence = evidenceOf(directory, phase)
   if (!(await exists(evidence))) return { say: `write ${q(evidence)} mapping each card row to its test ({"schemaVersion":1,"rows":{"O1":{"kind":"test","name":"<test name>"}}}), then rerun ${rerun(directory)}` }
   const labels = phase.state.requiredLabels ?? []
-  const red = historyRun(phase, 'VALID_RED') ?? runsOf(phase.ledger).findLast((run) => run.exitCode !== 0 && run.grade === 'reported')
-  const label = given.label ?? red?.label ?? (labels.length === 1 ? labels[0] : null)
-  const source = label ? sourceOf(phase, label, given) : null
-  if (!source) return { say: askCommand(directory, labels) }
-  const graded = unreported(directory, label, source)
-  if (graded) return graded
+  const label = await redLabel(directory, phase, given, labels)
+  const source = label ? await sourceOf(directory, phase, label, given) : null
+  if (!source) return { say: askCommand(directory, phase, label ? [label] : redCandidates(labels)) }
+  const issue = commandIssue(directory, label, source)
+  if (issue) return issue
   if (await preRedReviewMissing(directory, phase)) return { say: preRedReview(directory, phase, given) }
   const packet = action(phase, 'VALID_RED')
   const extra = ['--evidence', evidence]
@@ -237,14 +324,14 @@ function failedOnTheseBytes(phase, red, label) {
 async function planGreen(directory, phase, given) {
   const red = historyRun(phase, 'VALID_RED')
   if (red && phase.status.currentSnapshot?.productionSha256 === red.productionSha256)
-    return { say: `implement the production change so the RED tests pass (a test edit after VALID_RED needs a harness budget spend), then rerun ${rerun(directory)}` }
+    return { say: `implement the production change so the RED tests pass (a test edit after VALID_RED needs a fresh RED, one of the 2 harness spends), then rerun ${rerun(directory)}` }
   const label = red?.label ?? given.label
   const failed = red && failedOnTheseBytes(phase, red, label)
   if (failed) return { say: `${failed.runId} failed on these bytes: edit production so the RED tests pass, then rerun ${rerun(directory)}` }
-  const source = label ? sourceOf(phase, label, given) : null
-  if (!source) return { say: askCommand(directory, phase.state.requiredLabels ?? []) }
-  const graded = unreported(directory, label, source)
-  if (graded) return graded
+  const source = label ? await sourceOf(directory, phase, label, given) : null
+  if (!source) return { say: askCommand(directory, phase, label ? [label] : phase.state.requiredLabels ?? []) }
+  const issue = commandIssue(directory, label, source)
+  if (issue) return issue
   // GREEN checks every required label on these bytes; the others run first, GREEN's own command last
   const others = await labelCalls(directory, phase, notPassing(phase).filter((name) => name !== label), given)
   if (others.say) return others
@@ -358,11 +445,38 @@ async function blindArgs(directory, targets, given, excluded) {
   return { args: ['--blind-map', targets.blindMap, '--blind-reviewer', 'blind-mapper', '--blind-task-id', found.task] }
 }
 
+/**
+ * The run close cites: the newest fresh pass after GREEN of the GREEN label's own command. Another label's pass is
+ * refused (REVIEW_COMMAND_CHANGED), and a packet needs a pass of that command on its bytes (REVIEW_RERUN_REQUIRED).
+ */
+function citedRun(phase, packetAction) {
+  const green = historyRun(phase, 'IMPLEMENTED_GREEN')
+  const runs = runsOf(phase.ledger)
+  const sameCommand = (runId) => {
+    const run = runs.find((entry) => entry.runId === runId)
+    return Boolean(green) && run?.label === green.label && JSON.stringify(run.command) === JSON.stringify(green.command)
+  }
+  return (packetAction?.candidateRuns ?? []).find(sameCommand) ?? null
+}
+
+/** No pass to cite: step runs the GREEN command on the current bytes, then plans close again; a failure there is the implementer's. */
+async function witnessCall(directory, phase) {
+  const green = historyRun(phase, 'IMPLEMENTED_GREEN')
+  if (!green) return { say: `no fresh passing run to cite: run oracle-run.mjs guide --dir ${q(directory)} --to REVIEW_VERIFIED` }
+  const runs = runsOf(phase.ledger)
+  const now = phase.status.currentSnapshot?.worktreeSha256
+  const last = runs.slice(runs.indexOf(green) + 1).findLast((run) => run.label === green.label && run.worktreeSha256 === now)
+  if (last?.exitCode === 0) return { say: `${last.runId} passed on these bytes and status cites no run for the review: read ${readNext(directory, phase)} and do what it names` }
+  if (last) return { say: `${last.runId} failed on these bytes: edit production so the GREEN tests pass, then rerun ${rerun(directory)}` }
+  const source = { command: green.command, adapter: green.adapter ?? null, cwd: green.cwd, note: green.env?.note ?? '' }
+  return { calls: [await testCall(directory, phase, 'exec', green.label, source, [], 0)], again: true }
+}
+
 /** close at IMPLEMENTED_GREEN with every argument a person would assemble, taken from the oracle directory and the ledger. */
 export async function closeCall(directory, phase, given = {}) {
   const packetAction = action(phase, 'REVIEW_VERIFIED')
-  const run = packetAction?.candidateRuns[0]
-  if (!run) return { say: `no fresh passing run to cite: run oracle-run.mjs guide --dir ${q(directory)} --to REVIEW_VERIFIED` }
+  const run = citedRun(phase, packetAction)
+  if (!run) return witnessCall(directory, phase)
   const decision = join(directory, 'implementation-decision.md')
   if (!(await exists(decision))) return { say: `write ${q(decision)} (what the implementation changed and why; the reviewers read it), then rerun ${rerun(directory)}` }
   const rev = phase.status.currentSnapshot.worktreeSha256
@@ -461,9 +575,20 @@ async function inputFolder(directory, kind, digest) {
   await mkdir(folder, { recursive: true, mode: 0o700 })
   return folder
 }
+// the kinds whose return is JSON: the Formal card review, and reverse-impossible, its candidates' kind before 0.129
+const JSON_RETURNS = new Set(['card-review', 'reverse-impossible'])
 /** Where the agent saves a review's return unchanged: in the oracle directory, named by the input digest it read. */
 export const reviewReturn = (directory, kind, digest) =>
-  join(directory, 'reviews', `${kind}-${digest.slice(0, 12)}.${kind === 'reverse-impossible' ? 'json' : 'md'}`)
+  join(directory, 'reviews', `${kind}-${digest.slice(0, 12)}.${JSON_RETURNS.has(kind) ? 'json' : 'md'}`)
+
+/** The return saved for the input a review reads now: under its kind's name, or an older run's name for the kind. */
+async function savedReturn(directory, kind, digest) {
+  for (const each of roundKinds(kind)) {
+    const path = reviewReturn(directory, each, digest)
+    if (await exists(path)) return path
+  }
+  return null
+}
 
 /** The card a card review reads: the user's approval is not part of it, so recording the approval asks for no new round. */
 function reviewedCard(text) {
@@ -485,11 +610,21 @@ function saveOutput(script, args, cwd) {
   return result.status === 0 ? result.stdout : `${script} ${args[0]} failed: ${(result.stderr || result.stdout).split('\n')[0]}\n`
 }
 
+/** The card copies a card read gets: the reading view and a byte copy, both outside the repository. */
+async function writeCardCopies(directory, root, folder) {
+  const card = join(directory, 'oracle.md')
+  await writeFile(join(folder, 'view.md'), saveOutput('oracle-review-view.mjs', ['card', '--oracle', card], root))
+  await copyFile(card, join(folder, 'oracle.md'))
+  return [join(folder, 'view.md'), join(folder, 'oracle.md')]
+}
+
 /**
  * Each review kind: the digest of what it reads (a round is a saved return for a new digest), the input files step
  * writes for its first round, and how that round is dispatched; a second round confirms the first one's fixes
- * (reviewClause). The model analyst reads the sources only, never the model. A conditional kind (source-aware: whether
- * card/policy-sources.md's trigger applies is the author's call) is named with its condition until a return is saved.
+ * (reviewClause). The model analyst reads the sources only, never the model. The Formal card review is one reviewer:
+ * the cold read of the card copies alone, written before it opens the reverse-impossible inputs, in one JSON return. A
+ * conditional kind (source-aware: whether card/policy-sources.md's trigger applies is the author's call) is named with
+ * its condition until a return is saved.
  */
 const REVIEW_KINDS = {
   'model-analyst': {
@@ -508,32 +643,28 @@ const REVIEW_KINDS = {
     },
     say: (files, saved) => `the model analyst — $oracle-review in a fresh context with only ${files} (keep writing the model while it runs; join its world, goals and State Model into the package), its return saved unchanged as ${saved}`,
   },
-  'cold-read': {
-    name: 'cold-read',
+  'card-review': {
+    name: 'the card review',
     digest: cardDigest,
     async write(directory, root, folder) {
       const card = join(directory, 'oracle.md')
-      await writeFile(join(folder, 'view.md'), saveOutput('oracle-review-view.mjs', ['card', '--oracle', card], root))
-      await copyFile(card, join(folder, 'oracle.md'))
-      return [join(folder, 'view.md'), join(folder, 'oracle.md')]
-    },
-    say: (files, saved) => `cold-read — $oracle-review in a fresh context with only ${files}, its return saved unchanged as ${saved}`,
-  },
-  'reverse-impossible': {
-    name: 'reverse-impossible',
-    digest: cardDigest,
-    async write(directory, root, folder) {
-      const card = join(directory, 'oracle.md')
-      const files = [join(folder, 'ir.json')]
-      await writeFile(files[0], saveOutput('oracle-verify.mjs', ['card', '--oracle', card, '--ir'], root))
+      const files = [...(await writeCardCopies(directory, root, folder)), join(folder, 'ir.json')]
+      await writeFile(files[2], saveOutput('oracle-verify.mjs', ['card', '--oracle', card, '--ir'], root))
       if (/^## Adequacy\s*$/m.test(await readFile(card, 'utf8'))) {
         files.push(join(folder, 'explore-input.md'))
-        const built = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-adequacy.mjs'), 'explore-input', '--card', card, '--output', files[1]], { cwd: root, encoding: 'utf8' })
-        if (built.status !== 0) await writeFile(files[1], `explore-input failed: ${(built.stderr || built.stdout).split('\n')[0]}\n`)
+        const built = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-adequacy.mjs'), 'explore-input', '--card', card, '--output', files[3]], { cwd: root, encoding: 'utf8' })
+        if (built.status !== 0) await writeFile(files[3], `explore-input failed: ${(built.stderr || built.stdout).split('\n')[0]}\n`)
       }
       return files
     },
-    say: (files, saved) => `reverse-impossible — a second fresh $oracle-review with only ${files}, its candidates JSON saved unchanged as ${saved}`,
+    say: (files, saved) =>
+      `the card review — $oracle-review in a fresh context with only ${files}: its cold read of view.md and oracle.md alone first, written before it opens the rest for the reverse-impossible attack; its one JSON return ({"coldRead": {"root", "nail", "findings"}, "candidates": [...]}) saved unchanged as ${saved}`,
+  },
+  'cold-read': {
+    name: 'cold-read',
+    digest: cardDigest,
+    write: writeCardCopies,
+    say: (files, saved) => `cold-read — $oracle-review in a fresh context with only ${files}, its return saved unchanged as ${saved}`,
   },
   'source-aware': {
     name: 'source-aware',
@@ -555,10 +686,11 @@ const REVIEW_KINDS = {
 async function reviewState(directory, root, record, kind) {
   const digest = await REVIEW_KINDS[kind].digest(directory, root)
   if (!digest) return null
-  const saved = await exists(reviewReturn(directory, kind, digest))
+  const file = await savedReturn(directory, kind, digest)
+  const saved = file !== null
   const rounds = await reviewRounds(directory, record, kind)
   const offered = Boolean(REVIEW_KINDS[kind].conditional) && rounds === 0
-  return { kind, digest, saved, rounds, offered, wanted: !offered && !saved && rounds < REVIEW_ROUNDS }
+  return { kind, digest, saved, file, rounds, offered, wanted: !offered && !saved && rounds < REVIEW_ROUNDS }
 }
 
 /** The review nodes that come before `failed` in the graph (all of them when every node passes). */
@@ -573,11 +705,15 @@ async function reviewStates(directory, root, record, profile, failed) {
   return states
 }
 
-/** The return a second round continues: the kind's other saved return, or the path its recorded digest names. */
+/**
+ * The return a second round continues: the kind's other saved return (an older run's under the kind's old name too), or
+ * the path its recorded digest names.
+ */
 async function roundOneReturn(directory, record, kind, digest) {
   const own = basename(reviewReturn(directory, kind, digest))
   const names = await readdir(join(directory, 'reviews')).catch(() => [])
-  const saved = names.find((name) => name.startsWith(`${kind}-`) && name !== own && !name.endsWith('.triage.json'))
+  const named = (name) => roundKinds(kind).some((each) => name.startsWith(`${each}-`))
+  const saved = names.find((name) => named(name) && name !== own && !name.endsWith('.triage.json'))
   if (saved) return join(directory, 'reviews', saved)
   const recorded = (record?.reviews ?? []).find((entry) => entry.kind === kind && entry.digest.slice(0, 12) !== digest.slice(0, 12))
   return recorded ? reviewReturn(directory, kind, recorded.digest) : null
@@ -690,16 +826,16 @@ function repoPolicyLead(directory, root) {
   return candidates > 0 ? `disposition the ${candidates} repository policy candidates \`oracle-verify.mjs card --oracle ${q(card)} --repo-policies\` lists as sweep counterparts; then ` : ''
 }
 
-/** The reverse-impossible return triaged once per digest (oracle-adequacy.mjs triage), saved beside it. */
+/** The card review's candidates triaged once per digest (oracle-adequacy.mjs triage), saved beside its return. */
 async function triageLead(directory, root, states) {
-  const state = states.find(({ kind, saved }) => kind === 'reverse-impossible' && saved)
+  const state = states.find(({ kind, saved }) => kind === 'card-review' && saved)
   if (!state) return ''
-  const saved = reviewReturn(directory, state.kind, state.digest)
+  const saved = state.file
   const triaged = saved.replace(/\.json$/, '.triage.json')
   if (!(await exists(triaged))) {
     const args = ['triage', '--card', join(directory, 'oracle.md'), '--candidates', saved]
     const result = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-adequacy.mjs'), ...args], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 })
-    if (result.status !== 0) return `the reverse-impossible return does not triage (${(result.stderr || result.stdout).split('\n')[0]}): save the reviewer's candidates JSON unchanged as ${q(saved)}; then `
+    if (result.status !== 0) return `the card review's candidates do not triage (${(result.stderr || result.stdout).split('\n')[0]}): save the reviewer's JSON unchanged as ${q(saved)}; then `
     await writeFile(triaged, result.stdout)
   }
   return `record one journal line per candidate ${q(triaged)} triages (a non-covered one goes to the package or the user); then `
@@ -986,7 +1122,8 @@ function stopAfter(directory, { step, phase, after, seen, call, result }) {
     return refusal(directory, after, call, result, step.targets)
   }
   if (step.read) return readStop(directory, call, result)
-  if (!seen.has(phaseOf(after.line)) || (grew(phase, after) && flakinessLeft(after))) return null
+  // a recorded run the plan asked for before its own next call (the review's witness, a flaky pass) is progress on the same line
+  if (!seen.has(phaseOf(after.line)) || (grew(phase, after) && (flakinessLeft(after) || step.again))) return null
   const how = phaseOf(after.line) === phaseOf(phase.line) ? 'did not move' : 'came back to a line it had'
   return { say: `the phase ${how} after ${callText(call)}: read ${readNext(directory, after)} and do what it names` }
 }

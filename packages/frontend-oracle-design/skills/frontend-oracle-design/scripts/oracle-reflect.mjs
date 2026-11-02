@@ -10,6 +10,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { runCli } from './oracle-cli.mjs'
 import { readStage } from './oracle-stage.mjs'
+import { ledgerSpend } from './oracle-transition-guards.mjs'
 
 class CliError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -94,6 +95,19 @@ function walksBack(history, index) {
 /** step이 멈춘 횟수(0.127) — 같은 실패 목록이 세 번째 고친 상태에서 나와 next가 stop인 검사, 이어진 stop은 한 번. */
 const stepStops = (checks = []) => checks.filter((check, index) => check.next === 'stop' && checks[index - 1]?.next !== 'stop').length
 
+/**
+ * 원장 하나의 예산 지출 — 옛 `budget` 기록(이유와 함께), 그리고 0.129부터 원장에서 계산한 지출이 그 기록보다 많은 만큼(메모
+ * 없음). 종류마다 둘 중 큰 쪽이다.
+ */
+function spendsOf(ledger) {
+  const recorded = ledger.filter((event) => event.type === 'budget' && !event.duplicate).map((event) => ({ name: event.budget, note: event.reason }))
+  const derived = Object.entries(ledgerSpend(ledger).spent).flatMap(([name, spent]) => {
+    const extra = spent - recorded.filter((entry) => entry.name === name).length
+    return Array.from({ length: Math.max(0, extra) }, () => ({ name }))
+  })
+  return [...recorded, ...derived]
+}
+
 export function reflectRuns(runs, { minRuns = 2 } = {}) {
   const rewinds = { total: 0, unrecorded: 0, byReason: {}, byWalk: {} }
   const budgets = {}
@@ -122,13 +136,11 @@ export function reflectRuns(runs, { minRuns = 2 } = {}) {
     })
   }
   for (const run of runs) {
-    for (const event of run.ledger) {
-      if (event.type === 'budget' && !event.duplicate) {
-        bump(budgets, event.budget)
-        observe(`budget:${event.budget}`, run.id, event.reason)
-      }
-      if (event.type === 'transition' && STOP_STATES.has(event.state)) bump(stops, event.state)
+    for (const { name, note } of spendsOf(run.ledger)) {
+      bump(budgets, name)
+      observe(`budget:${name}`, run.id, note)
     }
+    for (const event of run.ledger) if (event.type === 'transition' && STOP_STATES.has(event.state)) bump(stops, event.state)
     const stopped = stepStops(run.checks)
     if (stopped > 0) stops.NEEDS_DECISION = (stops.NEEDS_DECISION ?? 0) + stopped
   }
@@ -240,7 +252,7 @@ function deliveryTiming(ledger) {
     wrapperMs: sum(runs.map((run) => run.wrapperMs ?? 0)),
     runsByLabel: byLabel,
     reviewRounds: ledger.filter((event) => event.type === 'review-round').length,
-    budgetSpends: ledger.filter((event) => event.type === 'budget' && !event.duplicate).length,
+    budgetSpends: spendsOf(ledger).length,
   }
 }
 

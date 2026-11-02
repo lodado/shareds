@@ -1469,7 +1469,8 @@ export const EXPLORER_SCHEMA = {
 }
 
 /**
- * AI 탐색가 입력 — 기존 reverse-impossible 리뷰어가 받는다. 모델 분석가와 달리 카드 전체를 본다: 역할이 공격이다.
+ * AI 탐색가 입력 — Formal 카드 리뷰어가 cold read를 쓴 뒤 reverse-impossible 단계에서 받는다. 모델 분석가와 달리 카드 전체를
+ * 본다: 역할이 공격이다.
  * 원문·Outcome Brief·카드 행·Terms·Adequacy에 더해, 가정 끄기 결과와 모델 밖 목록을 붙인다.
  */
 export async function exploreInput({ card, bin, cwd = process.cwd(), timeoutMs }) {

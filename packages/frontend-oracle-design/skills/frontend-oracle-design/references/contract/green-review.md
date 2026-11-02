@@ -17,6 +17,6 @@ Delivery packets persist a two-round budget in the existing ledger. Both High re
 round. Round 2 requires preceding receipt-bound `--findings` and, for High, `--intersect`; preserve
 `reviewScope.mode: "confirm-fixes"`, prior finding IDs and the repair diff rather than dispatch a fresh
 defect hunt. Round 2 blocks only on a backed `confirm` claim; other findings are improvement proposals
-the report lists. There is no round 3 (`REVIEW_ROUNDS_CLOSED`, also for `review-extend`): repaired
+the report lists. There is no round 3 (`REVIEW_ROUNDS_CLOSED`; no command opens one): repaired
 round-2 blockers close as PARTIAL_VERIFIED with the repair unreviewed. No blocker, evidence,
 independence or final acceptance gate is waived.

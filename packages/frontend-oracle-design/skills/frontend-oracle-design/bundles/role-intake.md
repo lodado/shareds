@@ -285,14 +285,14 @@ these routes. An unconfirmed problem candidate stays in the existing investigati
 `needs-evidence`, not a guessed defect classification. Current implementation, test observations,
 and reviewer preference are classification evidence, not policy sources.
 
-| Classification       | Meaning                                                                                             | Routing                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
-| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
-| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
-| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
-| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
+| Classification       | Meaning                                                                                             | Routing                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                |
+| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                 |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (one per new RED binding) |
+| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`            |
+| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                         |
+| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy           |
 
 - A revision mismatch is not a feedback classification. Stop using existing evidence for the changed
   revision and move to `NEEDS_DECISION` or `FAIL` per the lock rules. Preserve past artifacts and
@@ -873,8 +873,8 @@ surviving questions remain after pruning, bundle the two rounds into the Draft i
 rounds with no branch to kill only adds round trips. Space discovery axes and A/B counterexamples
 ride the Draft too ([first response](../common.md#first-response--one-message-one-confirmation)). When the user explicitly requests a
 one-question-at-a-time interview (e.g. "grill me"), proceed in phase order without a round cap, for
-Design-only investigation only. Policy questions during Delivery still follow the 2 rounds of
-`oracle-run.mjs budget`.
+Design-only investigation only. Policy questions during Delivery still follow the 2-resume policy
+budget `oracle-run.mjs` reads off the ledger.
 
 At the end of each round, append the questions·answers·whether the recommendation was adopted and
 the pruning reasons to `.ai/oracles/<oracle-id>/journal.md`. Do not leave answers only in the

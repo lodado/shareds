@@ -6,8 +6,9 @@ dependencies in independent context. Procedure reads grant no access to excluded
 
 Card-only cold-read sees card bytes alone, not sources, implementation, author conclusions or Delivery
 packets. Apply five questions per row and return one root and cheapest falsifying nail.
-Reverse-impossible sees only impossible dispositions and the approved witness/falsifier table, asks
-for a counterexample, and returns disagreements without deciding policy. Source-aware review sees
+Reverse-impossible, after that cold read in the same Formal card review, adds only impossible
+dispositions, the approved witness/falsifier table and the explore input, asks for a counterexample, and
+returns disagreements without deciding policy. Source-aware review sees
 approved source excerpts and card decisions, distinct from blind review. Formal `adapter-pre-red` follows
 delivery/red without a Delivery packet/receipt. Delivery review sees only
 the matching locked packet, raw reported evidence, final snapshot and mode-appropriate criteria.

@@ -128,7 +128,7 @@ test('canonical reviewer mode labels retain blind audience constraints', async (
   const body = await readFile(new URL('../skills/frontend-oracle-design/references/roles/review.md', import.meta.url), 'utf8')
   for (const mode of ['cold-read', 'reverse-impossible', 'source-aware', 'delivery']) assert.ok(body.toLowerCase().includes(mode))
   assert.match(body, /cold-read sees card bytes alone, not sources, implementation, author conclusions or Delivery\s+packets/)
-  assert.match(body, /Reverse-impossible sees only impossible dispositions and the approved witness\/falsifier table/)
+  assert.match(body, /Reverse-impossible, after that cold read in the same Formal card review, adds only impossible\s+dispositions, the approved witness\/falsifier table and the explore input/)
   assert.match(body, /Do not mix these contexts/)
   assert.match(body, /No product edits/)
   assert.match(body, /(?:policy\s+approval, lock changes, receipts or transitions|Never approve policy, change locks, issue receipts or perform transitions)/)

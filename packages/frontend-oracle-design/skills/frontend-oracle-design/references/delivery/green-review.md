@@ -370,8 +370,8 @@ Round 2 packet generation requires the preceding raw receipt-bound `--findings` 
 `--intersect`. It includes their IDs/original findings and the repair diff under
 `reviewScope.mode: "confirm-fixes"`; preserve that scope in both reviewer tasks. The runtime refuses
 missing/changed/non-independent previous findings with `REVIEW_FOLLOWUP_REQUIRED` and rewritten task
-scope with `REVIEW_SCOPE_INVALID`. The other gates are unchanged. `review-extend` refuses delivery
-review (`REVIEW_ROUNDS_CLOSED`); a ledger that already records an extension still replays.
+scope with `REVIEW_SCOPE_INVALID`. The other gates are unchanged. No command opens a third round
+(`REVIEW_ROUNDS_CLOSED`); a ledger that already records an extension still replays.
 
 ## Forbidden
 

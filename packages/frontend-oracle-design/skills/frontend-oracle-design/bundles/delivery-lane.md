@@ -285,14 +285,14 @@ these routes. An unconfirmed problem candidate stays in the existing investigati
 `needs-evidence`, not a guessed defect classification. Current implementation, test observations,
 and reviewer preference are classification evidence, not policy sources.
 
-| Classification       | Meaning                                                                                             | Routing                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
-| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
-| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
-| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
-| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
+| Classification       | Meaning                                                                                             | Routing                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                |
+| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                 |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (one per new RED binding) |
+| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`            |
+| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                         |
+| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy           |
 
 - A revision mismatch is not a feedback classification. Stop using existing evidence for the changed
   revision and move to `NEEDS_DECISION` or `FAIL` per the lock rules. Preserve past artifacts and
@@ -495,8 +495,8 @@ label that needs `:reported`/`:exit` (`LABEL_NOT_REQUIRED`).
   `node_modules`·build-output exclusion list. **A gitignored path is not counted as a production
   change.** If something is real production but gitignored, clean up `--scan-root` or the ignore
   settings first.
-- Run `init` once scaffold, runner config and test dependencies exist. Before `VALID_RED`, `init --reason`
-  again replaces only labels, milestones and harness paths (the ledger records an `amend`).
+- Run `init` once scaffold, runner config and test dependencies exist; it refuses a directory that
+  records runs (`RUN_ARTIFACTS_EXIST`).
 
 ## Current-step guide and resume
 
@@ -534,15 +534,15 @@ runId. State writes use temp file + atomic rename; never hand-edit `run-state.js
   is not enforced by default for Low/Medium.
 - The nondeterministic source scan is based on a known token list — do not use a detection failure as
   evidence of integrity.
-- Call `oracle-run.mjs budget --spend policy|harness|product --reason ...` on every budget use.
+- No command spends a budget; the ledger shows each spend: policy per resume after `NEEDS_DECISION`,
+  harness per new test binding a RED refresh or a GREEN on a changed harness rests on, product per
+  production state a run failed on after `VALID_RED` and per worker dispatch.
   If `BUDGET_EXHAUSTED`, do not route around it with another budget; report `FAIL`.
-  Before `VALID_RED`, harness repairs are free (`BUDGET_NOT_NEEDED`).
-  After RED, harness identity includes the frozen test-binding semantics (`rows`, `paths`, `frames`,
-  `sequence`) from the selected evidence map as well as the existing test/harness file digest.
-  A mapping-only correction counts once; formatting and non-binding notes do not count again.
-  Legacy pre-RED spends keep their file-only identity. An unreadable bound
-  map is an error, not a reason to omit it from identity. Spending still requires fresh RED→GREEN
-  for changed bindings; it neither increases the two-spend limit nor reopens terminal `FAIL`.
+  Before `VALID_RED`, harness repairs are free. A binding is the test/harness file digests plus the
+  frozen test-binding semantics (`rows`, `paths`, `frames`, `sequence`) of the evidence map; one
+  binding counts once, and formatting or non-binding notes are no new binding. An unreadable bound map
+  is an error, not a reason to omit it. A spend still needs a fresh RED→GREEN for the changed binding;
+  it neither raises the two-spend limit nor reopens terminal `FAIL`.
 
 ## Optional task-scoped implementation worker
 

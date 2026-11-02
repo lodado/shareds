@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest, stableStringify } from './oracle-fs.mjs'
 import { confirmClass, repairHunks } from './oracle-iterations.mjs'
 import { emitWorld } from './oracle-projection.mjs'
+import { FIX_CLASSES, refusalLine, REFUSALS } from './oracle-run.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
 
@@ -1860,7 +1861,7 @@ test('init: 잠긴 카드의 Risk가 run risk이고, 다른 --risk는 RISK_MISMA
   const downgraded = run([...base, '--risk', 'medium'])
   assert.equal(downgraded.status, 1)
   assert.match(downgraded.stderr, /^RISK_MISMATCH: --risk medium disagrees with the locked card's Risk: high/)
-  assert.match(downgraded.stderr, /\nnext: drop --risk/)
+  assert.match(downgraded.stderr, /\nnext: \[command\] drop --risk/)
 
   const derived = run(base)
   assert.equal(derived.status, 0, derived.stderr)
@@ -1910,7 +1911,7 @@ test('O6: harness-path는 scan root 안의 존재하는 정확한 파일만 받�
   }
 })
 
-test('O6: 등록한 harness는 RED 전에 바꿀 수 있고 RED 후 변경은 예산과 새 RED를 요구한다', async (t) => {
+test('O6: 등록한 harness는 RED 전에 바꿀 수 있고 RED 후 변경은 새 RED를 요구하며 그 GREEN이 harness 지출 하나다', async (t) => {
   const { root, oracleDirectory } = await workspace(t, {
     harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
   })
@@ -1924,14 +1925,7 @@ test('O6: 등록한 harness는 RED 전에 바꿀 수 있고 RED 후 변경은 �
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-  assert.equal(withoutBudget.status, 1)
-  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
-
-  assert.equal(
-    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test setup changed']).status,
-    0,
-  )
+  // 0.129.0: no spend command — GREEN on the changed harness needs only the new RED, and binding it is the spend
   const withoutRed = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(withoutRed.status, 1)
   assert.match(withoutRed.stderr, /^HARNESS_RED_REQUIRED: /)
@@ -1941,6 +1935,7 @@ test('O6: 등록한 harness는 RED 전에 바꿀 수 있고 RED 후 변경은 �
   greenRun(oracleDirectory, 'green-4')
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-006')
   assert.equal(transitioned.status, 0, transitioned.stderr)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
 })
 
 test('O6: milestone은 알려진 행을 중복 없이 한 번씩만 소유한다', async (t) => {
@@ -2127,7 +2122,6 @@ test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지
 test('O6: run-state를 지우고 다시 init해도 기준선과 예산을 되살리지 못한다', async (t) => {
   const { root, oracleDirectory, lock } = await workspace(t)
   run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'r1']).status, 0)
 
   await rm(join(oracleDirectory, 'run-state.json'))
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = () => null\n')
@@ -2140,126 +2134,16 @@ test('O6: run-state를 지우고 다시 init해도 기준선과 예산을 되살
   assert.doesNotMatch(reinitialized.stderr, /remove it/)
 })
 
-test('O11: exec 없이 예산만 쓴 뒤 run-state를 지워도 예산을 되살리지 못한다', async (t) => {
-  const { root, oracleDirectory, lock } = await workspace(t)
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'r1']).status, 0)
-
-  await rm(join(oracleDirectory, 'run-state.json'))
-  const reinitialized = run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root])
-
-  assert.equal(reinitialized.status, 1)
-  assert.match(reinitialized.stderr, /^RUN_ARTIFACTS_EXIST: /)
-})
-
-test('O6: VALID_RED 전에는 같은 init을 --reason과 다시 돌려 라벨·마일스톤·harness 경로만 고치고 기준선·예산은 그대로 둔다', async (t) => {
-  // 실런 사고: 이미 충족된 행을 마일스톤에 넣었고, 필수 라벨 하나를 빠뜨렸고, 뼈대 설정 파일은 init 뒤에 생겼다
+test('O6: init on an oracle that already has a run state is refused before VALID_RED too — a corrected setup is a new oracle-id', async (t) => {
+  // 0.129.0 removed the init re-run that amended labels·milestones·harness paths before VALID_RED (0 uses in 8 field runs)
   const { root, oracleDirectory, lock } = await workspace(t, { milestones: ['satisfied:O1'] })
-  assert.equal((await state(oracleDirectory)).milestones.length, 1)
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'p1']).status, 0)
   const before = await state(oracleDirectory)
-  await writeFile(join(root, 'vitest.config.mjs'), 'export default { setup: 1 }\n')
-  const reinit = (...extra) =>
-    run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, ...extra])
-  const labels = ['--required-label', 'behavior', '--required-label', 'lint:exit']
-
-  const unexplained = reinit(...labels)
-  assert.equal(unexplained.status, 2)
-  assert.match(unexplained.stderr, /^USAGE: this oracle already has a run state — before VALID_RED, re-run init with --reason/)
-  const elsewhere = run(['init', '--dir', oracleDirectory, '--lock', lock, '--scan-root', join(root, 'src'), ...labels, '--reason', 'narrow the scan root'])
-  assert.equal(elsewhere.status, 1)
-  assert.match(elsewhere.stderr, /^AMEND_SCOPE_CHANGED: /)
-
-  const amended = reinit(...labels, '--harness-path', 'vitest.config.mjs', '--reason', 'lint was left out; O1 was already satisfied')
-  assert.equal(amended.status, 0, amended.stderr)
-  assert.match(amended.stdout, /^RUN_STATE_AMENDED state:ORACLE_READY labels:behavior,lint:exit milestones:0 harness:1\n/)
-  assert.match(amended.stdout, /^HARNESS_ADDED_AFTER_INIT vitest\.config\.mjs /m)
-  assert.match(amended.stdout, /^AMEND_REMOVED milestone satisfied$/m, 'a dropped milestone is named, not silently removed')
-  const after = await state(oracleDirectory)
-  assert.deepEqual(after.requiredLabels, ['behavior', 'lint:exit'])
-  assert.deepEqual(after.milestones, [])
-  assert.deepEqual(after.harnessPaths, ['vitest.config.mjs'])
-  assert.deepEqual(after.snapshot, before.snapshot, 'the baseline stays the init baseline')
-  assert.deepEqual(after.testFilesAtInit, before.testFilesAtInit)
-  assert.deepEqual(after.budgets, before.budgets)
-  assert.deepEqual(after.history, before.history)
-  const recorded = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1)
-  assert.equal(recorded.type, 'amend')
-  assert.equal(recorded.reason, 'lint was left out; O1 was already satisfied')
-  assert.deepEqual(recorded.stateDelta.requiredLabels, ['behavior', 'lint:exit'])
-
-  // 원장이 정본이다 — 끊긴 state 쓰기는 수정 기록을 재생해 되살린다
-  await writeFile(join(oracleDirectory, 'run-state.json'), `${JSON.stringify(before, null, 2)}\n`)
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'p1']).status, 0)
-  assert.deepEqual((await state(oracleDirectory)).requiredLabels, ['behavior', 'lint:exit'])
-
-  await reachValidRed(oracleDirectory, root)
-  const late = reinit('--required-label', 'behavior', '--reason', 'drop lint after RED')
-  assert.equal(late.status, 1)
-  assert.match(late.stderr, /^RUN_ARTIFACTS_EXIST: init can only be corrected before VALID_RED \(the run is at VALID_RED\)/)
-  assert.deepEqual((await state(oracleDirectory)).requiredLabels, ['behavior', 'lint:exit'])
-})
-
-test('O6: init 수정은 init 뒤 바뀐 production 파일을 harness로 옮겨 TDD 순서 판정에서 빼지 못한다', async (t) => {
-  const original = 'export const save = () => 0\n'
-  const { root, oracleDirectory, lock } = await workspace(t, { initialFiles: { 'src/save.mjs': original } })
-  const before = await state(oracleDirectory)
-  assert.ok('src/save.mjs' in before.snapshot)
-  const reinit = (...extra) =>
-    run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, '--required-label', 'behavior', ...extra])
-
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = () => 1\n')
-  const refused = reinit('--harness-path', 'src/save.mjs', '--reason', 'move the edited file out of the production comparison')
-  assert.equal(refused.status, 1)
-  assert.match(refused.stderr, /^HARNESS_PATH_MODIFIED: /)
-  assert.deepEqual((await state(oracleDirectory)).harnessPaths, [])
+  const reinit = run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, '--required-label', 'behavior', '--required-label', 'lint:exit', '--reason', 'lint was left out'])
+  assert.equal(reinit.status, 1)
+  assert.match(reinit.stderr, /^RUN_ARTIFACTS_EXIST: /)
+  assert.match(reinit.stderr, /\nnext: \[card\] /)
+  assert.deepEqual(await state(oracleDirectory), before)
   assert.ok(!(await allLedgerLines(oracleDirectory)).some((line) => JSON.parse(line).type === 'amend'))
-
-  await writeFile(join(root, 'src', 'save.mjs'), original)
-  const registered = reinit('--harness-path', 'src/save.mjs', '--reason', 'the file is test support after all')
-  assert.equal(registered.status, 0, registered.stderr)
-  assert.match(registered.stdout, /^HARNESS_ADDED_BY_AMEND src\/save\.mjs /m)
-})
-
-test('O6: init 수정은 init 뒤 새로 만든 production 파일을 harness로 숨기지 못하고, 새 설정 파일만 받는다', async (t) => {
-  const { root, oracleDirectory, lock } = await workspace(t)
-  const reinit = (...extra) =>
-    run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, '--required-label', 'behavior', ...extra])
-
-  await writeFile(join(root, 'src', 'extra.mjs'), 'export const extra = 1\n')
-  const refused = reinit('--harness-path', 'src/extra.mjs', '--reason', 'hide a new source file from the TDD order check')
-  assert.equal(refused.status, 1)
-  assert.match(refused.stderr, /^HARNESS_PATH_NEW_SOURCE: .*src\/extra\.mjs/)
-  assert.match(refused.stderr, /next: a new non-test, non-config file is production/)
-  assert.deepEqual((await state(oracleDirectory)).harnessPaths, [])
-  assert.ok(!(await allLedgerLines(oracleDirectory)).some((line) => JSON.parse(line).type === 'amend'))
-
-  // 제품 설정은 도구 설정이 아니다 — 이름이 *.config.*여도 패키지 루트의 도구 설정만 받는다
-  await mkdir(join(root, 'src', 'checkout'), { recursive: true })
-  await writeFile(join(root, 'src', 'checkout', 'pricing.config.ts'), 'export const fee = 3\n')
-  const product = reinit('--harness-path', 'src/checkout/pricing.config.ts', '--reason', 'register a config-named product file')
-  assert.equal(product.status, 1)
-  assert.match(product.stderr, /^HARNESS_PATH_NEW_SOURCE: .*src\/checkout\/pricing\.config\.ts/)
-
-  // 새 러너 설정이 setupFiles로 가리킨다고 새 production 파일이 harness가 되지는 않는다
-  await writeFile(join(root, 'src', 'pay.ts'), 'export const pay = () => 1\n')
-  await writeFile(join(root, 'vitest.config.ts'), "export default { test: { setupFiles: ['./src/pay.ts'] } }\n")
-  const viaSetup = reinit('--reason', 'the runner config came after init')
-  assert.equal(viaSetup.status, 1)
-  assert.match(viaSetup.stderr, /^HARNESS_PATH_NEW_SOURCE: .*src\/pay\.ts/)
-  assert.doesNotMatch(viaSetup.stderr, /vitest\.config\.ts/, 'the runner config itself may be registered')
-  assert.deepEqual((await state(oracleDirectory)).harnessPaths, [])
-  assert.ok(!(await allLedgerLines(oracleDirectory)).some((line) => JSON.parse(line).type === 'amend'))
-  await rm(join(root, 'vitest.config.ts'))
-
-  // 실런 사례: 뼈대가 init 뒤에 만든 package.json·tsconfig·eslint 설정은 등록할 수 있다
-  await writeFile(join(root, 'package.json'), '{}\n')
-  await writeFile(join(root, 'tsconfig.json'), '{}\n')
-  await writeFile(join(root, 'eslint.config.mjs'), 'export default []\n')
-  const harness = ['package.json', 'tsconfig.json', 'eslint.config.mjs']
-  const accepted = reinit(...harness.flatMap((path) => ['--harness-path', path]), '--reason', 'the scaffold came after init')
-  assert.equal(accepted.status, 0, accepted.stderr)
-  for (const path of harness) assert.ok(accepted.stdout.includes(`\nHARNESS_ADDED_AFTER_INIT ${path} `), path)
-  assert.deepEqual([...(await state(oracleDirectory)).harnessPaths].sort(), [...harness].sort())
 })
 
 test('O6: 체크포인트 앞 legacy 구간의 전이 뒤에 이어 붙인 amend도 원장이 읽지 못한다', async (t) => {
@@ -2330,37 +2214,12 @@ test('O1: exec는 등급 접미사를 빠뜨린 필수 라벨을 실행 전에 �
 
   const refused = runLabelled('lint')
   assert.equal(refused.status, 1)
-  assert.match(refused.stderr, /^LABEL_NOT_REQUIRED: "lint" is not a required label — the gate looks for "lint:exit"\nnext: re-run with the exact required label/)
+  assert.match(refused.stderr, /^LABEL_NOT_REQUIRED: "lint" is not a required label — the gate looks for "lint:exit"\nnext: \[command\] re-run with the exact required label/)
   assert.equal(await markerCount(marker), 0, 'the command never ran')
   assert.equal((await ledgerLines(oracleDirectory)).length, 0)
   // 정확한 필수 라벨, 접미사를 직접 적은 다른 등급, 필수 라벨과 무관한 RED 라벨은 그대로 돈다
   for (const label of ['lint:exit', 'behavior:exit', 'red-1']) assert.equal(runLabelled(label).status, 0, label)
   assert.equal(await markerCount(marker), 3)
-})
-
-test('O11: 예산 기록은 run 번호를 소비하지 않는다', async (t) => {
-  const { oracleDirectory } = await workspace(t)
-  // harness는 VALID_RED 전에 기록하지 않으므로(BUDGET_NOT_NEEDED) RED 전에도 기록되는 product 예산으로 잰다
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'p1']).status, 0)
-
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'red-1',
-    '--',
-    process.execPath,
-    '-e',
-    'process.exit(1)',
-  ])
-
-  assert.match(executed.stdout, /^RUN_RECORDED r-001 /)
-  const entries = (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line))
-  assert.deepEqual(
-    entries.map((entry) => entry.type),
-    ['budget', 'run'],
-  )
 })
 
 test('O7: exit 0 run으로는 VALID_RED로 전이하지 못한다', async (t) => {
@@ -3284,12 +3143,7 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-  assert.equal(withoutBudget.status, 1)
-  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
-
-  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'frozen test bytes changed'])
-  assert.equal(spent.status, 0, spent.stderr)
+  // the changed bytes are not weakening; they still need a fresh RED, which binds them (no spend command since 0.129.0)
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
@@ -3297,51 +3151,35 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
-test('O10: RED 전 harness 수리는 예산을 쓰지 않고, harness-path를 등록해도 RED 후 테스트 바이트 변경은 첫 harness 지출이다', async (t) => {
+test('O10: RED 전 harness 수리는 지출이 아니고, RED 후 묶인 테스트 바이트 변경은 새 RED가 묶을 때 첫 harness 지출이다', async (t) => {
   const { root, oracleDirectory } = await workspace(t, {
     harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
   })
-  // RED 전에는 얼린 binding이 없다 — 수리는 RED를 만드는 작업의 일부라 기록도 지출도 없다
-  const before = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'setup before RED'])
-  assert.equal(before.status, 0, before.stderr)
-  assert.match(before.stdout, /^BUDGET_NOT_NEEDED harness 0\/2 /)
-  assert.equal((await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'budget').length, 0)
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
+  // RED 전에는 얼린 binding이 없다 — 수리는 RED를 만드는 작업의 일부라 지출이 없다
+  await writeFile(join(root, 'vitest.config.mjs'), 'export default { setup: 2 }\n')
   await reachValidRed(oracleDirectory, root)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
 
   // 등록한 harness(vitest.config.mjs)는 그대로, 묶인 테스트 파일만 바뀐다
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper retyped\n")
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
   const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  const stale = transition(oracleDirectory, 'IMPLEMENTED_GREEN', latest)
+  assert.match(stale.stderr, /^EVIDENCE_STALE: /)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0, 'a change no RED has bound spends nothing yet')
 
-  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', latest)
-  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
-
-  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test helper retyped after RED'])
-  assert.equal(spent.status, 0, spent.stderr)
-  assert.match(spent.stdout, /^BUDGET_SPENT harness 1\//)
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', latest)
-  assert.match(transitioned.stderr, /^EVIDENCE_STALE: /)
-})
-
-test('O10: 테스트 바이트 변경 지출은 VALID_RED를 새로 고친 뒤 다시 해도 중복이다', async (t) => {
-  const { root, oracleDirectory } = await workspace(t, {
-    harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
-  })
-  await reachValidRed(oracleDirectory, root)
-  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper retyped\n")
-  const first = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test helper retyped'])
-  assert.match(first.stdout, /^BUDGET_SPENT harness 1\//)
-
+  // the fresh RED binds the change: that is the spend, once per binding — a refresh on the same bytes is refused
   redRun(oracleDirectory)
-  const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
-  const refreshed = transition(oracleDirectory, 'VALID_RED', latest)
-  assert.equal(refreshed.status, 0, refreshed.stderr)
-
-  // 바이트는 그대로, 새 binding만 그 바이트를 담는다 — 충돌 후 재시도 같은 같은 변경의 두 번째 지출
-  const replay = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'retry, nothing changed'])
-  assert.match(replay.stdout, /^BUDGET_SPENT harness 1\//)
+  const red = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  assert.equal(transition(oracleDirectory, 'VALID_RED', red).status, 0)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+  redRun(oracleDirectory)
+  const again = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  const unchanged = transition(oracleDirectory, 'VALID_RED', again)
+  assert.equal(unchanged.status, 1)
+  assert.match(unchanged.stderr, /^TRANSITION_NOT_ALLOWED: VALID_RED already binds these tests/)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
 })
 
 test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', async (t) => {
@@ -3375,12 +3213,12 @@ test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', asyn
 
   const swappedPath = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(swappedPath.status, 1)
-  assert.match(swappedPath.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+  assert.match(swappedPath.stderr, /^EVIDENCE_STALE: /)
 
   await writeFile(evidencePath, JSON.stringify({ ...frozen, sequence: { kind: 'test', name: 'save > other' } }))
   const swappedSequence = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(swappedSequence.status, 1)
-  assert.match(swappedSequence.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+  assert.match(swappedSequence.stderr, /^EVIDENCE_STALE: /)
 
   await writeFile(
     evidencePath,
@@ -3388,7 +3226,7 @@ test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', asyn
   )
   const swappedFrame = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(swappedFrame.status, 1)
-  assert.match(swappedFrame.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+  assert.match(swappedFrame.stderr, /^EVIDENCE_STALE: /)
   for (const [field, value] of [
     ['tuple', { action: 'previous' }],
     ['scenario', 'G2'],
@@ -3401,7 +3239,7 @@ test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', asyn
     )
     const staleMetadata = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
     assert.equal(staleMetadata.status, 1, field)
-    assert.match(staleMetadata.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+    assert.match(staleMetadata.stderr, /^EVIDENCE_STALE: /)
   }
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
@@ -3415,23 +3253,42 @@ test('O10: RED에 기록된 테스트 파일이 사라지면 TEST_WEAKENED로 GR
   assert.match(transitioned.stderr, /deleted/)
 })
 
-test('O11: 예산은 distinct 변경 digest 한도까지만 사용되고 초과 요청은 BUDGET_EXHAUSTED로 거부한다', async (t) => {
+test('O11: derived budgets — harness allows its second binding and refuses a third, policy its second resume and not a third', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-
-  for (const round of [1, 2, 3]) {
-    await writeFile(join(root, 'src', 'save.mjs'), `export const save = ${round}\n`)
-    const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', `round-${round}`])
-    assert.equal(spent.status, 0, spent.stderr)
-    assert.equal(spent.stdout, `BUDGET_SPENT product ${round}/3\n`)
+  await reachValidRed(oracleDirectory, root)
+  const latestRun = async () => (await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'run').at(-1).runId
+  const rebind = async (round) => {
+    await writeFile(join(root, 'src', 'save.test.mjs'), `import assert from 'node:assert'\nassert.equal(1, 1)\n// helper ${round}\n`)
+    redRun(oracleDirectory)
+    return transition(oracleDirectory, 'VALID_RED', await latestRun())
   }
+  for (const round of [1, 2]) {
+    const refreshed = await rebind(round)
+    assert.equal(refreshed.status, 0, refreshed.stderr)
+    assert.equal((await state(oracleDirectory)).budgets.harness.spent, round)
+  }
+  const third = await rebind(3)
+  assert.equal(third.status, 1)
+  assert.match(third.stderr, /^BUDGET_EXHAUSTED: harness budget is spent \(2\/2\)/)
+  assert.match(third.stderr, /\nnext: \[stop\] report FAIL/)
+  // restoring a bound state costs nothing: the second binding's bytes refresh no further, GREEN may rest on them
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper 2\n")
+  assert.equal(JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).remainingBudgets.harness.spent, 2)
 
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 4\n')
-  const exhausted = run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'round-4'])
-
-  assert.equal(exhausted.status, 1)
-  assert.match(exhausted.stderr, /^BUDGET_EXHAUSTED: /)
-  assert.equal((await state(oracleDirectory)).budgets.product.spent, 3)
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
+  // policy: a resume after a decision is one spend — the second is allowed, the third refused
+  for (const round of [1, 2, 3]) {
+    assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'NEEDS_DECISION', '--reason', `decision ${round}`]).status, 0)
+    const paused = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+    const [cite] = paused.nextActions.find((entry) => entry.to === 'ORACLE_READY').candidateRuns
+    const resumed = run(['transition', '--dir', oracleDirectory, '--to', 'ORACLE_READY', '--run', cite])
+    if (round < 3) {
+      assert.equal(resumed.status, 0, resumed.stderr)
+      assert.equal((await state(oracleDirectory)).budgets.policy.spent, round)
+    } else {
+      assert.equal(resumed.status, 1)
+      assert.match(resumed.stderr, /^BUDGET_EXHAUSTED: policy budget is spent \(2\/2\)/)
+    }
+  }
 })
 
 test('status --json reports current state, blockers, budgets, and orphaned reservations', async (t) => {
@@ -3569,8 +3426,12 @@ test('status --json nextActions is an execution packet: per transition, what is 
   const red = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
   const review = red.nextActions.find((action) => action.to === 'IMPLEMENTED_GREEN')
   assert.deepEqual(review.readNodes, ['delivery-ledger', 'delivery-implementation-decision', 'delivery-green-review'])
+  // a refresh onto the binding VALID_RED already holds binds nothing: the packet shows the refusal transition gives
   const refresh = red.nextActions.find((action) => action.to === 'VALID_RED')
-  assert.ok(refresh.blockers.includes('HARNESS_BUDGET_REQUIRED'))
+  assert.ok(refresh.blockers.includes('TRANSITION_NOT_ALLOWED'))
+  const same = transition(oracleDirectory, 'VALID_RED', 'r-001')
+  assert.equal(same.status, 1)
+  assert.match(same.stderr, /^TRANSITION_NOT_ALLOWED: VALID_RED already binds/)
 })
 
 test('nextActions mirrors what transition actually accepts: escape stays open, resume needs --run, review needs the packet', async (t) => {
@@ -3660,19 +3521,28 @@ test('nextActions review candidates only cite runs recorded after IMPLEMENTED_GR
   assert.match(refreshed.example, /--run r-003 /)
 })
 
-test('O11: budget spend is counted once per distinct current change digest', async (t) => {
-  const { root, oracleDirectory } = await workspace(t)
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
-
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'round-1']).status, 0)
-  const repeated = run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'same digest'])
-  assert.equal(repeated.status, 0, repeated.stderr)
-  assert.match(repeated.stdout, /^BUDGET_SPENT product 1\/3\n$/)
-  assert.equal((await state(oracleDirectory)).budgets.product.spent, 1)
-
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'round-2']).status, 0)
-  assert.equal((await state(oracleDirectory)).budgets.product.spent, 2)
+test('O11: product spend is read off the ledger — one per production state a run failed on after VALID_RED, capped at dispatch', async (t) => {
+  const fixture = await implementationWorkerFixture(t)
+  const { root, oracleDirectory } = fixture
+  const spent = () => JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).remainingBudgets.product.spent
+  const behavior = () => {
+    reportSequence += 1
+    const report = join(oracleDirectory, `round-${reportSequence}.ndjson`)
+    return run(['exec', '--dir', oracleDirectory, '--label', 'behavior', '--adapter', 'node-test', '--report', report, '--', process.execPath, '--test', join(root, 'save.test.mjs')])
+  }
+  // the RED's own production failing again is not a fix round
+  assert.equal(behavior().status, 0)
+  assert.equal(spent(), 0)
+  for (const round of [1, 2, 3]) {
+    await writeFile(join(root, 'src', 'save.mjs'), `export const pending = ${round}\n`)
+    assert.equal(behavior().status, 0)
+    assert.equal(behavior().status, 0)
+    assert.equal(spent(), round, 'one production state, however many runs failed on it')
+  }
+  // the derived rounds meet the existing cap where it is enforced: no further implementation dispatch
+  const exhausted = run(['worker-packet', '--dir', oracleDirectory, '--task', fixture.spec])
+  assert.equal(exhausted.status, 1)
+  assert.match(exhausted.stderr, /^BUDGET_EXHAUSTED: no product attempts remain/)
 })
 
 test('status --json reports evidence gaps and reporter receipt issues', async (t) => {
@@ -3704,116 +3574,75 @@ test('status --json reports evidence gaps and reporter receipt issues', async (t
   assert.match(status.runIssues[0].reportError, /not rewritten|not written/)
 })
 
-test('O11: policy와 implicit harness budget은 stable digest별로만 spend된다', async (t) => {
+test('O11: one harness binding counts once — returning to the first binding or to a counted one spends nothing', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'same revision']).status, 0)
-  assert.equal(
-    run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'same revision again']).status,
-    0,
-  )
-  assert.equal((await state(oracleDirectory)).budgets.policy.spent, 1)
-
-  // harness 예산은 VALID_RED 뒤에만 쓴다 — 얼린 binding이 생긴 다음 바뀐 테스트만 지출이다
   await reachValidRed(oracleDirectory, root)
-  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// harness changed\n")
-  assert.equal(
-    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test harness changed']).status,
-    0,
-  )
-  assert.equal(
-    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'same harness again']).status,
-    0,
-  )
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
-
-  await writeFile(
-    join(root, 'src', 'save.test.mjs'),
-    "import assert from 'node:assert'\nassert.equal(1, 1)\nassert.equal(2, 2)\n",
-  )
-  assert.equal(
-    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'next harness digest']).status,
-    0,
-  )
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+  const first = await readFile(join(root, 'src', 'save.test.mjs'), 'utf8')
+  const latestRun = async () => (await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'run').at(-1).runId
+  const rebind = async (bytes) => {
+    await writeFile(join(root, 'src', 'save.test.mjs'), bytes)
+    redRun(oracleDirectory)
+    const refreshed = transition(oracleDirectory, 'VALID_RED', await latestRun())
+    assert.equal(refreshed.status, 0, refreshed.stderr)
+    return (await state(oracleDirectory)).budgets.harness.spent
+  }
+  const changed = `${first}// harness changed\n`
+  assert.equal(await rebind(changed), 1)
+  assert.equal(await rebind(first), 1, 'the first VALID_RED binding is free')
+  assert.equal(await rebind(changed), 1, 'a binding counted before costs nothing again')
+  assert.equal(await rebind(`${first}assert.equal(2, 2)\n`), 2)
 })
 
-test('harness budget: evidence-only repair spends once and still needs fresh RED before GREEN', async (t) => {
+test('harness budget: an evidence-only repair is spent when a fresh RED binds it, and replays from the ledger', async (t) => {
   for (const mode of ['implicit', 'registered', 'pre-red']) {
     await t.test(mode, async (t) => {
       const harnessFiles = mode === 'registered' ? { 'src/harness.mjs': 'export const marker = 1\n' } : {}
       const { root, oracleDirectory } = await workspace(t, { harnessFiles })
-      const spend = () =>
-        run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'fixture binding repair'])
+      const latestRun = async () => (await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'run').at(-1).runId
+      const spent = () => JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).remainingBudgets.harness.spent
       if (mode === 'pre-red') {
-        // A repair before VALID_RED is free: nothing is recorded, so the post-RED budget starts untouched.
-        await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+        // A repair before VALID_RED is part of making the RED: nothing is bound yet, so nothing is spent.
+        await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(0, 0)\n")
         redRun(oracleDirectory)
-        const free = spend()
-        assert.equal(free.status, 0, free.stderr)
-        assert.match(free.stdout, /^BUDGET_NOT_NEEDED harness 0\/2 /)
-        const red = transition(oracleDirectory, 'VALID_RED', 'r-001')
-        assert.equal(red.status, 0, red.stderr)
-      } else {
-        await reachValidRed(oracleDirectory, root)
       }
-      assert.equal(spend().status, 0)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+      await reachValidRed(oracleDirectory, root)
+      assert.equal(spent(), 0)
       const evidence = { ...EVIDENCE, sequence: { kind: 'test', name: 'save > pending' } }
       await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
 
-      const cachedState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
-      const repaired = spend()
-      assert.equal(repaired.status, 0, repaired.stderr)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
-      // Simulate an interrupted cache write, retaining the seed state required for ledger replay.
-      await writeFile(join(oracleDirectory, 'run-state.json'), cachedState)
-      const replayed = run(['status', '--dir', oracleDirectory, '--json'])
-      assert.equal(replayed.status, 0, replayed.stderr)
-      assert.equal(JSON.parse(replayed.stdout).remainingBudgets.harness.spent, 2)
-      assert.equal(spend().status, 0)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
-
       greenRun(oracleDirectory, 'before-refresh-1')
       greenRun(oracleDirectory, 'before-refresh-2')
-      const stale = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+      const stale = transition(oracleDirectory, 'IMPLEMENTED_GREEN', await latestRun())
       assert.equal(stale.status, 1)
       assert.match(stale.stderr, /^EVIDENCE_STALE: /)
+      assert.equal(spent(), 0, 'a repair no RED has bound spends nothing yet')
 
+      const cachedState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
       redRun(oracleDirectory)
-      const refreshed = transition(oracleDirectory, 'VALID_RED', 'r-004')
+      const refreshed = transition(oracleDirectory, 'VALID_RED', await latestRun())
       assert.equal(refreshed.status, 0, refreshed.stderr)
-      assert.equal(spend().status, 0)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+      // An interrupted cache write loses nothing: the spend is read off the ledger, not kept in the cache.
+      await writeFile(join(oracleDirectory, 'run-state.json'), cachedState)
+      assert.equal(spent(), 1)
+
       greenRun(oracleDirectory, 'after-refresh-1')
       greenRun(oracleDirectory, 'after-refresh-2')
-      const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-006')
+      const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', await latestRun())
       assert.equal(green.status, 0, green.stderr)
-
-      await writeFile(
-        join(oracleDirectory, 'evidence.json'),
-        JSON.stringify({
-          ...evidence,
-          sequence: { kind: 'test', name: 'another binding' },
-        }),
-      )
-      const exhausted = spend()
-      assert.equal(exhausted.status, 1)
-      assert.match(exhausted.stderr, /^BUDGET_EXHAUSTED: /)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
-      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1, 'GREEN on the bound repair spends nothing more')
       greenRun(oracleDirectory, 'review-green')
-      const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-007')
+      const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', await latestRun())
       assert.equal(reviewed.status, 0, reviewed.stderr)
-      const stopped = transition(oracleDirectory, 'FAIL', 'r-007', ['--reason', 'synthetic terminal-state regression'])
+      const stopped = transition(oracleDirectory, 'FAIL', await latestRun(), ['--reason', 'synthetic terminal-state regression'])
       assert.equal(stopped.status, 0, stopped.stderr)
-      assert.equal(transition(oracleDirectory, 'ORACLE_READY', 'r-007').status, 1)
+      assert.equal(transition(oracleDirectory, 'ORACLE_READY', await latestRun()).status, 1)
       assert.equal((await state(oracleDirectory)).state, 'FAIL')
     })
   }
 })
 
-test('harness budget: semantic row path frame and sequence bindings participate in identity', async (t) => {
+test('harness budget: semantic row path frame and sequence bindings are a new binding, formatting is not', async (t) => {
   const changes = {
     rows: { rows: { O1: { kind: 'test', name: 'another row binding' } } },
     paths: { paths: { PATH1: { kind: 'test', name: 'path binding' } } },
@@ -3824,62 +3653,54 @@ test('harness budget: semantic row path frame and sequence bindings participate 
     await t.test(name, async (t) => {
       const { root, oracleDirectory } = await workspace(t)
       await reachValidRed(oracleDirectory, root)
-      const spend = () =>
-        run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'binding identity'])
-      assert.equal(spend().status, 0)
-      const mapping = { ...EVIDENCE, ...change }
-      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(mapping))
-      assert.equal(spend().status, 0)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
-      await writeFile(
-        join(oracleDirectory, 'evidence.json'),
-        JSON.stringify({ note: 'not a test binding', ...mapping }, null, 2),
-      )
-      assert.equal(spend().status, 0)
-      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+      const evidencePath = join(oracleDirectory, 'evidence.json')
+      const bound = await readFile(evidencePath, 'utf8')
+      // the refresh packet mirrors the VALID_RED refusal: a refresh onto the binding it holds binds nothing
+      const refreshBindsNothing = () =>
+        JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+          .nextActions.find((action) => action.to === 'VALID_RED')
+          .blockers.includes('TRANSITION_NOT_ALLOWED')
+      assert.equal(refreshBindsNothing(), true)
+      await writeFile(evidencePath, JSON.stringify({ ...JSON.parse(bound), ...change }))
+      assert.equal(refreshBindsNothing(), false, `${name} is part of the binding`)
+      await writeFile(evidencePath, JSON.stringify({ note: 'not a test binding', ...JSON.parse(bound) }, null, 2))
+      assert.equal(refreshBindsNothing(), true, 'a note and formatting are not part of the binding')
     })
   }
 })
 
-test('harness budget: bound evidence path is authoritative and unreadable bindings fail without spending', async (t) => {
+test('harness budget: the bound evidence path is the binding, and an unreadable map fails the refresh without spending', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   const customMap = join(oracleDirectory, 'selected-evidence.json')
   await writeFile(customMap, JSON.stringify(EVIDENCE))
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
   redRun(oracleDirectory)
-  const red = run([
-    'transition',
-    '--dir',
-    oracleDirectory,
-    '--to',
-    'VALID_RED',
-    '--run',
-    'r-001',
-    '--row',
-    'O1',
-    '--evidence',
-    customMap,
-  ])
+  const refresh = (runId) =>
+    run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', runId, '--row', 'O1', '--evidence', customMap])
+  const red = refresh('r-001')
   assert.equal(red.status, 0, red.stderr)
+  // evidence.json is not the bound map: changing it changes no binding
   await writeFile(join(oracleDirectory, 'evidence.json'), 'not the selected map')
-  const spend = () => run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'selected binding'])
-  assert.equal(spend().status, 0)
+  const packet = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  assert.ok(packet.nextActions.find((action) => action.to === 'VALID_RED').blockers.includes('TRANSITION_NOT_ALLOWED'))
+
+  redRun(oracleDirectory)
   const ledgerBefore = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
   await writeFile(customMap, '{')
-  const malformed = spend()
+  const malformed = refresh('r-002')
   assert.equal(malformed.status, 1)
   assert.match(malformed.stderr, /^EVIDENCE_INVALID: /)
   await rm(customMap)
-  const missing = spend()
+  const missing = refresh('r-002')
   assert.equal(missing.status, 1)
   assert.match(missing.stderr, /^EVIDENCE_INVALID: /)
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
   assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), ledgerBefore)
   await writeFile(customMap, JSON.stringify({ ...EVIDENCE, sequence: { kind: 'test', name: 'save > pending' } }))
-  assert.equal(spend().status, 0)
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+  const rebound = refresh('r-002')
+  assert.equal(rebound.status, 0, rebound.stderr)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
 })
-
 test('O12: RED와 GREEN의 env fingerprint가 다르면 전이는 통과하되 ENV_DRIFT를 남긴다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
@@ -4121,6 +3942,7 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 인용 run 재실�
           finding: 'pending이 표시되지 않는다',
           evidence: 'r-003',
           fix: 'pending UI 추가',
+          wrongPasses: 'a product that shows no pending passes every row',
           packetSha256: CLEAR_REVIEW.packetSha256,
           targetRevision: CLEAR_REVIEW.targetRevision,
         },
@@ -4136,6 +3958,23 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 인용 run 재실�
   const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
+})
+
+test('a round-1 claim that names no wrong implementation the locked tests pass is a recorded proposal, never a blocker', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachGreen(oracleDirectory, root)
+  // the field's policy-ish "high" findings opened repair rounds; the label is not the criterion, a changed verdict is
+  const claim = { id: 'f-1', row: 'O1', classification: 'EVIDENCE_GAP', severity: 'high', finding: 'the pending label is never asserted',
+    evidence: 'r-003', fix: 'assert it', packetSha256: CLEAR_REVIEW.packetSha256, targetRevision: CLEAR_REVIEW.targetRevision }
+  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify({ ...CLEAR_REVIEW, findings: [claim] }))
+  greenRun(oracleDirectory, 'review')
+  const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(verified.status, 0, verified.stderr)
+  const recorded = (await state(oracleDirectory)).history.at(-1)
+  assert.equal(recorded.state, 'REVIEW_VERIFIED')
+  assert.deepEqual(recorded.proposals.map(({ id, demoted }) => [id, demoted]), [
+    ['f-1', 'names no wrong implementation every locked test passes (wrongPasses) and no reproduction'],
+  ])
 })
 
 test('열린 hold가 있으면 REVIEW_VERIFIED는 거부되고 PARTIAL_VERIFIED가 같은 리뷰 관문 뒤에 hold ID를 원장에 남긴다', async (t) => {
@@ -4175,6 +4014,7 @@ test('열린 hold가 있으면 REVIEW_VERIFIED는 거부되고 PARTIAL_VERIFIED�
           finding: 'x',
           evidence: 'r-003',
           fix: 'y',
+          wrongPasses: 'the delivered product passes every row',
           packetSha256: CLEAR_REVIEW.packetSha256,
           targetRevision: CLEAR_REVIEW.targetRevision,
         },
@@ -4557,26 +4397,13 @@ test('O3: RED evidence mapping and test bytes remain bound through GREEN', async
   )
   await writeFile(join(root, 'src', 'save.test.mjs'), "import test from 'node:test'\ntest('rewritten', () => {})\n")
   greenRun(oracleDirectory, 'behavior')
-  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
-  assert.equal(withoutBudget.status, 1)
-  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
-
-  const budget = run([
-    'budget',
-    '--dir',
-    oracleDirectory,
-    '--spend',
-    'harness',
-    '--reason',
-    'mapped test bytes changed',
-  ])
-  assert.equal(budget.status, 0, budget.stderr)
   const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
 
   assert.equal(green.status, 1)
   assert.match(green.stderr, /^EVIDENCE_STALE: /)
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
-  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+  // nothing is spent until a fresh RED binds the changed mapping and bytes
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
 })
 
 test('O4: reporter destinations cannot alias protected Oracle artifacts', async (t) => {
@@ -4669,20 +4496,17 @@ test('O5: init rejects Oracle directories that overlap the production scan root'
   await assert.rejects(readFile(join(fixture.root, 'src', 'production-oracle', 'run-state.json')))
 })
 
-test('O6: concurrent transition and budget writes preserve both state changes', async (t) => {
+test('O6: state writes hold the state lock, and no budget write is left to race a transition', async (t) => {
   const { oracleDirectory } = await workspace(t)
   const runnerSource = await readFile(script, 'utf8')
   assert.match(
     runnerSource,
     /async function transition\(options\) \{[\s\S]*?await withDirectoryLock\(directory, 'state', async \(\) => \{/,
   )
-  assert.match(
-    runnerSource,
-    /async function spendBudget\(options\) \{[\s\S]*?await withDirectoryLock\(directory, 'state', async \(\) => \{/,
-  )
+  // 0.129.0: spend is read off the ledger — the one cache write outside transition (after a worker run) takes the same lock
+  assert.match(runnerSource, /withDirectoryLock\(directory, 'state', async \(\) => writeState\(directory, await readConsistentState\(directory\)\)\)/)
+  assert.doesNotMatch(runnerSource, /function spendBudget\(/)
 
-  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'bounded policy change'])
-  assert.equal(spent.status, 0, spent.stderr)
   const transitioned = run([
     'transition',
     '--dir',
@@ -4695,11 +4519,11 @@ test('O6: concurrent transition and budget writes preserve both state changes', 
   assert.equal(transitioned.status, 0, transitioned.stderr)
   const current = await state(oracleDirectory)
   assert.equal(current.state, 'NEEDS_DECISION')
-  assert.equal(current.budgets.policy.spent, 1)
+  assert.equal(current.budgets.policy.spent, 0, 'a decision is not a spend; the resume after it is')
   assert.equal(current.history.at(-1).state, 'NEEDS_DECISION')
   assert.deepEqual(
     (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line).type),
-    ['budget', 'transition'],
+    ['transition'],
   )
 })
 
@@ -4768,14 +4592,14 @@ test('review iterations bind High reviewers to one round, require prior findings
   // Recovery replays the same budget from the real ledger even if the state cache write was lost.
   await writeFile(join(oracleDirectory, 'run-state.json'), preReviewState)
   assert.match(run(args).stderr, /^REVIEW_ROUNDS_CLOSED:/)
-  // 0.123.0: an approval no longer opens round 3 — review-extend refuses and writes nothing
+  // 0.123.0: an approval no longer opens round 3; 0.129.0 deleted review-extend — no command writes one
   const approval = join(oracleDirectory, 'round-3-approval.json')
   await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'delivery-review', round: 3,
     source: 'conversation: user explicitly approved round 3', reason: 'resolve the surviving locked-row defect' }))
   const ledgerBefore = await readFile(join(oracleDirectory, 'runs.jsonl'))
   const extension = run(['review-extend', '--dir', oracleDirectory, '--approval', approval])
-  assert.equal(extension.status, 1)
-  assert.match(extension.stderr, /^REVIEW_ROUNDS_CLOSED:/)
+  assert.equal(extension.status, 2)
+  assert.match(extension.stderr, /^USAGE: Expected init, /)
   assert.deepEqual(await readFile(join(oracleDirectory, 'runs.jsonl')), ledgerBefore)
   const refused = run([...strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'packet-round-3.json')),
     '--findings', followupPaths[0], '--intersect', followupPaths[1]])
@@ -4796,7 +4620,7 @@ async function roundTwo(t) {
   const round1 = join(dir, 'packet-round-1.json')
   assert.equal(run(strictReviewPacketArgs(dir, round1)).status, 0)
   const claim = { id: 'F1', row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT', finding: 'save never retries',
-    evidence: 'the card row O1 needs a retry', fix: 'retry once' }
+    evidence: 'the card row O1 needs a retry', fix: 'retry once', wrongPasses: 'a save that never retries passes every row' }
   const firstFindings = join(dir, 'round-1.json')
   await writeFile(firstFindings, JSON.stringify({ ...CLEAR_REVIEW, findings: [claim] }))
   const bindTo = async (path, packetPath) => {
@@ -4838,10 +4662,11 @@ test('a round-2 class is backed only by the packet: round-1 claim ids, new-side 
   // only added lines count (not context); a hunk that only deletes marks both sides of the gap
   assert.deepEqual([...repairHunks(diff)], [['src/a.mjs', [[2, 2], [11, 12]]], ['src/new.mjs', [[1, 1]]]])
   assert.deepEqual([...repairHunks(['--- a/x', '+++ "b/src/\\303\\251.mjs"', '@@ -1 +1 @@', '-a', '+b'].join('\n'))], [['src/é.mjs', [[1, 1]]]])
-  const scope = { mode: 'confirm-fixes', repairDiff: diff, previousFindings: [{ reviewerId: 'a', findings: [{ id: 'F1', classification: 'PRODUCT_DEFECT' }, { id: 'N1', classification: 'NON_ORACLE_OPINION' }] }] }
+  const scope = { mode: 'confirm-fixes', repairDiff: diff, previousFindings: [{ reviewerId: 'a', findings: [{ id: 'F1', classification: 'PRODUCT_DEFECT', wrongPasses: 'the product passes every row' }, { id: 'N1', classification: 'NON_ORACLE_OPINION' }, { id: 'Q1', row: 'O1', classification: 'EVIDENCE_GAP' }] }] }
   const verdict = (confirm, severity = 'medium') => confirmClass({ severity, evidence: 'seen', confirm }, scope).class
   assert.equal(verdict({ class: 'previous', finding: 'F1' }), 'previous')
   assert.equal(verdict({ class: 'previous', finding: 'N1' }), 'proposal', 'an opinion never blocked, so it cannot come back as a blocker')
+  assert.equal(verdict({ class: 'previous', finding: 'Q1' }), 'proposal', 'a round-1 claim naming no wrong pass was a proposal, so it cannot come back as a blocker')
   assert.equal(verdict({ class: 'previous', finding: 'F1', reviewerId: 'b' }), 'proposal')
   assert.equal(verdict({ class: 'regression', path: 'packages/src/a.mjs', line: 11 }), 'regression')
   assert.equal(verdict({ class: 'regression', path: 'src/a.mjs', line: 4 }), 'proposal')
@@ -4859,7 +4684,8 @@ test('a round-2 class is backed only by the packet: round-1 claim ids, new-side 
 })
 
 const roundTwoFinding = (id, confirm, extra = {}) => ({ id, row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT',
-  finding: `round-2 finding ${id}`, evidence: 'seen in the repair diff', fix: 'adjust it', ...(confirm ? { confirm } : {}), ...extra })
+  finding: `round-2 finding ${id}`, evidence: 'seen in the repair diff', fix: 'adjust it', wrongPasses: 'the repaired product passes every row',
+  ...(confirm ? { confirm } : {}), ...extra })
 
 test('round 2 blocks only a backed previous, regression or security finding; every other finding is a recorded improvement proposal', async (t) => {
   const lap = await roundTwo(t)
@@ -5535,21 +5361,9 @@ test('O11: review packets require post-GREEN state decision and canonical review
 })
 
 test('O16: state events form a replayable digest chain without lost budget history', async (t) => {
-  const { oracleDirectory } = await workspace(t)
-  const recorded = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'lint:exit',
-    '--',
-    process.execPath,
-    '-e',
-    'process.exit(0)',
-  ])
-  assert.equal(recorded.status, 0, recorded.stderr)
-  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'recorded policy change'])
-  assert.equal(spent.status, 0, spent.stderr)
+  const { root, oracleDirectory } = await workspace(t)
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  assert.equal(redRun(oracleDirectory).status, 0)
   const transitioned = run([
     'transition',
     '--dir',
@@ -5560,10 +5374,13 @@ test('O16: state events form a replayable digest chain without lost budget histo
     'recorded state decision',
   ])
   assert.equal(transitioned.status, 0, transitioned.stderr)
+  const cachedState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
+  const resume = run(['transition', '--dir', oracleDirectory, '--to', 'ORACLE_READY', '--run', 'r-001'])
+  assert.equal(resume.status, 0, resume.stderr)
   const events = (await allLedgerLines(oracleDirectory)).map((line) => JSON.parse(line))
   assert.deepEqual(
     events.map((event) => event.type),
-    ['init', 'run', 'budget', 'transition'],
+    ['init', 'run', 'transition', 'transition'],
   )
   assert.equal(events[0].previousDigest, '0'.repeat(64))
   for (let index = 0; index < events.length; index += 1) {
@@ -5571,11 +5388,13 @@ test('O16: state events form a replayable digest chain without lost budget histo
     if (index > 0) assert.equal(events[index].previousDigest, events[index - 1].digest)
   }
 
+  // the resume is the policy spend, read off the ledger: a lost cache write loses neither the state nor the spend
+  await writeFile(join(oracleDirectory, 'run-state.json'), cachedState)
   const resumed = run(['status', '--dir', oracleDirectory, '--json'])
   assert.equal(resumed.status, 0, resumed.stderr)
   const report = JSON.parse(resumed.stdout)
   assert.equal(report.remainingBudgets.policy.spent, 1)
-  assert.equal(report.currentState, 'NEEDS_DECISION')
+  assert.equal(report.currentState, 'ORACLE_READY')
   assert.equal(report.ledgerStatus.headDigest, events.at(-1).digest)
 })
 
@@ -5587,13 +5406,43 @@ test('a rejection prints the next legal action after the code line', async (t) =
   const rejected = run(['status', '--dir', join(root, 'not-an-oracle'), '--json'])
   assert.equal(rejected.status, 1)
   assert.match(rejected.stderr, /^STATE_INVALID: /)
-  assert.match(rejected.stderr, /\nnext: run `init` if this oracle never entered Delivery/)
+  assert.match(rejected.stderr, /\nnext: \[state\] run `init` if this oracle never entered Delivery/)
 
   // 인수 오류에는 처방이 없다 — 상태 조회 안내가 오해를 낳는다
   const usage = run(['no-such-command'])
   assert.equal(usage.status, 2)
   assert.match(usage.stderr, /^USAGE: /)
   assert.doesNotMatch(usage.stderr, /\nnext: /)
+})
+
+test('every refusal code a Delivery script can print maps to one fix class and one prescription line', async () => {
+  const read = (name) => readFile(join(scriptDirectory, name), 'utf8')
+  const codes = new Set()
+  const collect = (source, pattern) => {
+    for (const match of source.matchAll(pattern)) codes.add(match[1])
+  }
+  const runner = await read('oracle-run.mjs')
+  collect(runner, /new CliError\(\s*'([A-Z][A-Z0-9_]+)'/g)
+  // a freshness code passed as the last argument on its own line (assertRunFresh)
+  collect(runner, /\n {2,}'([A-Z][A-Z0-9_]+)',\n *\)/g)
+  collect(runner, /fatalCode: [^\n]*?'([A-Z][A-Z0-9_]+)'/g)
+  collect(await read('oracle-iterations.mjs'), /IterationError\(\s*'([A-Z][A-Z0-9_]+)'/g)
+  collect(await read('oracle-worker.mjs'), /Error\(\s*[`'](WORKER_[A-Z_]+):/g)
+  collect(await read('oracle-fs.mjs'), /code: '(LOCK_BUSY)'/g)
+  collect(await read('oracle-profile.mjs'), /'(PROFILE_[A-Z_]+)'/g)
+  // the runner forwards the verifier's and the lock check's refusals: they keep their own words under a class
+  collect(await read('oracle-verify.mjs'), /new CliError\(\s*'([A-Z][A-Z0-9_]+)'/g)
+  collect(await read('oracle-lock.mjs'), /(?:CliError\(\s*|fail\(\s*|Code = |code = |\?\? )'([A-Z][A-Z0-9_]+)'/g)
+  assert.ok(codes.size > 150, `${codes.size} codes found — the scan patterns no longer match the sources`)
+  assert.deepEqual([...codes].filter((code) => !Object.hasOwn(REFUSALS, code)).sort(), [], 'a refusal with no class: add it to REFUSALS')
+  for (const [code, [fixClass, line]] of Object.entries(REFUSALS)) {
+    assert.ok(Object.hasOwn(FIX_CLASSES, fixClass), `${code}: ${fixClass} is not a fix class`)
+    if (line !== undefined) assert.equal(typeof line, 'string', code)
+    assert.match(refusalLine(code, '.ai/oracles/x'), /^\[[a-z]+\] \S[^\n]*$/, code)
+  }
+  assert.doesNotMatch(refusalLine('TRANSITION_NOT_ALLOWED', '.ai/oracles/x'), /<dir>/, 'the class line names the oracle directory')
+  // the table keeps no code nothing prints; EVIDENCE_MISSING_ROWS is a status blocker guide prints a fix for
+  assert.deepEqual(Object.keys(REFUSALS).filter((code) => !codes.has(code) && code !== 'EVIDENCE_MISSING_ROWS'), [])
 })
 
 test('status --changed-files lists only the paths changed since the init baseline, one per line', async (t) => {
@@ -6594,7 +6443,7 @@ test('witness: GREEN fails WITNESS_INVALIDATED when the implementation edits the
   const invalidated = transition(edited.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(invalidated.status, 1)
   assert.match(invalidated.stderr, /^WITNESS_INVALIDATED: .*packages\/src\/save\.mjs#L1-L1/)
-  assert.match(invalidated.stderr, /\nnext: the code an `impossible` cell cites changed/)
+  assert.match(invalidated.stderr, /\nnext: \[card\] the code an `impossible` cell cites changed/)
 })
 
 test('GREEN scans the changed production files itself — an unowned side effect or a test-environment branch blocks it', async (t) => {
@@ -6888,7 +6737,7 @@ test('status --check-report compares the Status line and cited runs with the led
   )
   assert.match(inflated.stderr, /r-009 is not in runs\.jsonl/)
   assert.match(inflated.stderr, /r-001 exit 0, the ledger records exit 1/)
-  assert.match(inflated.stderr, /\nnext: rewrite the report from `status --json`/)
+  assert.match(inflated.stderr, /\nnext: \[review\] rewrite the report from `status --json`/)
 
   // 실행으로만 닿는 상태는 인용한 run이 없으면 대조할 근거가 없다
   const uncited = check('Status: IMPLEMENTED_GREEN — card tests pass\n')
@@ -7338,19 +7187,17 @@ test('the phase line never names a command its guard refuses: production touched
   await writeFile(save, 'export const save = 2\n')
   // red and green both refuse PRODUCTION_TOUCHED_BEFORE_RED: the line names guide, which lists the blocker and its fix
   assert.match(firstLine(), /^phase 4\/6 RED · next: oracle-run\.mjs guide --dir \S+ --to VALID_RED · /)
-  assert.match(guided('VALID_RED'), /^blockers: .*PRODUCTION_TOUCHED_BEFORE_RED.*\n[\s\S]*^fix PRODUCTION_TOUCHED_BEFORE_RED: revert the production files/m)
+  assert.match(guided('VALID_RED'), /^blockers: .*PRODUCTION_TOUCHED_BEFORE_RED.*\n[\s\S]*^fix PRODUCTION_TOUCHED_BEFORE_RED: \[production\] revert the production files/m)
   if (original === null) await rm(save)
   else await writeFile(save, original)
   assert.match(firstLine(), /^phase 4\/6 RED · next: oracle-run\.mjs red --dir /)
 
   await reachValidRed(oracleDirectory, root)
   await writeFile(join(root, 'src', 'extra.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
-  // test bytes changed after VALID_RED with no new harness spend: green refuses HARNESS_BUDGET_REQUIRED
-  assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs guide --dir \S+ --to IMPLEMENTED_GREEN · /)
-  assert.match(guided('IMPLEMENTED_GREEN'), /^fix HARNESS_BUDGET_REQUIRED: `budget --spend harness/m)
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'new test file']).status, 0)
-  // after the spend green refuses EVIDENCE_STALE: the line names a fresh RED, which the spend allows
+  // test bytes changed after VALID_RED: green refuses EVIDENCE_STALE, so the line names the fresh RED that binds them —
+  // that binding is the harness spend, read off the ledger; no command spends it first
   assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs red --dir \S+ --label <label> --evidence <evidence> --row <row> -- <command> · /)
+  assert.match(guided('IMPLEMENTED_GREEN'), /^fix EVIDENCE_STALE: \[order\] the tests or evidence\.json changed after VALID_RED/m)
 })
 
 test('guide on test bytes changed after VALID_RED with the harness budget spent names the revert before FAIL', async (t) => {
@@ -7358,10 +7205,9 @@ test('guide on test bytes changed after VALID_RED with the harness budget spent 
   const firstLine = () => run(['status', '--dir', oracleDirectory, '--brief']).stdout.split('\n')[0]
   await reachValidRed(oracleDirectory, root)
   const testFile = join(root, 'src', 'save.test.mjs')
-  // two spends, each followed by a refreshed VALID_RED: the budget is used up and the baseline is at the limit
+  // two refreshed VALID_REDs, each binding changed test bytes: the harness budget is used up
   for (const round of [1, 2]) {
     await writeFile(testFile, `import assert from 'node:assert'\nassert.equal(1, 1)\n// helper ${round}\n`)
-    assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', `helper ${round}`]).status, 0)
     redRun(oracleDirectory)
     const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
     assert.equal(transition(oracleDirectory, 'VALID_RED', latest).status, 0)
@@ -7369,9 +7215,9 @@ test('guide on test bytes changed after VALID_RED with the harness budget spent 
   const frozen = await readFile(testFile, 'utf8')
   await writeFile(testFile, `${frozen}// one more edit\n`)
   assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs guide --dir \S+ --to IMPLEMENTED_GREEN · /)
-  // a spend is refused now, but putting the tests back to the VALID_RED bytes clears the guard
+  // a third binding is refused now, but putting the tests back to the VALID_RED bytes clears the guard
   const guided = run(['guide', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN']).stdout
-  assert.match(guided, /^fix BUDGET_EXHAUSTED: revert the test files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL$/m)
+  assert.match(guided, /^fix BUDGET_EXHAUSTED: \[tests\] revert the test files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL$/m)
   await writeFile(testFile, frozen)
   assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs green --dir /)
 })
@@ -7388,7 +7234,7 @@ test('close never writes or reviews a packet without a passing run on its bytes;
   const early = join(oracleDirectory, 'review-early.json')
   const refused = close(early, 'r-004')
   assert.equal(refused.status, 1)
-  assert.match(refused.stderr, /^REVIEW_RERUN_REQUIRED: no passing reported run of the GREEN label on the current bytes — a packet made now would have no witness\nnext: run `oracle-run\.mjs exec /)
+  assert.match(refused.stderr, /^REVIEW_RERUN_REQUIRED: no passing reported run of the GREEN label on the current bytes — a packet made now would have no witness\nnext: \[order\] run `oracle-run\.mjs exec /)
   assert.equal(existsSync(early), false)
 
   // review-packet still writes one; close refuses that packet before any receipt, and its fix names a new path
@@ -7397,7 +7243,7 @@ test('close never writes or reviews a packet without a passing run on its bytes;
   assert.equal(greenRun(oracleDirectory, 'review-2').status, 0)
   const rejected = close(unwitnessed, 'r-005')
   assert.equal(rejected.status, 1)
-  assert.match(rejected.stderr, /^REVIEW_PACKET_INVALID: \S*review-unwitnessed\.json was made before a passing run on its bytes — the review would refuse it\nnext: after `exec` on the current bytes, rerun the same close with a new --packet path/)
+  assert.match(rejected.stderr, /^REVIEW_PACKET_INVALID: \S*review-unwitnessed\.json was made before a passing run on its bytes — the review would refuse it\nnext: \[order\] after `exec` on the current bytes, rerun the same close with a new --packet path/)
   assert.doesNotMatch(rejected.stdout, /RECEIPT/)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 
@@ -7443,11 +7289,11 @@ test('status does not call GREEN ready while a bare required label passed only e
   const refused = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.match(
     refused.stderr,
-    /^REQUIRED_LABEL_GRADE: required label "repo-test" needs a passing reported run for the current snapshot: its latest run r-\d+ passed as exit-only, and the label takes reported\nnext: make that label pass on the current bytes and rerun it with the grade it asks for: a bare label needs a reported run/,
+    /^REQUIRED_LABEL_GRADE: required label "repo-test" needs a passing reported run for the current snapshot: its latest run r-\d+ passed as exit-only, and the label takes reported\nnext: \[command\] make that label pass on the current bytes and rerun it with the grade it asks for: a bare label needs a reported run/,
   )
   // the phase line sends the agent to guide, which names the fix instead of a green that would be refused again
   assert.match(run(['status', '--dir', oracleDirectory, '--brief']).stdout, /· next: oracle-run\.mjs guide --dir \S+ --to IMPLEMENTED_GREEN /)
-  assert.match(run(['guide', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN']).stdout, /^fix REQUIRED_LABEL_GRADE: make that label pass/m)
+  assert.match(run(['guide', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN']).stdout, /^fix REQUIRED_LABEL_GRADE: \[command\] make that label pass/m)
   // the same code for a reported run that failed: the message says it did not pass, not that its grade is wrong
   const failingTest = resolve(oracleDirectory, '../../../packages/oracle-red-fixture.test.mjs')
   const reportPath = join(oracleDirectory, 'repo-test-failing.ndjson')
@@ -7468,12 +7314,12 @@ test('a node-test command with a bare node or a missing report folder is refused
   assert.equal(bare.status, 1)
   assert.equal(
     bare.stderr,
-    `ADAPTER_COMMAND_INVALID: node-test adapter requires node --test\nnext: start the command with this node's absolute path, not "node": ${process.execPath} --test <test files> (oracle-step.mjs rewrites a bare node)\n`,
+    `ADAPTER_COMMAND_INVALID: node-test adapter requires node --test\nnext: [command] start the command with this node's absolute path, not "node": ${process.execPath} --test <test files> (oracle-step.mjs rewrites a bare node)\n`,
   )
   const report = join(oracleDirectory, 'reports', 'behavior.ndjson')
   const unplaced = exec([process.execPath, '--test', testPath], report)
   assert.equal(unplaced.status, 1)
-  assert.match(unplaced.stderr, /^REPORT_DIRECTORY_MISSING: \S+reports does not exist; no run id was used\nnext: create the --report folder first/)
+  assert.match(unplaced.stderr, /^REPORT_DIRECTORY_MISSING: \S+reports does not exist; no run id was used\nnext: \[command\] create the --report folder first/)
   // neither refusal reserved a run id: the first run that executes is r-001
   await mkdir(dirname(report), { recursive: true })
   const placed = exec([process.execPath, '--test', testPath], report)
@@ -7531,7 +7377,7 @@ test('close chains packet, receipt, REVIEW_VERIFIED and the report check, waits 
   assert.match(first.stdout, /^REVIEW_PACKET_WRITTEN review-close\.json\n$/)
   assert.match(
     first.stderr,
-    /^CLOSE_PENDING: waiting for reviewer output: --findings\nnext: dispatch \$oracle-review in a fresh context with \S*review-close\.json, save each return unchanged, then rerun the same close adding --findings <file> --task-id <id>; the --findings given now answered the previous packet, so name the new returns there\n$/,
+    /^CLOSE_PENDING: waiting for reviewer output: --findings\nnext: \[review\] dispatch \$oracle-review in a fresh context with \S*review-close\.json, save each return unchanged, then rerun the same close adding --findings <file> --task-id <id>; the --findings given now answered the previous packet, so name the new returns there\n$/,
   )
   assert.equal(JSON.parse(readFileSync(findings, 'utf8')).orchestrationReceipt, undefined)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
@@ -7541,7 +7387,7 @@ test('close chains packet, receipt, REVIEW_VERIFIED and the report check, waits 
   assert.match(again.stdout, /^CLOSE_SKIP review-packet: \S*review-close\.json exists\n$/)
   assert.match(
     again.stderr,
-    /^CLOSE_PENDING: \S*findings\.json does not answer \S*review-close\.json\nnext: dispatch \$oracle-review with \S*review-close\.json, save its return unchanged, then rerun the same close with --findings naming that file\n$/,
+    /^CLOSE_PENDING: \S*findings\.json does not answer \S*review-close\.json\nnext: \[review\] dispatch \$oracle-review with \S*review-close\.json, save its return unchanged, then rerun the same close with --findings naming that file\n$/,
   )
   assert.equal(JSON.parse(readFileSync(findings, 'utf8')).orchestrationReceipt, undefined)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
@@ -7563,7 +7409,7 @@ test('close chains packet, receipt, REVIEW_VERIFIED and the report check, waits 
   assert.equal(reviewed.status, 1)
   assert.match(reviewed.stdout, /^CLOSE_SKIP review-receipt: \S*findings\.json already carries one$/m)
   assert.match(reviewed.stdout, /^STATE_REVIEW_VERIFIED run:r-002$/m)
-  assert.match(reviewed.stderr, /^CLOSE_PENDING: REVIEW_VERIFIED is recorded; the final report is not checked yet\nnext: write the report from `status --json` and run `oracle-run\.mjs close --dir \S+ --check-report <report>`\n$/)
+  assert.match(reviewed.stderr, /^CLOSE_PENDING: REVIEW_VERIFIED is recorded; the final report is not checked yet\nnext: \[review\] write the report from `status --json` and run `oracle-run\.mjs close --dir \S+ --check-report <report>`\n$/)
   const verified = await state(oracleDirectory)
   assert.equal(verified.state, 'REVIEW_VERIFIED')
   assert.equal(verified.history.at(-1).packet, 'review-close.json')
@@ -7573,7 +7419,7 @@ test('close chains packet, receipt, REVIEW_VERIFIED and the report check, waits 
   // a report path not written yet waits like a missing --check-report, naming that path
   const unwritten = run(['close', '--dir', oracleDirectory, '--check-report', report])
   assert.equal(unwritten.status, 1)
-  assert.match(unwritten.stderr, /^CLOSE_PENDING: REVIEW_VERIFIED is recorded; the final report is not checked yet\nnext: write the report from `status --json` and run `oracle-run\.mjs close --dir \S+ --check-report \S*report\.md`\n$/)
+  assert.match(unwritten.stderr, /^CLOSE_PENDING: REVIEW_VERIFIED is recorded; the final report is not checked yet\nnext: \[review\] write the report from `status --json` and run `oracle-run\.mjs close --dir \S+ --check-report \S*report\.md`\n$/)
   await writeFile(report, 'Status: PARTIAL_VERIFIED\nr-002 exit 0\n')
   const mismatch = run(['close', '--dir', oracleDirectory, '--check-report', report])
   assert.equal(mismatch.status, 1)
@@ -7593,7 +7439,7 @@ test('close on High asks for the blind input before writing anything, then recor
 
   const unasked = close()
   assert.equal(unasked.status, 1)
-  assert.match(unasked.stderr, /^CLOSE_PENDING: this run needs a blind row mapping\nnext: rerun the same close adding --blind-input </)
+  assert.match(unasked.stderr, /^CLOSE_PENDING: this run needs a blind row mapping\nnext: \[review\] rerun the same close adding --blind-input </)
   assert.equal(existsSync(packetPath), false)
 
   const pending = close('--blind-input', blindPath)
@@ -7601,7 +7447,7 @@ test('close on High asks for the blind input before writing anything, then recor
   assert.match(pending.stdout, /^REVIEW_PACKET_WRITTEN review-close\.json\nBLIND_INPUT_WRITTEN blind-close\.json required:true /)
   assert.match(
     pending.stderr,
-    /^CLOSE_PENDING: waiting for reviewer output: --findings, --intersect, --blind-map\nnext: dispatch \$oracle-review in two fresh contexts with \S*review-close\.json and a blind mapper with only \S*blind-close\.json, save each return unchanged, then rerun the same close adding --findings <file> --task-id <id> --intersect <file> --intersect-task-id <id> --blind-map <file> --blind-reviewer <id> --blind-task-id <id>\n$/,
+    /^CLOSE_PENDING: waiting for reviewer output: --findings, --intersect, --blind-map\nnext: \[review\] dispatch \$oracle-review in two fresh contexts with \S*review-close\.json and a blind mapper with only \S*blind-close\.json, save each return unchanged, then rerun the same close adding --findings <file> --task-id <id> --intersect <file> --intersect-task-id <id> --blind-map <file> --blind-reviewer <id> --blind-task-id <id>\n$/,
   )
 
   const packetRaw = readFileSync(packetPath, 'utf8')
@@ -7625,7 +7471,7 @@ test('close on High asks for the blind input before writing anything, then recor
   writeFileSync(blindPath, JSON.stringify({ ...JSON.parse(blindRaw), targetRevision: 'f'.repeat(64) }))
   const staleBlind = close(...outputs)
   assert.equal(staleBlind.status, 1)
-  assert.match(staleBlind.stderr, /^BLIND_INPUT_INVALID: \S*blind-close\.json was written for another revision than \S*review-close\.json\nnext: rerun the same close with a new --blind-input path, then have a blind mapper map that new file\n$/)
+  assert.match(staleBlind.stderr, /^BLIND_INPUT_INVALID: \S*blind-close\.json was written for another revision than \S*review-close\.json\nnext: \[review\] rerun the same close with a new --blind-input path, then have a blind mapper map that new file\n$/)
   assert.doesNotMatch(staleBlind.stdout, /RECEIPT/)
   writeFileSync(blindPath, blindRaw)
   const closed = close(...outputs)
@@ -7705,8 +7551,9 @@ test('guide as GREEN distinguishes already-satisfied verification from authorize
   assert.match(implementation.instructions.steps.join('\n'), /implementation.decision/i)
   assert.match(implementation.instructions.steps.join('\n'), /simplif/i)
   assert.deepEqual(implementation.requires, ['--run', '--evidence'])
+  // a refresh onto the binding VALID_RED already holds binds nothing; a refresh that binds a change is a harness spend
   const refresh = JSON.parse(run(['guide', '--dir', oracleDirectory, '--to', 'VALID_RED', '--json']).stdout).action
-  assert.equal(refresh.blockers.includes('HARNESS_BUDGET_REQUIRED'), true)
+  assert.equal(refresh.blockers.includes('TRANSITION_NOT_ALLOWED'), true)
   assert.match(refresh.instructions.steps.join('\n'), /harness.*budget|budget.*harness/i)
 })
 
@@ -7774,14 +7621,15 @@ test('guide as rejection recovery reuses canonical hints without requiring or fa
     `next: ${JSON.parse(fallback.stdout).rejection.next}\n`,
     missingRun.stderr.slice(missingRun.stderr.indexOf('next: ')),
   )
-  for (const code of ['RUN_NOT_FOUND', 'UNREGISTERED_DIAGNOSTIC']) {
+  // a classed code prints its class line (step assembles run ids); a code no table lists falls back to status
+  for (const [code, next] of [
+    ['RUN_NOT_FOUND', '[command] run it through `oracle-step.mjs --dir <dir>`, which assembles every flag, label, report path and run id'],
+    ['UNREGISTERED_DIAGNOSTIC', 'run `oracle-run.mjs status` and choose one of the actions shown'],
+  ]) {
     const standalone = run(['guide', '--rejection', code, '--json'])
     assert.equal(standalone.status, 0, standalone.stderr)
     assert.equal(JSON.parse(standalone.stdout).rejection.source, 'caller-supplied')
-    assert.equal(
-      JSON.parse(standalone.stdout).rejection.next,
-      'run `oracle-run.mjs status` and choose one of the actions shown',
-    )
+    assert.equal(JSON.parse(standalone.stdout).rejection.next, next)
     assert.equal(Object.hasOwn(JSON.parse(standalone.stdout), 'currentState'), false)
   }
   assert.deepEqual(await snapshotOf(repository), before)

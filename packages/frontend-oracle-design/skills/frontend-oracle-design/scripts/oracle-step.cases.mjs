@@ -153,6 +153,8 @@ const CLEAR = {
 const BLOCKING = { ...CLEAR, findings: [{ severity: 'high', title: 'double submit', evidence: 'src/save.mjs:1' }] }
 const REV = 'a'.repeat(64)
 const OLD = 'b'.repeat(64)
+// the GREEN run and its rerun on the reviewed bytes, the run close cites
+const GREEN_RUN = { type: 'run', runId: 'r-008', label: 'behavior', command: [process.execPath, '--test', 'save.test.mjs'], adapter: 'node-test', exitCode: 0, grade: 'reported', worktreeSha256: REV }
 
 /**
  * An oracle directory at IMPLEMENTED_GREEN as close sees it — the packet for REV written in round `round` (started at
@@ -172,8 +174,8 @@ async function closeFixture(t, { risk = 'low', returns = [], receipts = [], ledg
   if (receipts.length > 0) await writeFile(join(dir, HOST_RECEIPTS_FILE), host)
   const phase = {
     kind: 'delivery', key: 'close', line: phaseLine(SAMPLE_NEXT.close),
-    state: { risk, history: [] },
-    ledger: [...ledger, { type: 'review-round', targetRevision: REV, at: '2026-11-02T10:00:00.000Z' }],
+    state: { risk, history: [{ state: 'IMPLEMENTED_GREEN', runId: 'r-008' }] },
+    ledger: [GREEN_RUN, { ...GREEN_RUN, runId: 'r-009' }, ...ledger, { type: 'review-round', targetRevision: REV, at: '2026-11-02T10:00:00.000Z' }],
     status: { currentState: 'IMPLEMENTED_GREEN', currentSnapshot: { worktreeSha256: REV }, nextActions: [{ to: 'REVIEW_VERIFIED', candidateRuns: ['r-009'], requires: [], blockers: [] }] },
   }
   return { dir, phase, returnPath: (n) => join(dir, `return-${n}.json`) }
@@ -225,7 +227,7 @@ async function returnCounts(t) {
 async function staleDecision(t) {
   // round 1 reviewed OLD; the repair moved the bytes to REV, whose packet is not written yet
   const repaired = await closeFixture(t, { packets: [OLD], decision: 'first try\n' })
-  repaired.phase.ledger = [{ type: 'review-round', targetRevision: OLD, at: '2026-11-02T10:00:00.000Z' }]
+  repaired.phase.ledger = [...repaired.phase.ledger.filter((entry) => entry.type === 'run'), { type: 'review-round', targetRevision: OLD, at: '2026-11-02T10:00:00.000Z' }]
   const asked = await closeCall(repaired.dir, repaired.phase)
   assert.equal(asked.calls, undefined)
   assert.match(asked.say, /^the code changed since the last review round and \S+implementation-decision\.md is the one that round read: update it/)
@@ -393,12 +395,12 @@ function answer(result) {
 const LOCK_SOURCES = (pkg) => pkg.sources.map((source) => /^repo:([^#]+)/.exec(source.location)?.[1]).filter(Boolean)
 const RETURN = /saved unchanged as (\S+?\.(?:md|json))\b/g
 const savedText = (path) => (path.endsWith('.json') ? '{"candidates": []}\n' : '# review\n\nno findings\n')
-const NO_ROUNDS = { 'model-analyst': 0, translation: 0, 'cold-read': 0, 'reverse-impossible': 0, 'source-aware': 0 }
+const NO_ROUNDS = { 'model-analyst': 0, translation: 0, 'card-review': 0, 'cold-read': 0, 'source-aware': 0 }
 // the source-aware review is named with its condition until a return is saved for it
 const OFFER = /when card\/policy-sources\.md's trigger applies, a source-aware review — .*; save its return unchanged as (\S+);/
 /** A second round of a review kind: it continues the first reviewer, whose return it names, with the repair diff. */
-const confirmFixes = (kind) =>
-  `${kind} round 2 \\(confirm-fixes\\) — continue the round-1 reviewer with only its finding IDs \\(\\.ai/oracles/stale-search/reviews/${kind}-[0-9a-f]{12}\\.(?:md|json)\\) and the repair diff, its return saved unchanged as \\S+`
+const confirmFixes = (kind, name = kind) =>
+  `${name} round 2 \\(confirm-fixes\\) — continue the round-1 reviewer with only its finding IDs \\(\\.ai/oracles/stale-search/reviews/${kind}-[0-9a-f]{12}\\.(?:md|json)\\) and the repair diff, its return saved unchanged as \\S+`
 const PENDING_APPROVAL = '- Status: pending\n- Source: none yet'
 
 /** The template in a folder of this test, and receipts of this test only. */
@@ -445,16 +447,22 @@ async function authoringToLock(t) {
   if (!(await installedBend(t))) return
   const fixture = await authoringFixture(t, 'authoring')
   const at = await authoringRepo(fixture)
-  // from no stage record every node passes: step asks for the three reviews at once, writes their inputs outside the
+  // from no stage record every node passes: step asks for both reviews at once, writes their inputs outside the
   // repository and names where each return is saved
   const first = await at.step()
   assert.equal(first.status, 0, first.stderr)
   const lines = answer(first)
   assert.deepEqual(lines.slice(0, 2), ['ran: package ok; model ok; card ok', 'phase 3/6 Card review and lock'])
-  assert.match(lines.at(-1), /^NEXT FOR YOU: dispatch \(1\) the model analyst — .*\(2\) cold-read — .*\(3\) reverse-impossible — .*; repair what they find, then rerun oracle-step\.mjs --dir \.ai\/oracles\/stale-search$/)
+  assert.match(lines.at(-1), /^NEXT FOR YOU: dispatch \(1\) the model analyst — .*\(2\) the card review — .*; repair what they find, then rerun oracle-step\.mjs --dir \.ai\/oracles\/stale-search$/)
   const inputs = [...lines.at(-1).matchAll(/with only (\S+)/g)].map((match) => match[1])
-  assert.equal(inputs.length, 3, lines.at(-1))
+  assert.equal(inputs.length, 2, lines.at(-1))
   assert.ok(inputs.every((path) => !path.startsWith(at.repo) && !path.startsWith('.ai/')), lines.at(-1))
+  // the card review is one packet and one return: the card copies read alone first, then the reverse-impossible inputs
+  // from the same folder, answered in one JSON
+  const cardClause = /\(2\) the card review — \$oracle-review in a fresh context with only (\S+)\/view\.md and \1\/oracle\.md and \1\/ir\.json(?: and \1\/explore-input\.md)?: its cold read of view\.md and oracle\.md alone first, written before it opens the rest for the reverse-impossible attack; its one JSON return .* saved unchanged as (\S+)$/.exec(lines.at(-1).replace(/; repair what they find.*$/, ''))
+  assert.ok(cardClause, lines.at(-1))
+  assert.match(cardClause[2], /^\.ai\/oracles\/stale-search\/reviews\/card-review-[0-9a-f]{12}\.json$/)
+  assert.equal([...lines.at(-1).matchAll(RETURN)].length, 2, lines.at(-1))
   await at.save(first.stdout)
 
   // the returns saved: the lock comes last, after the source-aware review when its trigger applies, the touched-file
@@ -465,7 +473,7 @@ async function authoringToLock(t) {
   const found = order.map((text) => ready.indexOf(text))
   assert.ok(found.every((index, n) => index > (found[n - 1] ?? -1)), ready)
   assert.equal(ready.split('--source .ai/oracles/stale-search/oracle.package.json').length, 2, ready)
-  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'cold-read': 1, 'reverse-impossible': 1 })
+  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'card-review': 1 })
 
   // an issue only a hand-written section raises is fixed in oracle.md outside the markers: no package patch, nothing
   // asked again of the analyst, whose input the card does not feed
@@ -535,15 +543,15 @@ async function bClassIncidents(t) {
   await at.step()
   await at.save(first.stdout, (path) => (path.endsWith('.json') ? '{"candidates": [], "attempt": 2}\n' : '# review\n\nno findings, second attempt\n'))
   await at.step()
-  const once = { ...NO_ROUNDS, 'model-analyst': 1, 'cold-read': 1, 'reverse-impossible': 1 }
+  const once = { ...NO_ROUNDS, 'model-analyst': 1, 'card-review': 1 }
   assert.deepEqual(await rounds(), once)
   // a Bend source edit (S4, World.bend) moves the card's projection, not the analyst's input: the analyst is not asked
-  // again, and the card reviews' second round confirms the first one's fixes
+  // again, and the card review's second round confirms the first one's fixes
   const world = join(at.repo, 'World.bend')
   const edited = `${fixture.world}# S4 edited\n`
   await writeFile(world, edited)
   const asked = answer(await at.step()).at(-1)
-  assert.match(asked, new RegExp(`^NEXT FOR YOU: dispatch \\(1\\) ${confirmFixes('cold-read')} \\(2\\) ${confirmFixes('reverse-impossible')}; `))
+  assert.match(asked, new RegExp(`^NEXT FOR YOU: dispatch ${confirmFixes('card-review', 'the card review')}; `))
   assert.ok(!asked.includes('model analyst'), asked)
   // an edit after DRAFTED that breaks the model, then its fix: the label follows the files, nothing is rewound or spent
   await writeFile(world, edited.replace(WORLD_ROW, FORBIDDING_ROW))
@@ -661,7 +669,7 @@ async function noThirdRound(t) {
   assert.ok(!opened.includes('source-aware'), opened)
   await note(1)
   const second = await at.step()
-  const kinds = ['cold-read', 'reverse-impossible', 'source-aware'].map((kind, index) => `\\(${index + 1}\\) ${confirmFixes(kind)}`)
+  const kinds = [['card-review', 'the card review'], ['source-aware']].map((kind, index) => `\\(${index + 1}\\) ${confirmFixes(...kind)}`)
   assert.match(answer(second).at(-1), new RegExp(`^NEXT FOR YOU: dispatch ${kinds.join(' ')}; repair what they find`))
   await at.save(second.stdout)
   assert.match(answer(await at.step()).at(-1), /every check passes; in order: \(1\) oracle-verify\.mjs card /)
@@ -669,10 +677,34 @@ async function noThirdRound(t) {
   const third = answer(await at.step()).at(-1)
   assert.match(third, /every check passes; in order: \(1\) oracle-verify\.mjs card /)
   assert.ok(!/dispatch|source-aware/.test(third), third)
-  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'cold-read': 2, 'reverse-impossible': 2, 'source-aware': 2 })
+  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'card-review': 2, 'source-aware': 2 })
   assert.equal(nextCommandOf(await at.brief()), 'lock')
   const locked = await at.lock(third)
   assert.equal(locked.status, 0, locked.stderr)
+}
+
+async function legacyCardRounds(t) {
+  if (!(await installedBend(t))) return
+  // a Formal run from before the card review was one reviewer saved its card returns as reverse-impossible: each is a
+  // card-review round for its card version, the second round continues that return, and two leave no third to ask for
+  const fixture = await authoringFixture(t, 'legacy-rounds')
+  const at = await authoringRepo(fixture)
+  const legacy = (path) => path.replace(/\/card-review-([0-9a-f]{12})\.json$/, '/reverse-impossible-$1.json')
+  const saveLegacy = async (stdout) => {
+    for (const [, path] of stdout.matchAll(RETURN)) await writeFile(join(at.repo, legacy(path)), savedText(path))
+  }
+  const note = (n) => writeFile(at.file('oracle.md'), withHandWritten(fixture.card, `<!-- edit ${n} -->`))
+  await saveLegacy((await at.step()).stdout)
+  assert.ok(!/the card review/.test(answer(await at.step()).at(-1)))
+  await note(1)
+  const second = await at.step()
+  assert.match(answer(second).at(-1), new RegExp(`^NEXT FOR YOU: dispatch ${confirmFixes('reverse-impossible', 'the card review')}; `))
+  await saveLegacy(second.stdout)
+  await note(2)
+  const third = answer(await at.step()).at(-1)
+  assert.match(third, /every check passes; in order: /)
+  assert.ok(!/the card review/.test(third), third)
+  assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'card-review': 2 })
 }
 
 const PAGINATION = fileURLToPath(new URL('../../../test-fixtures/pagination/', import.meta.url))
@@ -862,15 +894,12 @@ async function contractThroughStep(t) {
 const SAVE_TEST = "import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { save } from './src/save.mjs'\ntest('save > pending', () => assert.ok(save > 0))\n"
 
 async function deliveryToClose(t) {
-  const fixture = await workspace(t, { risk: 'low', initialFiles: { 'src/save.mjs': 'export const save = 0\n', 'save.test.mjs': SAVE_TEST } })
+  const fixture = await workspace(t, { risk: 'low', initialFiles: { 'src/save.mjs': 'export const save = 0\n', 'save.behavior.test.mjs': SAVE_TEST } })
   const { root, oracleDirectory: dir } = fixture
   const state = async () => JSON.parse(await readFile(join(dir, 'run-state.json'), 'utf8')).state
 
-  // the first RED needs the test command once; step assembles the rest and stops at the implementation
-  const asked = step(root, ['--dir', dir])
-  assert.equal(asked.status, 0, asked.stderr)
-  assert.match(answer(asked).at(-1), /--label behavior -- <the command that runs them>$/)
-  const red = step(root, ['--dir', dir, '--label', 'behavior', '--', 'node', '--test', join(root, 'save.test.mjs')])
+  // the agent names no command: step runs the label's test file, named for it, and stops at the implementation
+  const red = step(root, ['--dir', dir])
   assert.equal(red.status, 0, red.stderr)
   assert.deepEqual(answer(red).slice(0, 2), ['ran: oracle-run.mjs red behavior ok', 'phase 5/6 GREEN'])
   assert.match(answer(red).at(-1), /^NEXT FOR YOU: implement the production change/)
@@ -930,6 +959,123 @@ async function refusalOnce(t) {
   assert.match(lines[0], /^ran: oracle-run\.mjs red behavior [A-Z_]+$/)
   const ledger = (await readFile(join(dir, 'runs.jsonl'), 'utf8')).split('\n').filter(Boolean).map((text) => JSON.parse(text))
   assert.equal(ledger.filter((entry) => entry.type === 'run').length, 1)
+}
+
+const BEHAVIOR_TEST = 'save.behavior.test.mjs'
+const readLedger = async (dir) => (await readFile(join(dir, 'runs.jsonl'), 'utf8')).split('\n').filter(Boolean).map((text) => JSON.parse(text))
+const runEntries = async (dir) => (await readLedger(dir)).filter((entry) => entry.type === 'run')
+/** The commands one step call ran, each with its outcome: `ok`, the waiting close, or the code it stopped on. */
+const ranOf = (lines) => (lines[0].startsWith('ran: ') ? lines[0].slice(5).split('; ') : [])
+const outcomes = (ran) => ran.map((text) => text.split(' ').at(-1))
+
+/** A two-label Delivery run (the card's behavior test and the repository test script) whose agent types no command. */
+async function twoLabels(t, risk) {
+  const fixture = await workspace(t, { risk, requiredLabels: ['behavior', 'repo-test'], initialFiles: { 'src/save.mjs': 'export const save = 0\n', [BEHAVIOR_TEST]: SAVE_TEST } })
+  await writeFile(join(fixture.repository, 'package.json'), JSON.stringify({ scripts: { test: `node --test packages/${BEHAVIOR_TEST}` } }))
+  return fixture
+}
+
+async function commandRefusals(t) {
+  // the 0.124–0.125 command-shape refusals (W4-PREP §3.2): ADAPTER_COMMAND_INVALID in 5/5 runs (a bare `node`, reporter
+  // flags), INPUT_UNREADABLE (the --report folder missing), REPORT_PATH_EXISTS (a report path used again),
+  // REQUIRED_LABEL_GRADE (repo-test run as `npm test`), REVIEW_POINTS_REQUIRED (close without its review points).
+  // Through step the agent types no command or path, and step says what the CLI would refuse instead of running it.
+  const { root, oracleDirectory: dir } = await twoLabels(t, 'low')
+  const flagged = step(root, ['--dir', dir, '--label', 'behavior', '--', 'node', '--test', '--test-reporter=spec', join(root, BEHAVIOR_TEST)])
+  assert.equal(flagged.status, 0, flagged.stderr)
+  assert.deepEqual(ranOf(answer(flagged)), [])
+  assert.match(answer(flagged).at(-1), /passes reporter, destination or leniency arguments the node-test adapter owns: drop them/)
+  assert.deepEqual(await runEntries(dir), [])
+
+  // no reports folder yet: step makes it, and runs the label's file with this node from the repository
+  const red = step(root, ['--dir', dir])
+  assert.equal(red.status, 0, red.stdout)
+  assert.deepEqual(ranOf(answer(red)), ['oracle-run.mjs red behavior ok'])
+  const [first] = await runEntries(dir)
+  assert.deepEqual(first.command, [process.execPath, '--test', `packages/${BEHAVIOR_TEST}`])
+
+  // a report left where the next ones would go: step takes the next free path
+  for (const name of ['step-repo-test-2.ndjson', 'step-behavior-3.ndjson']) await writeFile(join(dir, 'reports', name), '')
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  const green = step(root, ['--dir', dir])
+  assert.equal(green.status, 0, green.stdout)
+  const ran = ranOf(answer(green))
+  assert.deepEqual(outcomes(ran), [...ran.slice(0, -1).map(() => 'ok'), 'CLOSE_PENDING'], green.stdout)
+  assert.ok(ran.includes('oracle-run.mjs green behavior ok'), green.stdout)
+  const runs = await runEntries(dir)
+  // repo-test is the package.json script on a reported run, so GREEN takes it (no REQUIRED_LABEL_GRADE)
+  assert.deepEqual(runs.filter((run) => run.label === 'repo-test').map((run) => [run.grade, run.exitCode]), [['reported', 0]])
+  assert.equal(JSON.parse(await readFile(join(dir, 'run-state.json'), 'utf8')).state, 'IMPLEMENTED_GREEN')
+
+  // a label with no file named for it: step names the file names it runs, and the override
+  const ready = await readyFixture(t, ['behavior'])
+  const asked = await planStep(ready.dir, ready.phase)
+  assert.equal(asked.calls, undefined)
+  assert.match(asked.say, /^write the tests in files named for their label under the scan root \(behavior: <name>\.behavior\.test\.<mjs\|ts>\), then rerun .* --label <label> -- <the command that runs them>$/)
+}
+
+async function orderRefusals(t) {
+  // the order refusals: EVIDENCE_STALE (a test edit after VALID_RED needs a fresh RED), REQUIRED_RUN_MISSING (GREEN
+  // before another required label ran), FLAKINESS_GATE (Medium GREEN needs two passes in a row), and
+  // REVIEW_RERUN_REQUIRED·REVIEW_COMMAND_CHANGED (close after a repair, the GREEN label not the last one run). Step runs
+  // what each one asks for first; none reaches the agent.
+  const { root, oracleDirectory: dir } = await twoLabels(t, 'medium')
+  assert.deepEqual(ranOf(answer(step(root, ['--dir', dir]))), ['oracle-run.mjs red behavior ok'])
+  await writeFile(join(root, BEHAVIOR_TEST), `${SAVE_TEST}// the same test, one more line\n`)
+  const refreshed = step(root, ['--dir', dir])
+  assert.deepEqual(ranOf(answer(refreshed)), ['oracle-run.mjs red behavior ok'], refreshed.stdout)
+  assert.match(answer(refreshed).at(-1), /^NEXT FOR YOU: implement the production change/)
+
+  // no implementation decision yet: step stops before close, after GREEN and the review run
+  await rm(join(dir, 'implementation-decision.md'))
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  const green = step(root, ['--dir', dir])
+  assert.equal(green.status, 0, green.stdout)
+  assert.ok(outcomes(ranOf(answer(green))).every((code) => code === 'ok' || code === 'FLAKINESS_GATE'), green.stdout)
+  assert.match(answer(green).at(-1), /^NEXT FOR YOU: write \S+implementation-decision\.md/)
+  assert.equal(JSON.parse(await readFile(join(dir, 'run-state.json'), 'utf8')).state, 'IMPLEMENTED_GREEN')
+
+  // a repair: the stale labels run again in their order (repo-test last), and close cites the GREEN label's pass
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  await writeFile(join(dir, 'implementation-decision.md'), 'save is positive\n')
+  const closed = step(root, ['--dir', dir])
+  const ran = ranOf(answer(closed))
+  assert.deepEqual(outcomes(ran).at(-1), 'CLOSE_PENDING', closed.stdout)
+  assert.ok(outcomes(ran).every((code) => code === 'ok' || code === 'FLAKINESS_GATE' || code === 'CLOSE_PENDING'), closed.stdout)
+  const runs = await runEntries(dir)
+  assert.equal(runs.at(-1).label, 'repo-test')
+  const cited = flagValue((await closeCall(dir, await readPhase(dir))).calls[0].args, '--run')
+  assert.equal(cited, runs.findLast((run) => run.label === 'behavior').runId)
+}
+
+async function citedGreenRun(t) {
+  // close cites the GREEN label's pass even when another label ran after it, and with none after GREEN it runs the GREEN
+  // command first (REVIEW_RERUN_REQUIRED never reaches the agent); a failure on these bytes is the implementer's
+  const { dir, phase } = await closeFixture(t, { returns: [CLEAR], receipts: [['C', CLEAR, '2026-11-02T10:30:00.000Z']] })
+  const lint = { ...GREEN_RUN, runId: 'r-010', label: 'lint', command: [process.execPath, '--test', 'lint.test.mjs'] }
+  phase.ledger.splice(2, 0, lint)
+  phase.status.nextActions[0].candidateRuns = ['r-010', 'r-009']
+  assert.equal(flagValue((await closeCall(dir, phase)).calls[0].args, '--run'), 'r-009')
+  phase.status.nextActions[0].candidateRuns = ['r-010']
+  phase.ledger.splice(1, 1)
+  const witness = await closeCall(dir, phase)
+  assert.equal(witness.again, true)
+  assert.deepEqual(witness.calls.map((item) => [item.args[0], item.label, item.args.slice(item.args.indexOf('--') + 1)]), [['exec', 'behavior', GREEN_RUN.command]])
+  // the loop goes on after that exec on the same phase line, and plans close again
+  const plans = [witness, { calls: [{ script: 'oracle-run.mjs', args: ['close'], label: '' }] }]
+  let reads = 0
+  const looped = await drive({
+    directory: dir,
+    read: () => {
+      reads += 1
+      return { ...phase, ledger: Array.from({ length: reads }) }
+    },
+    plan: () => plans.shift() ?? { say: 'done' },
+    run: () => ({ status: 0, stdout: '', stderr: '' }),
+  })
+  assert.deepEqual(looped.ran, ['oracle-run.mjs exec behavior ok', 'oracle-run.mjs close ok'])
+  phase.ledger.splice(1, 0, { ...GREEN_RUN, runId: 'r-011', exitCode: 1 })
+  assert.match((await closeCall(dir, phase)).say, /^r-011 failed on these bytes: edit production so the GREEN tests pass/)
 }
 
 async function scaffoldFirst(t) {
@@ -1000,6 +1146,7 @@ export const stepCases = [
   ['[bend] step --check fails exactly when the lock refuses, names every issue the lock names and changes nothing in the oracle directory', checkParity],
   ['[bend] the same issues on a third distinct file state stop step with no review asked; the second does not', stopOnThird],
   ['[bend] no review kind is asked for a third round, the second confirms the fixes, and source-aware opens with its first return', noThirdRound],
+  ['[bend] an older Formal run\'s reverse-impossible returns are card-review rounds: round 2 continues one, a third is not asked', legacyCardRounds],
   ['[bend] a translation review recorded against a mapping fixed after its dispute is a round: the third table goes to the user', translationRounds],
   ['[bend] a PROOF.bend edit alone is a new file state: a proof failing the same way stops step on the third edit', proofEditsStop],
   ['[bend] the lock line names the oracle package even when its self source names another file: refused before the lock, not at init', lockNamesPackage],
@@ -1007,4 +1154,7 @@ export const stepCases = [
   ['contract/v1 goes from a pending card to its lock and the Delivery run through oracle-step.mjs', contractThroughStep],
   ['step takes a Delivery run from ORACLE_READY to a checked report, stopping only for the agent, with the close a person would assemble', deliveryToClose],
   ['a refused command stops step after one run with one action', refusalOnce],
+  ['the command-shape refusals of the field runs do not reach the agent: step derives every command and path', commandRefusals],
+  ['the order refusals of the field runs do not reach the agent: step runs what each asks for first', orderRefusals],
+  ['close cites the GREEN label\'s own pass after GREEN, and runs the GREEN command first when there is none', citedGreenRun],
 ]

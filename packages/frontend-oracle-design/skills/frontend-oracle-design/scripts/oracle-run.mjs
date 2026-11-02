@@ -67,7 +67,7 @@ import {
 import { assertProfileReviewReferences, snapshotContext } from './oracle-review-context.mjs'
 import { approvedSourceIds, auditFullProduct, markdownLines, sectionLines, tWaySummary } from './oracle-space.mjs'
 import { phaseLine } from './oracle-stage.mjs'
-import { redRefreshBlocker, reviewHoldBlocker } from './oracle-transition-guards.mjs'
+import { harnessIdentity, ledgerSpend, reviewHoldBlocker } from './oracle-transition-guards.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
 
@@ -157,129 +157,292 @@ class CliError extends Error {
   }
 }
 
-/** 거절 코드마다 다음 합법 행동 한 줄 — green-review.md·red.md·ledger.md의 처방 표와 같은 내용이다. */
-const NEXT_ACTIONS = {
-  ORACLE_CHANGED:
-    'stop reusing RED·GREEN·review evidence for this revision, preserve history, show the card diff, and return to NEEDS_DECISION — never relock',
-  SOURCE_CHANGED:
-    'stop reusing evidence for this revision, preserve history, show the source diff, and confirm a new revision — never relock',
-  LOCK_MANIFEST_CHANGED:
-    'stop reusing evidence for this revision, preserve history, and confirm a new revision with the changed source set — never relock',
-  LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
-  RUN_NOT_GREEN: 'produce an actually passing run with `exec --label <label>` and cite that runId',
-  REVIEW_CLOSURE_INVALID:
-    'the closure does not apply — send the confirm-fixes packet to the round-2 reviewers and pass their --findings',
-  REPRODUCTION_INVALID:
-    'a reproduction must name a test file inside the scan root; otherwise confirm that claim with the round-2 reviewers',
-  RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
-  EVIDENCE_REQUIRED:
-    'generate `oracle-verify.mjs evidence-scaffold --oracle <card> > evidence.json`, fill the slots, pass --evidence',
-  EVIDENCE_MISSING_ROWS: 'regenerate the scaffold from the locked card and fill only the values',
-  EVIDENCE_NOT_IN_RUN: `attach the reporter (\`${TRUSTED_ADAPTER_FLAG} --report <path>\`) and re-run; never invent a test name`,
-  EVIDENCE_UNVERIFIABLE: `the run is exit-only — re-run with \`${TRUSTED_ADAPTER_FLAG} --report <path>\``,
-  RED_EVIDENCE_MISSING: `run the mapped test with \`${TRUSTED_ADAPTER_FLAG} --report <path>\` so the failing name is recorded`,
-  RED_EVIDENCE_UNVERIFIABLE:
-    'an exit-only or setup failure is not RED — re-run with the reporter and a failing mapped row',
-  REQUIRED_RUN_MISSING: 're-run every declared required label with `exec --label <label>` and cite the latest pass',
-  FLAKINESS_GATE:
-    're-run the same command unchanged until consecutive passes reach the risk count; a failure is HARNESS_DEFECT',
-  TEST_WEAKENED:
-    'restore the tests to the RED baseline — assertion count, expected-value literals, no forbidden tokens',
-  PRODUCTION_TOUCHED_BEFORE_RED: 'revert the production files, write the tests first, record VALID_RED with `red`',
-  HARNESS_BUDGET_REQUIRED:
-    '`budget --spend harness --reason ...`, then a new reported RED→GREEN with the changed harness bytes',
-  HARNESS_RED_REQUIRED: 'run a new reported RED→GREEN with the changed harness bytes',
-  MILESTONE_RED_MISSING: 'run a reported `red:<name>` for every milestone before the global VALID_RED',
-  MUTATION_EVIDENCE_REQUIRED:
-    'after GREEN, run the guard-removed failing run, restore, re-GREEN, and pass --mutation-run/--mutation-row',
-  MUTATION_EVIDENCE_INVALID:
-    'the mutation must fail on the mapped row and the production digest must return exactly before review',
-  REVIEW_PACKET_REQUIRED: 'generate `review-packet` and hand the reviewer its path',
-  BLIND_MAP_REQUIRED:
-    'derive `blind-input`, have a reviewer who never saw evidence.json return the test→row mapping, record it with `review-receipt --role blind-mapper`, and pass --blind-input/--blind-map',
-  BLIND_INPUT_STALE:
-    'the revision or the test bytes moved after the blind read — derive `blind-input` again and re-run the blind mapping',
-  BLIND_MAP_STALE:
-    'the evidence mapping changed after the blind read — a stale blind read cannot disprove the new mapping; re-run it',
-  BLIND_MAP_RECEIPT_INVALID:
-    'record the blind mapping with `review-receipt --role blind-mapper` against this input and revision',
-  BLIND_INPUT_INVALID:
-    'generate the blind input with `blind-input` — it carries only the contract rows and the test sources',
-  REVIEW_PACKET_STALE:
-    'the input changed since the packet — `exec` the GREEN command on the current bytes, then `close` with a new --packet path; never edit it',
-  REVIEW_PACKET_INVALID:
-    'the packet is unreadable or no passing run on its bytes preceded it — `exec` on the current bytes, then `close` with a new --packet path; after round 2, NEEDS_DECISION',
-  CLOSE_PENDING: 'supply the reviewer output or report named above, then rerun the same `close`',
-  REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
-  SNAPSHOT_STALE: 're-run the cited label on the current bytes and cite the new run',
-  REVIEW_RUN_STALE: 're-run the cited command against the current bytes',
-  FINDINGS_BLOCKING: FINDINGS_BLOCKING_NEXT,
-  REVIEW_ROUNDS_CLOSED:
-    'repair the round-2 blockers, rerun the required labels, then `close --packet <round-2 packet>` with its findings records PARTIAL_VERIFIED with the repair unreviewed; or stop at NEEDS_DECISION',
-  FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
-  REVIEWER_NOT_INDEPENDENT: 'High risk needs two artifacts from different reviewerIds',
-  BUDGET_EXHAUSTED: 'report FAIL with the last actual failure — never route around via another budget',
-  TRANSITION_NOT_ALLOWED: 'run `status --json` and take one of nextLegalActions',
-  STATE_INVALID:
-    'run `init` if this oracle never entered Delivery; otherwise do not edit state files — recover from the ledger with `status --json`',
-  STATE_LEDGER_DIVERGENCE: 'do not edit state files — run `status --json` and recover from the ledger',
-  ADAPTER_COMMAND_INVALID: `drop the reporter·destination and leniency arguments — \`${TRUSTED_ADAPTER_FLAG}\` injects its own reporter`,
-  REPORT_MISSING: 'pass `--report <path>` and let the adapter write it',
-  REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
-  REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
-  REPORT_DIRECTORY_MISSING: 'create the --report folder first (mkdir -p), or pass a --report path in an existing folder, then rerun the same command',
-  REQUIRED_LABEL_GRADE:
-    'make that label pass on the current bytes and rerun it with the grade it asks for: a bare label needs a reported run (`--adapter node-test` with `<this node> --test …` or `--adapter vitest` with `vitest run …`), a `:exit` label an exit-only run (no --adapter)',
-  RUN_ARTIFACTS_EXIST:
-    'after VALID_RED, or without the run state, a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
-  HARNESS_PATH_MODIFIED: 'revert the production edit made before RED; only test and runner files can be registered as harness',
-  HARNESS_PATH_NEW_SOURCE:
-    'a new non-test, non-config file is production — write it after VALID_RED, or put test support under a test path',
-  AMEND_SCOPE_CHANGED: 're-run init with the same --lock and --scan-root — another lock or scan root is a new revision',
-  LABEL_NOT_REQUIRED:
-    're-run with the exact required label `status` shows — a run under another name never satisfies the gate',
-  STACK_LABELS_REQUIRED:
-    'register every mandatory-stack label: bend-proof:reported, bend-adequacy:reported, fast-check:reported and — unless the card declares ## Type Contract not applicable — type-contract:reported',
-  PACKAGE_UNLOCKED: 'recreate the lock with --source <package> — the model package is part of the approved meaning',
-  PACKAGE_STALE: 're-project the card from the package, re-confirm a changed meaning, and lock a new revision',
-  FORMAL_PROOF_LABEL_REQUIRED:
-    'register --required-label bend-proof:reported — its node-test run asserts `oracle-model.mjs prove` reports proven for the locked laws',
-  ADEQUACY_LABEL_REQUIRED:
-    'register --required-label bend-adequacy:reported — its node-test run asserts `oracle-adequacy.mjs check` reports proven for the locked card',
-  RISK_MISMATCH: "drop --risk to use the locked card's Risk — a different risk is a new revision, not an init flag",
-  RED_CAUSE_INFRA:
-    'repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED',
-  WITNESS_INVALIDATED:
-    'the code an `impossible` cell cites changed — return to NEEDS_DECISION, re-disposition that cell against the new code, and lock a new revision',
-  SIDE_EFFECT_UNOWNED:
-    'add the row whose side-effect column owns that category (POLICY_GAP), remove the unrequested effect (PRODUCT_DEFECT), or exempt the line with `oracle:side-effect <row|reason>`',
-  NONDETERMINISM_FOUND:
-    'inject the source through a seam, or record `oracle:nondeterminism <reason>` next to the token',
-  TEST_ENV_BRANCH:
-    'remove the test-environment branch and make the real path pass — a genuine need is exempted with `oracle:test-env <reason>`',
-  MUTATION_NOT_TARGETED:
-    'mutate only the guard the row owns and run the full GREEN suite — every other test must still pass, so the kill is the row assertion and not a crash',
-  MUTATION_ROW_NOT_WEAKEST:
-    'mutate a row whose test is shared with another row — that mapping is the weakest evidence and the one a mutation must prove',
-  REVIEW_RECEIPT_UNATTESTED:
-    'pass the findings exactly as the reviewer subagent returned them — this host recorded every reviewer output in host-receipts.jsonl',
-  REPORT_CLAIM_MISMATCH: 'rewrite the report from `status --json` — the ledger wins over the report',
-  RED_ROW_KEPT: 'cite a new or changed row with --row — a `same` row passes before implementation by definition',
-  CHANGED_ROW_NOT_RED:
-    'update the existing test in place so it asserts the new Then — while it still passes on the current code it asserts the As-is behavior',
-  KEPT_ROW_NOT_PASSING:
-    'include the existing test in the RED run; if it really fails, the behavior is not there — the row is new or changed, which is POLICY_GAP',
-  TEST_WEAKENED_BEFORE_RED:
-    "restore the existing test — only the file holding a changed row's test, or a file that row's As-is names, may change its expectations before RED",
-  ORACLE_DIR_INVALID: 'pass --dir as <repository>/.ai/oracles/<oracle-id> — an existing directory inside the scan root',
+/**
+ * Where a refusal's fix lives, with the line printed when a code has none of its own. `command` and `order` are step's
+ * work: it assembles every argument and runs the earlier step first, so an agent sees them only by calling a command by
+ * hand.
+ */
+export const FIX_CLASSES = {
+  command: 'run it through `oracle-step.mjs --dir <dir>`, which assembles every flag, label, report path and run id',
+  order: 'rerun `oracle-step.mjs --dir <dir>`; it runs the step that has to come first',
+  tests: 'fix the tests or evidence.json within the $test allowances, then rerun step',
+  production: 'fix the production code for the same row, then rerun step',
+  review: 'give close what the line names (a reviewer return, the implementation decision or the final report), then rerun step',
+  card: 'stop reusing evidence for this revision and return to NEEDS_DECISION; the user decides, never relock',
+  environment: 'FAIL with the actual cause; the tools or the environment prevent the judgment',
+  state: 'do not edit state files: run `status --json` and recover from the ledger',
+  stop: 'report FAIL with the last actual failure; never route around via another budget',
 }
 
-/** 인수 오류에는 처방이 없다 — 상태 조회 안내도 오해를 낳는다. */
+/**
+ * Every refusal code a Delivery script can print → [fix class, prescription line]. A missing line prints the class's.
+ * oracle-run.cases.mjs reads the codes oracle-run.mjs and its helpers can throw and fails on one this table lacks.
+ */
+export const REFUSALS = {
+  ADAPTER_COMMAND_INVALID: ['command', `drop the reporter·destination and leniency arguments — \`${TRUSTED_ADAPTER_FLAG}\` injects its own reporter`],
+  ADAPTER_INVALID: ['command'],
+  ADEQUACY_LABEL_REQUIRED: [
+    'command',
+    'register --required-label bend-adequacy:reported — its node-test run asserts `oracle-adequacy.mjs check` reports proven for the locked card',
+  ],
+  ADEQUACY_REQUIRED: ['card'],
+  ASSUMPTION_DRIFT: ['card'],
+  BLIND_INPUT_INVALID: ['review', 'rerun step: close derives the blind input from the contract rows and the test sources'],
+  BLIND_INPUT_STALE: ['review', 'the revision or the test bytes moved after the blind read — rerun step for a new blind input and mapping'],
+  BLIND_INPUT_STATE: ['order'],
+  BLIND_MAP_INVALID: ['review'],
+  BLIND_MAP_RECEIPT_INVALID: ['review', 'save the blind mapper’s return unchanged where step names it; close binds it to this input and revision'],
+  BLIND_MAP_REQUIRED: [
+    'review',
+    'have a reviewer who never saw evidence.json map the blind input step names to rows, save the return where step names it, then rerun step',
+  ],
+  BLIND_MAP_STALE: ['review', 'the evidence mapping changed after the blind read — a stale blind read cannot disprove the new mapping; re-run it'],
+  BUDGET_EXHAUSTED: ['stop', 'report FAIL with the last actual failure — never route around via another budget'],
+  CARD_LINT_FAILED: ['card'],
+  CARD_UNREADABLE: ['card'],
+  CASE_SPACE_FAILED: ['card'],
+  CASE_SPACE_REQUIRED: ['card'],
+  CHANGED_ROW_NOT_RED: [
+    'tests',
+    'update the existing test in place so it asserts the new Then — while it still passes on the current code it asserts the As-is behavior',
+  ],
+  CLOSE_PENDING: ['review', 'supply the reviewer output or report named above, then rerun step'],
+  COMMAND_TERMINATED: ['environment'],
+  COMMAND_UNRUNNABLE: ['environment', 'the command did not start (a missing tool, a timeout): fix the environment, or report FAIL with this cause'],
+  CONTRACT_CASES_LABEL_REQUIRED: ['command'],
+  CONTRACT_EXECUTION_REQUIRED: ['order'],
+  CONTRACT_FORMAL_FORBIDDEN: ['card'],
+  DEP_UNRESOLVED: ['environment'],
+  DIMENSION_UNDECLARED: ['card'],
+  EVIDENCE_CASE_COLLISION: ['tests'],
+  EVIDENCE_FORMAL_HAND_TEST: ['tests'],
+  EVIDENCE_GENERATED_OUTSIDE_MODEL: ['tests'],
+  EVIDENCE_INVALID: ['tests'],
+  EVIDENCE_MAPPING_DISPUTED: ['tests'],
+  EVIDENCE_MISSING_FRAME: ['tests'],
+  EVIDENCE_MISSING_PATH: ['tests'],
+  EVIDENCE_MISSING_ROW: ['tests'],
+  EVIDENCE_MISSING_ROWS: ['tests', 'regenerate the scaffold from the locked card and fill only the values'],
+  EVIDENCE_NOT_IN_RUN: ['tests', 'name the test exactly as the run reported it — never invent a test name'],
+  EVIDENCE_OWNER_INVALID: ['tests'],
+  EVIDENCE_PENDING: ['tests'],
+  EVIDENCE_REQUIRED: ['tests', 'generate `oracle-verify.mjs evidence-scaffold --oracle <card> > evidence.json`, fill the slots, then rerun step'],
+  EVIDENCE_SCAFFOLD_EMPTY: ['card'],
+  EVIDENCE_STALE: ['order', 'the tests or evidence.json changed after VALID_RED — rerun step to record a fresh RED, or restore them to the VALID_RED bytes'],
+  EVIDENCE_UNKNOWN_FRAME: ['tests'],
+  EVIDENCE_UNKNOWN_PATH: ['tests'],
+  EVIDENCE_UNKNOWN_ROW: ['tests'],
+  EVIDENCE_UNVERIFIABLE: ['command', `the run is exit-only — re-run with \`${TRUSTED_ADAPTER_FLAG} --report <path>\``],
+  FAST_CHECK_LABEL_REQUIRED: ['command'],
+  FINDINGS_BLOCKING: ['review', FINDINGS_BLOCKING_NEXT],
+  FINDINGS_INVALID: ['review', 'findings must use the six classifications and cite real card rows — regenerate the findings file'],
+  FLAKINESS_GATE: ['order', 're-run the same command unchanged until consecutive passes reach the risk count; a failure is HARNESS_DEFECT'],
+  FORMAL_PROOF_LABEL_REQUIRED: [
+    'command',
+    'register --required-label bend-proof:reported — its node-test run asserts `oracle-model.mjs prove` reports proven for the locked laws',
+  ],
+  GENERATED_TESTS_DRIFT: ['tests'],
+  HARNESS_PATH_INVALID: ['command'],
+  HARNESS_RED_REQUIRED: ['order', 'run a new reported RED→GREEN with the changed harness bytes'],
+  HOLDS_OPEN: ['review'],
+  IMPLEMENTATION_DECISION_INVALID: ['review'],
+  IMPLEMENTATION_DECISION_REQUIRED: ['review'],
+  INPUT_UNREADABLE: ['command'],
+  ITERATION_BUDGET_EXHAUSTED: ['stop'],
+  ITERATION_INVALID: ['state'],
+  KEPT_ROW_NOT_PASSING: [
+    'tests',
+    'include the existing test in the RED run; if it really fails, the behavior is not there — the row is new or changed, which is POLICY_GAP',
+  ],
+  LABEL_NOT_REQUIRED: ['command', 're-run with the exact required label `status` shows — a run under another name never satisfies the gate'],
+  LEDGER_INVALID: ['state'],
+  LEDGER_MIGRATION_INVALID: ['state'],
+  LOCK_BUSY: ['environment', 'another oracle command holds this directory — wait for it to finish, then rerun step'],
+  LOCK_INVALID: ['environment', 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment'],
+  LOCK_MANIFEST_CHANGED: [
+    'card',
+    'stop reusing evidence for this revision, preserve history, and confirm a new revision with the changed source set — never relock',
+  ],
+  METRICS_INVALID: ['command'],
+  MILESTONE_INVALID: ['command'],
+  MILESTONE_RED_INVALID: ['tests'],
+  MILESTONE_RED_MISSING: ['order', 'run a reported `red:<name>` for every milestone before the global VALID_RED'],
+  MILESTONE_RUN_INVALID: ['command'],
+  MISSING_REASON: ['command'],
+  MUTATION_EVIDENCE_INVALID: ['production', 'the mutation must fail on the mapped row and the production digest must return exactly before review'],
+  MUTATION_EVIDENCE_REQUIRED: ['production', 'after GREEN, run the guard-removed failing run, restore, re-GREEN, and pass --mutation-run/--mutation-row'],
+  MUTATION_NOT_TARGETED: [
+    'production',
+    'mutate only the guard the row owns and run the full GREEN suite — every other test must still pass, so the kill is the row assertion and not a crash',
+  ],
+  MUTATION_ROW_NOT_WEAKEST: [
+    'production',
+    'mutate a row whose test is shared with another row — that mapping is the weakest evidence and the one a mutation must prove',
+  ],
+  NO_OPEN_HOLDS: ['review'],
+  NONDETERMINISM_FOUND: ['production', 'inject the source through a seam, or record `oracle:nondeterminism <reason>` next to the token'],
+  ORACLE_CHANGED: [
+    'card',
+    'stop reusing RED·GREEN·review evidence for this revision, preserve history, show the card diff, and return to NEEDS_DECISION — never relock',
+  ],
+  ORACLE_DIR_INVALID: ['command', 'pass --dir as <repository>/.ai/oracles/<oracle-id> — an existing directory inside the scan root'],
+  ORACLE_DIR_OVERLAP: ['command'],
+  ORACLE_PATH_INVALID: ['card'],
+  PACKAGE_REQUIRED: ['card'],
+  PACKAGE_STALE: ['card', 're-project the card from the package, re-confirm a changed meaning, and lock a new revision'],
+  PACKAGE_UNLOCKED: ['card', 'recreate the lock with --source <package> — the model package is part of the approved meaning'],
+  PRODUCTION_TOUCHED_BEFORE_RED: ['production', 'revert the production files, write the tests first, record VALID_RED with `red`'],
+  PROFILE_CONTROLLER_UNKNOWN: ['card'],
+  PROFILE_DUPLICATE: ['card'],
+  PROFILE_MISMATCH: ['card'],
+  PROFILE_REQUIRED: ['card'],
+  PROFILE_UNKNOWN: ['card'],
+  RED_CAUSE_INFRA: [
+    'tests',
+    'repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED',
+  ],
+  RED_EVIDENCE_MISSING: ['tests', 'make the mapped test fail on its own assertion and keep its name as the reporter records it'],
+  RED_EVIDENCE_UNVERIFIABLE: ['tests', 'an exit-only or setup failure is not RED — the mapped row must fail on its own assertion'],
+  RED_ROW_KEPT: ['command', 'cite a new or changed row with --row — a `same` row passes before implementation by definition'],
+  REPORT_CLAIM_MISMATCH: ['review', 'rewrite the report from `status --json` — the ledger wins over the report'],
+  REPORT_DIRECTORY_MISSING: [
+    'command',
+    'create the --report folder first (mkdir -p), or pass a --report path in an existing folder, then rerun the same command',
+  ],
+  REPORT_EMPTY: ['command', 'the report holds no tests — point the command at the test files that hold the mapped rows'],
+  REPORT_MISSING: ['command', 'pass `--report <path>` and let the adapter write it'],
+  REPORT_NONPASSING: ['command', 'the run exited 0 while its report lists failures — run the test command itself, not a wrapper that drops its exit code'],
+  REPORT_PATH_EXISTS: ['command', 'choose a new --report path; an existing file cannot vouch for this run'],
+  REPORT_PATH_PROTECTED: ['command'],
+  REPORT_REQUIRED: ['command'],
+  REPORT_STALE: ['command', 'the report predates the run — re-run with a fresh --report path'],
+  REPRODUCTION_INVALID: ['review', 'a reproduction must name a test file inside the scan root; otherwise confirm that claim with the round-2 reviewers'],
+  REQUIRED_LABEL_GRADE: [
+    'command',
+    'make that label pass on the current bytes and rerun it with the grade it asks for: a bare label needs a reported run (`--adapter node-test` with `<this node> --test …` or `--adapter vitest` with `vitest run …`), a `:exit` label an exit-only run (no --adapter)',
+  ],
+  REQUIRED_LABEL_INVALID: ['command'],
+  REQUIRED_LABEL_REQUIRED: ['command'],
+  REQUIRED_RUN_MISSING: ['order', 're-run every declared required label on the current bytes and cite the latest pass'],
+  REVIEW_CLOSURE_INVALID: ['review', 'the closure does not apply — send the confirm-fixes packet to the round-2 reviewers and pass their --findings'],
+  REVIEW_COMMAND_CHANGED: ['order'],
+  REVIEW_CONTEXT_INCOMPLETE: ['review'],
+  REVIEW_CONTEXT_INVALID: ['review'],
+  REVIEW_EVIDENCE_REQUIRED: ['review'],
+  REVIEW_EVIDENCE_STALE: ['order'],
+  REVIEW_FINDING_UNKNOWN: ['review'],
+  REVIEW_FOLLOWUP_REQUIRED: ['review'],
+  REVIEW_ORACLE_STALE: ['card'],
+  REVIEW_PACKET_INPUT_CHANGED: ['order'],
+  REVIEW_PACKET_INPUT_INVALID: ['review'],
+  REVIEW_PACKET_INVALID: [
+    'order',
+    'the packet is unreadable or no passing run on its bytes preceded it — rerun step: it runs the GREEN command on the current bytes, then closes with a new packet; after round 2, NEEDS_DECISION',
+  ],
+  REVIEW_PACKET_OUTPUT_INVALID: ['command'],
+  REVIEW_PACKET_REQUIRED: ['order', 'rerun step: close writes the review packet and names the reviewer to dispatch'],
+  REVIEW_PACKET_STALE: ['order', 'the input changed since the packet — rerun step: it runs the GREEN command on the current bytes and closes with a new packet; never edit it'],
+  REVIEW_PACKET_STATE: ['order'],
+  REVIEW_POINT_INVALID: ['command'],
+  REVIEW_POINTS_REQUIRED: ['command'],
+  REVIEW_RECEIPT_EXISTS: ['review'],
+  REVIEW_RECEIPT_STATE: ['order'],
+  REVIEW_RECEIPT_UNATTESTED: [
+    'review',
+    'pass the findings exactly as the reviewer subagent returned them — this host recorded every reviewer output in host-receipts.jsonl',
+  ],
+  REVIEW_REPAIR_UNRELATED: ['production'],
+  REVIEW_RERUN_REQUIRED: ['order', 'rerun step: it runs the GREEN command on the current bytes and cites the new run'],
+  REVIEW_REVISION_MISMATCH: ['review'],
+  REVIEW_ROUNDS_CLOSED: [
+    'stop',
+    'repair the round-2 blockers, rerun the required labels, then close the round-2 packet with its findings, which records PARTIAL_VERIFIED with the repair unreviewed; or stop at NEEDS_DECISION',
+  ],
+  REVIEW_RUN_STALE: ['order', 're-run the cited command against the current bytes'],
+  REVIEW_SCOPE_INVALID: ['review'],
+  REVIEWER_EVIDENCE_INVALID: ['review'],
+  REVIEWER_NOT_INDEPENDENT: ['review', 'High risk needs two artifacts from different reviewerIds'],
+  RISK_MISMATCH: ['command', "drop --risk to use the locked card's Risk — a different risk is a new revision, not an init flag"],
+  RUN_ARTIFACTS_EXIST: [
+    'card',
+    'this oracle already records runs — a new revision gets a new <oracle-id> directory; never re-init to reset the baseline',
+  ],
+  RUN_NOT_FOUND: ['command'],
+  RUN_NOT_GREEN: ['production', 'make the tests pass on the current bytes, then rerun step; it cites the passing run'],
+  RUN_NOT_RED: ['tests', 'the cited run must fail on the mapped row — write the test, then rerun step'],
+  SCAN_UNREADABLE: ['environment'],
+  SEQUENCE_EVIDENCE_MISSING: ['tests'],
+  SIDE_EFFECT_EXEMPTION_INVALID: ['production', 'give each `oracle:side-effect` exemption a row or a reason'],
+  SIDE_EFFECT_UNOWNED: [
+    'production',
+    'add the row whose side-effect column owns that category (POLICY_GAP), remove the unrequested effect (PRODUCT_DEFECT), or exempt the line with `oracle:side-effect <row|reason>`',
+  ],
+  SNAPSHOT_STALE: ['order', 're-run the cited label on the current bytes and cite the new run'],
+  SOURCE_CHANGED: ['card', 'stop reusing evidence for this revision, preserve history, show the source diff, and confirm a new revision — never relock'],
+  STACK_LABELS_REQUIRED: [
+    'command',
+    'register every mandatory-stack label: bend-proof:reported, bend-adequacy:reported, fast-check:reported and — unless the card declares ## Type Contract not applicable — type-contract:reported',
+  ],
+  STAGE_CHANGED: ['card'],
+  STAGE_GATE: ['card'],
+  STAGE_STALE: ['card'],
+  STATE_INVALID: [
+    'state',
+    'run `init` if this oracle never entered Delivery; otherwise do not edit state files — recover from the ledger with `status --json`',
+  ],
+  STATE_LEDGER_DIVERGENCE: ['state', 'do not edit state files — run `status --json` and recover from the ledger'],
+  TEST_ENV_BRANCH: [
+    'production',
+    'remove the test-environment branch and make the real path pass — a genuine need is exempted with `oracle:test-env <reason>`',
+  ],
+  TEST_WEAKENED: ['tests', 'restore the tests to the RED baseline — assertion count, expected-value literals, no forbidden tokens'],
+  TEST_WEAKENED_BEFORE_RED: [
+    'tests',
+    "restore the existing test — only the file holding a changed row's test, or a file that row's As-is names, may change its expectations before RED",
+  ],
+  TRANSITION_NOT_ALLOWED: ['order', 'rerun step: it takes the legal next action from the current state (`status --json` lists them)'],
+  TYPE_CONTRACT_LABEL_REQUIRED: ['command'],
+  USAGE: ['command'],
+  VISUAL_EVIDENCE_INVALID: ['tests'],
+  WITNESS_INVALIDATED: [
+    'card',
+    'the code an `impossible` cell cites changed — return to NEEDS_DECISION, re-disposition that cell against the new code, and lock a new revision',
+  ],
+  WORKER_ATTEMPT_STALE: ['order'],
+  WORKER_BLOCKED: ['production'],
+  WORKER_BUDGET_REQUIRED: ['command'],
+  WORKER_CHECKS_MISSING: ['command'],
+  WORKER_HOST_UNSUPPORTED: ['environment'],
+  WORKER_INPUT_STALE: ['order'],
+  WORKER_INTERRUPTED: ['stop', 'no durable completion was recorded — do not repeat the external work automatically; report it'],
+  WORKER_PROTECTED_CHANGE: ['production'],
+  WORKER_RECURSION_FORBIDDEN: ['command'],
+  WORKER_REPLAY_UNAPPROVED: ['card'],
+  WORKER_RESULT_INVALID: ['review'],
+  WORKER_RESULT_STALE: ['order'],
+  WORKER_SCOPE_INVALID: ['command'],
+  WORKER_SCOPE_VIOLATION: ['production'],
+  WORKER_SKILL_MISSING: ['environment'],
+  WORKER_SKILL_UNVERIFIED: ['environment'],
+  WORKER_STATE_INVALID: ['order'],
+  WORKER_TASK_INVALID: ['command'],
+  WORKTREE_SNAPSHOT_INVALID: ['environment'],
+}
+
+/** Argument errors carry no prescription — even a pointer to status misleads. */
 const NO_NEXT_ACTION = new Set(['USAGE', 'INPUT_UNREADABLE'])
+
+/** The class and the prescription a refusal prints: its own line, or the class's line with the oracle directory filled in. */
+export function refusalLine(code, dir = null) {
+  const [fixClass, line] = REFUSALS[code] ?? []
+  if (!fixClass) return null
+  return `[${fixClass}] ${(line ?? FIX_CLASSES[fixClass]).replaceAll('<dir>', dir ?? '<dir>')}`
+}
 
 function nextActionLine(code, options) {
   if (NO_NEXT_ACTION.has(code)) return ''
-  if (Object.hasOwn(NEXT_ACTIONS, code)) return `next: ${NEXT_ACTIONS[code]}\n`
+  const line = refusalLine(code, options?.dir)
+  if (line) return `next: ${line}\n`
   let directory = ''
   if (options?.dir) directory = ` --dir ${options.dir}`
   return `next: run \`oracle-run.mjs status${directory}\` and choose one of the actions shown\n`
@@ -990,6 +1153,7 @@ function replayState(state, ledger) {
       })
     }
   }
+  applyLedgerSpend(state, ledger)
   return state
 }
 
@@ -1533,17 +1697,8 @@ async function initialize(options) {
   await mkdir(directory, { recursive: true })
 
   // run-state를 지우고 다시 init해 기준선·예산을 되살리는 우회를 막는다.
-  // append-only ledger가 남아 있으면 이 oracle-id의 판정은 이미 시작된 것이다 — run-state가 있고 VALID_RED 전이면
-  // 같은 명령이 설정만 고친다(amendInit).
+  // append-only ledger가 남아 있으면 이 oracle-id의 판정은 이미 시작된 것이다 — 설정을 고친 판정은 새 oracle-id다.
   if ((await readLedger(directory)).length > 0) {
-    const stateExists = await lstat(statePath(directory)).then(
-      () => true,
-      () => false,
-    )
-    if (stateExists) {
-      await amendInit(directory, scanRoot, harnessPaths, options)
-      return
-    }
     throw new CliError(
       'RUN_ARTIFACTS_EXIST',
       `${portablePath(
@@ -1566,9 +1721,9 @@ async function initialize(options) {
     milestones: [],
     harnessPaths,
     harnessAtValidRed: null,
-    harnessBudgetAtValidRed: null,
     state: 'ORACLE_READY',
     history: [],
+    // spent is read off the ledger (ledgerSpend); the state keeps the limits and the last count it saw
     budgets: Object.fromEntries(Object.entries(BUDGET_LIMITS).map(([name, limit]) => [name, { limit, spent: 0 }])),
     snapshot: {},
     testFiles: null,
@@ -1711,134 +1866,6 @@ function harnessNotices(runnerHarness, harnessPaths) {
       .filter((path) => !harnessPaths.includes(path))
       .map((path) => `HARNESS_SUGGESTED ${path} — register it with --harness-path if it carries the test config`),
   ]
-}
-
-/**
- * VALID_RED 전에는 같은 init 명령이 설정(필수 라벨·마일스톤·harness 경로)만 고쳐 다시 적는다. 기준선(스냅숏·RED 전 테스트
- * 측정)·예산·이력·잠금은 그대로라 기준선을 되살리는 우회가 되지 않는다. 잘못 적은 설정 하나로 run 전체를 FAIL하고 새
- * revision을 여는 일을 막는다.
- */
-async function amendInit(directory, scanRoot, harnessPaths, options) {
-  if (!options.reason?.trim()) {
-    throw new CliError(
-      'USAGE',
-      'this oracle already has a run state — before VALID_RED, re-run init with --reason <why> to correct its required labels, milestones and harness paths',
-      2,
-    )
-  }
-  const explicitLabels = parseRequiredLabels(options.requiredLabels)
-  await withDirectoryLock(directory, 'state', async () => {
-    const state = await readConsistentState(directory)
-    if (state.state !== 'ORACLE_READY' || redRecorded(state)) {
-      throw new CliError(
-        'RUN_ARTIFACTS_EXIST',
-        `init can only be corrected before VALID_RED (the run is at ${state.state}) — start a new <oracle-id> directory for a new revision`,
-      )
-    }
-    const [lockReal, stateLockReal, scanRootReal, stateScanRootReal] = await Promise.all(
-      [resolve(options.lock), resolve(directory, state.lock), scanRoot, resolve(directory, state.scanRoot)].map((path) =>
-        realpath(path).catch(() => path),
-      ),
-    )
-    if (lockReal !== stateLockReal || scanRootReal !== stateScanRootReal) {
-      throw new CliError('AMEND_SCOPE_CHANGED', 'a correction keeps the lock and the scan root of the run')
-    }
-    if (options.risk !== undefined && options.risk !== state.risk) {
-      throw new CliError('RISK_MISMATCH', `--risk ${options.risk} disagrees with the run's risk: ${state.risk}`)
-    }
-    verifyLock(directory, state)
-    const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
-    const binding = await resolveRunProfile(directory, state, true)
-    const { requiredLabels, notices: labelNotices } = await withDerivedLabels(oracle, binding, explicitLabels)
-    await assertProfileLabels(directory, state, oracle, binding, requiredLabels)
-    const milestones = parseMilestones(options.milestones, contractRowIds(oracle))
-    const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-    const runnerHarness = await runnerHarnessPaths(scanRoot, current)
-    const paths = [...harnessPaths, ...runnerHarness.paths.filter((path) => !harnessPaths.includes(path))]
-    const untracked = paths.filter((path) => !(path in current))
-    if (untracked.length > 0) {
-      throw new CliError('HARNESS_PATH_INVALID', `harness path is outside the tracked scan snapshot: ${untracked.join(', ')}`)
-    }
-    const previousPaths = state.harnessPaths ?? []
-    const added = paths.filter((path) => !previousPaths.includes(path))
-    // init 뒤 바뀐 기준선 production 파일을 harness로 옮기면 TDD 순서 판정에서 빠진다 — 테스트와 러너 설정 파일만 옮길 수 있다.
-    // 러너 설정이 setupFiles로 가리키는 파일은 면제하지 않는다: 설정 한 줄로 production 파일을 harness로 끌어들일 수 있다
-    const changedProduction = added.filter(
-      (path) => path in state.snapshot && current[path] !== state.snapshot[path] && !isTestPath(path) && !RUNNER_CONFIG.test(path),
-    )
-    if (changedProduction.length > 0) {
-      throw new CliError(
-        'HARNESS_PATH_MODIFIED',
-        `changed since init, so it cannot become harness: ${changedProduction.join(', ')} — revert it, or start a new <oracle-id>`,
-      )
-    }
-    // init 뒤 새로 만든 파일도 같다 — 테스트·러너 설정·패키지 루트의 도구 설정이 아니면 production이라 harness로 숨기지 못한다
-    const newSource = added.filter(
-      (path) => !(path in state.snapshot) && !isTestPath(path) && !RUNNER_CONFIG.test(path) && !isManifestOrConfigPath(path, current),
-    )
-    if (newSource.length > 0) {
-      throw new CliError(
-        'HARNESS_PATH_NEW_SOURCE',
-        `created after init and neither a test, a runner config nor a package-root manifest/tool config, so it is production: ${newSource.join(', ')}`,
-      )
-    }
-    const removed = [
-      ...previousPaths.filter((path) => !paths.includes(path)).map((path) => `harness ${path}`),
-      ...(state.milestones ?? [])
-        .filter((old) => !milestones.some((kept) => kept.name === old.name))
-        .map((old) => `milestone ${old.name}`),
-      ...(state.requiredLabels ?? []).filter((value) => !requiredLabels.includes(value)).map((value) => `label ${value}`),
-    ]
-    const stateDelta = { harnessPaths: paths, milestones, requiredLabels }
-    const amended = await appendLedger(directory, {
-      type: 'amend',
-      state: 'ORACLE_READY',
-      reason: options.reason.trim(),
-      stateDelta,
-      at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 수정 시각을 기록한다
-    })
-    Object.assign(state, stateDelta)
-    state.ledgerHead = amended.digest
-    await writeState(directory, state)
-    process.stdout.write(
-      [
-        `RUN_STATE_AMENDED state:ORACLE_READY labels:${requiredLabels.join(',')} milestones:${milestones.length} harness:${paths.length}`,
-        ...labelNotices,
-        ...harnessNotices(runnerHarness, paths),
-        ...removed.map((item) => `AMEND_REMOVED ${item}`),
-        // 새로 harness가 된 파일은 production 비교에서 빠진다 — 리뷰어가 원장에서 볼 수 있게 이름을 남긴다
-        ...added.map((path) =>
-          path in state.snapshot
-            ? `HARNESS_ADDED_BY_AMEND ${path} — unchanged since init; the ledger records it for review`
-            : `HARNESS_ADDED_AFTER_INIT ${path} — not in the init baseline; the ledger records it for review`,
-        ),
-        '',
-      ].join('\n'),
-    )
-  })
-}
-
-// init 뒤에 생겨도 harness로 등록할 수 있는 매니페스트·도구 설정 파일 이름(뼈대가 init 뒤에 만드는 package.json·tsconfig·eslint 설정).
-// `*.config.*`는 도구 이름만 받는다 — `pricing.config.ts` 같은 제품 설정은 production이다
-const MANIFEST_OR_CONFIG = [
-  /^(?:package\.json|pnpm-workspace\.yaml|\.npmrc|\.nvmrc)$/,
-  /^[jt]sconfig(?:\..+)?\.json$/,
-  /^(?:vitest|vite|vitest\.workspace|jest|playwright|eslint|prettier|babel|tsup|rollup|webpack|postcss|tailwind|next|storybook)\.config\.(?:[cm]?[jt]s|json)$/,
-  /^(?:eslint|babel)\.config\..+$/,
-  /^\.(?:eslintrc|babelrc)/,
-]
-
-/** 패키지 루트(스캔 루트, 또는 package.json이 있는 폴더)에 놓인 매니페스트·도구 설정 파일인가. */
-function isManifestOrConfigPath(path, worktree) {
-  const folder = dirname(path)
-  if (folder !== '.' && !(`${folder}/package.json` in worktree)) return false
-  const name = basename(path)
-  return MANIFEST_OR_CONFIG.some((pattern) => pattern.test(name))
-}
-
-/** VALID_RED를 한 번이라도 기록했나 — 그 전에는 얼린 harness·테스트 binding이 없다. */
-function redRecorded(state) {
-  return state.harnessAtValidRed != null || (state.history ?? []).some((entry) => entry.state === 'VALID_RED')
 }
 
 /** 필수 라벨이 프로필 요구(Contract의 cases·type·fast-check, Formal의 proof·adequacy·stack)를 덮는가 — init과 수정이 같이 쓴다. */
@@ -2054,18 +2081,25 @@ async function execute(options) {
     throw new CliError('COMMAND_UNRUNNABLE', `Cannot run command: ${executed.error.message}`)
   }
 
-  if (controls && !sameDigests(controls, await workerControls(directory)))
-    throw new CliError('WORKER_PROTECTED_CHANGE', 'worker changed Oracle artifacts')
+  // a dispatched worker is one product attempt read off the ledger, so its run is recorded before what it did is refused
+  const refusals = []
+  const refuse = async (check) => {
+    if (!controls) return check()
+    return check().catch((error) => refusals.push(error))
+  }
+  await refuse(async () => {
+    if (controls && !sameDigests(controls, await workerControls(directory))) throw new CliError('WORKER_PROTECTED_CHANGE', 'worker changed Oracle artifacts')
+  })
   if (options.capture) await writeFile(options.capture.outputPath, executed.stdout ?? '', { flag: 'wx', mode: 0o600 })
   if (adapterDestination && executed.status !== null) await rename(adapterDestination, resolve(options.report))
   const report = await readReport(options.report, reportBefore, executed.status !== null && !executed.signal)
   for (let index = 0; index < protectedBefore.length; index += 1) {
     if (protectedBefore[index])
-      await assertSnapshotUnchanged(protectedBefore[index].snapshot, { label: 'Oracle artifact' })
+      await refuse(() => assertSnapshotUnchanged(protectedBefore[index].snapshot, { label: 'Oracle artifact' }))
   }
   const scanRoot = resolve(directory, state.scanRoot)
   for (const artifact of generatedBefore)
-    await assertSnapshotUnchanged(artifact, { fail: (message) => new CliError('GENERATED_TESTS_DRIFT', message) })
+    await refuse(() => assertSnapshotUnchanged(artifact, { fail: (message) => new CliError('GENERATED_TESTS_DRIFT', message) }))
   const worktree = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const record = {
     type: 'run',
@@ -2105,6 +2139,7 @@ async function execute(options) {
 
   await appendLedger(directory, record)
   await finishRunId(directory, runId)
+  if (refusals.length > 0) throw refusals[0]
   if (executed.status === null || executed.signal) {
     throw new CliError('COMMAND_TERMINATED', `${runId} terminated by signal ${executed.signal ?? 'unknown'}`)
   }
@@ -2222,10 +2257,6 @@ function assertMutationLikeReview(mutationRun, run) {
 
 function harnessRedIndex(state, ledger, started, run, current) {
   if (!state.harnessAtValidRed || sameDigests(state.harnessAtValidRed, current)) return null
-
-  if (state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
-    throw new CliError('HARNESS_BUDGET_REQUIRED', 'harness changed after VALID_RED — spend harness budget')
-  }
 
   let redIndex = -1
   for (let index = started; index < ledger.length; index += 1) {
@@ -3282,6 +3313,10 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   if (!allowed.includes(options.to)) {
     throw new CliError('TRANSITION_NOT_ALLOWED', `${state.state} cannot move to ${options.to}`)
   }
+  // a resume after a decision is one policy spend (ledgerSpend counts the resumes)
+  if (options.to === 'ORACLE_READY' && state.budgets.policy.spent >= state.budgets.policy.limit) {
+    throw new CliError('BUDGET_EXHAUSTED', `policy budget is spent (${state.budgets.policy.spent}/${state.budgets.policy.limit}): no further resume after a decision`)
+  }
 
   // NEEDS_DECISION·FAIL은 증거가 아니라 멈춤을 기록하는 탈출 전이다. 카드·출처·manifest가 드리프트하면
   // 성공 진행은 계속 거부하지만, 멈춤까지 막으면 드리프트 처방("NEEDS_DECISION으로 돌아가라") 자체가
@@ -3328,19 +3363,17 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       if (!refreshingRed && milestones.length > 0) message = 'milestone VALID_RED requires --evidence'
       throw new CliError('EVIDENCE_REQUIRED', message)
     }
-    if (
-      redRefreshBlocker({
-        from: state.state,
-        to: options.to,
-        spent: state.budgets.harness.spent,
-        baseline: state.harnessBudgetAtValidRed ?? 0,
-      })
-    ) {
-      throw new CliError('HARNESS_BUDGET_REQUIRED', 'refreshing VALID_RED requires a new harness budget spend')
-    }
 
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
     const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
+    if (refreshingRed) {
+      // a refresh binds changed tests, harness or mapping: a binding no VALID_RED or GREEN rested on before spends one harness change
+      const binding = harnessIdentity(currentHarness, testDigests(current), await testEvidenceDigest(options.evidence))
+      if (binding === harnessIdentity(state.harnessAtValidRed, state.testBindings?.tests, state.testBindings?.evidenceSha256)) {
+        throw new CliError('TRANSITION_NOT_ALLOWED', 'VALID_RED already binds these tests, harness and evidence mapping — a refresh needs a change to them')
+      }
+      assertHarnessBudget(state, allLedger, binding)
+    }
     const oracle = await lockedOraclePath(directory, state)
     // 행별 delta — As-is 열이 `same`이면 기존 유지, 글이면 바뀌는 기존 동작. 열이 없는 카드는 전부 새 동작이다
     const deltas = JSON.parse(runVerifier(['card', '--delta', '--oracle', oracle]))
@@ -3467,7 +3500,6 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       state.testFiles[path] = measureTestFile(await readFile(join(scanRoot, path), 'utf8'))
     }
     state.harnessAtValidRed = currentHarness
-    state.harnessBudgetAtValidRed = state.budgets.harness.spent
     state.testBindings = {
       evidenceSha256: await testEvidenceDigest(options.evidence),
       tests: Object.fromEntries(
@@ -3510,9 +3542,8 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
         currentEvidenceSha256 !== state.testBindings.evidenceSha256 ||
         !sameDigests(testDigests(current), state.testBindings.tests)
       ) {
-        if (state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
-          throw new CliError('HARNESS_BUDGET_REQUIRED', 'evidence mapping or test bytes changed after VALID_RED')
-        }
+        // the refresh this asks for would bind the change: say now when the harness budget has no spend left for it
+        assertHarnessBudget(state, allLedger, harnessIdentity(currentHarness, testDigests(current), currentEvidenceSha256))
         throw new CliError(
           'EVIDENCE_STALE',
           'evidence mapping or test bytes changed after VALID_RED; record a fresh RED',
@@ -3533,6 +3564,10 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       const currentHarness = selectedDigests(current, state.harnessPaths)
       if (Object.values(currentHarness).includes(null)) {
         throw new CliError('HARNESS_PATH_INVALID', 'a registered harness file no longer exists')
+      }
+      if (state.harnessAtValidRed && !sameDigests(state.harnessAtValidRed, currentHarness)) {
+        // GREEN on a changed harness rests on a new RED with it: that binding spends one harness change
+        assertHarnessBudget(state, allLedger, harnessIdentity(currentHarness, state.testBindings?.tests, state.testBindings?.evidenceSha256))
       }
       const redIndex = harnessRedIndex(state, ledger, started, run, currentHarness)
       if (redIndex !== null) started = redIndex + 1
@@ -3880,7 +3915,6 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       testFiles: state.testFiles,
       testBindings: state.testBindings,
       harnessAtValidRed: state.harnessAtValidRed,
-      harnessBudgetAtValidRed: state.harnessBudgetAtValidRed,
       envDrift: state.envDrift,
       hostReceipts: state.hostReceipts ?? false,
     },
@@ -3889,113 +3923,39 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   })
   historyEntry.ledgerDigest = transitionEvent.digest
   state.ledgerHead = transitionEvent.digest
+  // the cache carries the spend this transition adds (a resume, a new binding) — replay derives the same count
+  applyLedgerSpend(state, [...allLedger, transitionEvent])
   await writeState(directory, state)
   // 드리프트 위에서 멈춤을 기록했다는 사실은 조용히 넘어가지 않는다 — 다음 사람이 잠금 상태를 오해하면 안 된다.
   if (lockStop) notices.push(`LOCK_UNVERIFIED ${lockStop.code}`)
   process.stdout.write([`STATE_${finalState} run:${run?.runId ?? 'none'}`, ...notices, ''].join('\n'))
 }
 
-async function budgetDigest(directory, state, name) {
-  const scanRoot = resolve(directory, state.scanRoot)
-  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-  if (name === 'harness') return harnessBudgetDigest(directory, state, current)
-  if (name === 'policy') return verifyLock(directory, state).lockManifestSha256
-  return productionSha256(current, state.harnessPaths)
+/** The state's budgets with the spend the ledger shows: a legacy explicit spend, or the derived count when larger. */
+function applyLedgerSpend(state, ledger) {
+  if (!state.budgets) return
+  for (const [name, count] of Object.entries(ledgerSpend(ledger).spent)) {
+    const budget = state.budgets[name]
+    if (budget) budget.spent = Math.max(budget.spent ?? 0, count)
+  }
 }
 
-async function harnessBudgetDigest(directory, state, current) {
-  let paths = state.harnessPaths ?? []
-  if (paths.length === 0) paths = Object.keys(current).filter(isTestPath)
-  const filesDigest = sha256(JSON.stringify(selectedDigests(current, paths.sort())))
-  // Without a frozen evidence binding (a legacy pre-RED spend, or a run that skipped RED) keep the file-only identity.
-  if (!state.testBindings?.evidenceSha256) return filesDigest
-  const evidenceDigest = await testEvidenceDigest(evidencePathFor(directory, state))
-  const evidenceIdentity = sha256(stableStringify({ filesDigest, evidenceDigest }))
-  // Without registered paths filesDigest already covers every test file.
-  if ((state.harnessPaths ?? []).length === 0) {
-    if (evidenceDigest === state.testBindings.evidenceSha256 && state.budgets.harness.digests?.includes(filesDigest)) {
-      return filesDigest
-    }
-    return evidenceIdentity
+/**
+ * Refuses a new test binding at VALID_RED the harness budget has no spend left for; a binding counted before costs
+ * nothing, and so does one made from ORACLE_READY (the first VALID_RED, or one after a resume).
+ */
+function assertHarnessBudget(state, ledger, identity) {
+  if (state.state !== 'VALID_RED') return
+  const { bindings, free } = ledgerSpend(ledger)
+  if (free.has(identity) || bindings.has(identity)) return
+  const { limit } = state.budgets.harness
+  const spent = Math.max(state.budgets.harness.spent ?? 0, bindings.size)
+  if (spent >= limit) {
+    throw new CliError(
+      'BUDGET_EXHAUSTED',
+      `harness budget is spent (${spent}/${limit}): the tests, harness or mapping changed after VALID_RED once more — restore a bound state or report FAIL with the last actual failure`,
+    )
   }
-  // The GREEN gate also compares every test file with the RED binding, and registered harness paths need not cover
-  // them, so a test-byte change must be a new spend even when the harness files are unchanged.
-  const tests = Object.fromEntries(Object.keys(current).filter(isTestPath).map((path) => [path, current[path]]))
-  const testsIdentity = sha256(stableStringify({ filesDigest, evidenceDigest, tests }))
-  const spent = state.budgets.harness.digests ?? []
-  // A refreshed RED binds the spent bytes, so the same change keeps its test-including identity.
-  if (!sameDigests(tests, state.testBindings.tests ?? tests) || spent.includes(testsIdentity)) return testsIdentity
-  // Legacy spends have file-only digests. Preserve their deduplication only while the binding is unchanged.
-  if (evidenceDigest === state.testBindings.evidenceSha256 && spent.includes(filesDigest)) return filesDigest
-  return evidenceIdentity
-}
-
-async function spendBudget(options) {
-  if (!options.dir || !options.spend || !options.reason) {
-    throw new CliError('USAGE', 'budget requires --dir, --spend and --reason', 2)
-  }
-
-  const directory = resolve(options.dir)
-  await withDirectoryLock(directory, 'state', async () => {
-    const state = await readConsistentState(directory)
-    const budget = state.budgets[options.spend]
-
-    if (!budget) {
-      throw new CliError('USAGE', `Unknown budget: ${options.spend}`, 2)
-    }
-    // ORACLE_READY에서 VALID_RED 전에는 얼린 테스트·harness binding이 없다 — tsc·fixture·adapter 수리는 RED를 만드는
-    // 작업의 일부라 예산을 쓰지 않는다. 기록하지 않으므로 RED 뒤 예산 2회가 그대로 남는다. RED 없이 GREEN으로 간 run은 센다.
-    if (options.spend === 'harness' && state.state === 'ORACLE_READY' && !redRecorded(state)) {
-      process.stdout.write(
-        `BUDGET_NOT_NEEDED harness ${budget.spent}/${budget.limit} — nothing is frozen before VALID_RED, so test and harness repairs are free\n`,
-      )
-      return
-    }
-
-    const sourceDigest = await budgetDigest(directory, state, options.spend)
-    const digest = options.workerAttemptId
-      ? sha256(stableStringify({ sourceDigest, workerAttemptId: options.workerAttemptId }))
-      : sourceDigest
-    if ((budget.digests ?? []).includes(digest)) {
-      budget.reasons = [...(budget.reasons ?? []), options.reason]
-      await appendLedger(directory, {
-        type: 'budget',
-        budget: options.spend,
-        spent: budget.spent,
-        limit: budget.limit,
-        reason: options.reason,
-        changeDigest: digest,
-        duplicate: true,
-        at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
-      })
-      await writeState(directory, state)
-      process.stdout.write(`BUDGET_SPENT ${options.spend} ${budget.spent}/${budget.limit}\n`)
-      return
-    }
-
-    if (budget.spent >= budget.limit) {
-      throw new CliError(
-        'BUDGET_EXHAUSTED',
-        `${options.spend} budget is spent (${budget.spent}/${budget.limit}) — report FAIL with the last real failure`,
-      )
-    }
-
-    budget.spent += 1
-    budget.digests = [...(budget.digests ?? []), digest]
-    budget.reasons = [...(budget.reasons ?? []), options.reason]
-    await appendLedger(directory, {
-      type: 'budget',
-      budget: options.spend,
-      spent: budget.spent,
-      limit: budget.limit,
-      reason: options.reason,
-      changeDigest: digest,
-      at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
-    })
-    await writeState(directory, state)
-
-    process.stdout.write(`BUDGET_SPENT ${options.spend} ${budget.spent}/${budget.limit}\n`)
-  })
 }
 
 function gitDiff(root, changed, before, current) {
@@ -4392,12 +4352,6 @@ function reviewVerdict(reviewArgs, { closure, unreviewedRepair, oracle, packetPa
   const repaired = unreviewedRepair.repaired.flatMap((path) => ['--repaired', path])
   const result = JSON.parse(runVerifier(['findings', '--oracle', oracle, '--file', resolve(options.findings), ...intersect, '--packet', packetPath, ...repaired, '--ir']))
   return { proposals: (result.proposals ?? []).map(findingRecord), blockers: repairedBlockers(result.blocking, scope, unreviewedRepair.repaired) }
-}
-
-/** Old ledgers keep their review-extension entries and replay them; no new delivery round is granted. */
-async function extendReview(options) {
-  if (!options.dir || !options.approval) throw new CliError('USAGE', 'review-extend requires --dir --approval <explicit-user-approval.json>', 2)
-  throw new CliError('REVIEW_ROUNDS_CLOSED', `delivery review ends at round ${REVIEW_ROUND_LIMIT}; review-extend grants no further round`)
 }
 
 async function reviewPacket(options) {
@@ -4889,20 +4843,22 @@ function isReviewTransition(to) {
 
 /**
  * transition이 지금 바이트만으로 거부할 RED·GREEN — 단계 줄이 거부될 `red`·`green`을 권하지 않게 같은 사실을 막힘으로
- * 보인다: VALID_RED 전 production 변경, VALID_RED 뒤 바뀐 테스트 바이트(새 harness 지출 전이면 예산 또는 소진, 뒤면 새 RED). 판정은
+ * 보인다: VALID_RED 전 production 변경, VALID_RED 뒤 바뀐 테스트 바이트(harness 예산이 남았으면 새 RED, 다 썼으면 소진). 판정은
  * 그대로 transition 몫이다 — 증거 매핑 변경처럼 인수에 달린 거부는 여기서 보이지 않는다.
  */
-function guardBlockers(to, state, current) {
+function guardBlockers(to, state, current, rebindsNothing) {
   if (to !== 'VALID_RED' && to !== 'IMPLEMENTED_GREEN') return []
   if (state.state === 'ORACLE_READY') {
     return productionChanges(changedPaths(state.snapshot, current), state.harnessPaths).length > 0 ? ['PRODUCTION_TOUCHED_BEFORE_RED'] : []
   }
-  if (to !== 'IMPLEMENTED_GREEN' || state.state !== 'VALID_RED' || !state.testBindings) return []
+  if (state.state !== 'VALID_RED' || !state.testBindings) return []
+  // a refresh onto the binding VALID_RED already holds is refused (TRANSITION_NOT_ALLOWED) — it would bind nothing new
+  if (to === 'VALID_RED' && rebindsNothing) return ['TRANSITION_NOT_ALLOWED']
   if (sameDigests(testDigests(current), state.testBindings.tests)) return []
+  // 바뀐 테스트는 새 RED가 묶는다(EVIDENCE_STALE이 단계를 RED로 돌린다) — 묶을 지출이 없으면 그 RED도 거부된다(BUDGET_EXHAUSTED)
   const harness = state.budgets.harness
-  if (harness.spent > (state.harnessBudgetAtValidRed ?? 0)) return ['EVIDENCE_STALE']
-  // 지출할 예산이 없으면 지출 처방도 거부된다(BUDGET_EXHAUSTED) — 그 코드의 처방(FAIL 보고)을 바로 보인다
-  return [harness.spent >= harness.limit ? 'BUDGET_EXHAUSTED' : 'HARNESS_BUDGET_REQUIRED']
+  if (harness.spent >= harness.limit) return ['BUDGET_EXHAUSTED']
+  return to === 'IMPLEMENTED_GREEN' ? ['EVIDENCE_STALE'] : []
 }
 
 /**
@@ -4939,7 +4895,7 @@ function requiredLabelsMisgraded(state, runEntries, stale) {
   })
 }
 
-function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping, current }) {
+function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping, current, rebindsNothing }) {
   const requires = protocolRequiredFlags(deliveryProtocol, to, deliveryFacts(state, blindMapping ?? null))
   const packetBlockers = []
   let candidateRuns = []
@@ -4979,16 +4935,7 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
     ) {
       packetBlockers.push('EVIDENCE_MISSING_ROWS')
     }
-    if (to === 'VALID_RED') {
-      const blocker = redRefreshBlocker({
-        from: state.state,
-        to,
-        spent: state.budgets?.harness?.spent ?? 0,
-        baseline: state.harnessBudgetAtValidRed ?? 0,
-      })
-      if (blocker) packetBlockers.push(blocker)
-    }
-    packetBlockers.push(...guardBlockers(to, state, current))
+    packetBlockers.push(...guardBlockers(to, state, current, rebindsNothing))
     if (to === 'IMPLEMENTED_GREEN') {
       // 연속 통과 게이트: 같은 명령의 신선한 연속 통과가 부족하면 지금 인용해도 FLAKINESS_GATE다.
       const required = REQUIRED_CONSECUTIVE_PASSES[state.risk] ?? 1
@@ -5033,7 +4980,7 @@ function blindMappingReport(to, blindMapping) {
   return { blindMapping }
 }
 
-function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds, current }) {
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds, current, rebindsNothing }) {
   const dir = portablePath(process.cwd(), directory)
   return nextTargets(deliveryProtocol, state.state).map((to) => {
     const { requires, packetBlockers, candidateRuns } = transitionPacket(to, {
@@ -5044,6 +4991,7 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       evidence,
       blindMapping,
       current,
+      rebindsNothing,
     })
     // 열린 hold가 있으면 완전한 REVIEW_VERIFIED는 막히고 PARTIAL_VERIFIED가 그 자리다 — transition이 같은 규칙을 강제한다
     const holdBlocker = reviewHoldBlocker(to, holds.length)
@@ -5356,6 +5304,13 @@ async function collectStatus(directory, state, ledger) {
   const needsEvidence = ['ORACLE_READY', 'VALID_RED', 'IMPLEMENTED_GREEN'].includes(state.state)
   if (needsEvidence && evidence.status === 'invalid') blockers.push(evidence.code)
   if (needsEvidence && evidence.missingRows?.length > 0) blockers.push('EVIDENCE_MISSING_ROWS')
+  // the refresh packet mirrors the VALID_RED refusal of a binding it already holds; an unreadable map is a change
+  let rebindsNothing = false
+  if (state.state === 'VALID_RED' && state.testBindings) {
+    const mapping = await testEvidenceDigest(evidencePathFor(directory, state)).catch(() => null)
+    const now = harnessIdentity(currentSnapshot.harnessSha256, testDigests(current), mapping)
+    rebindsNothing = now === harnessIdentity(state.harnessAtValidRed, state.testBindings.tests, state.testBindings.evidenceSha256)
+  }
 
   return {
     ...(await runIdentity(directory, state)),
@@ -5386,6 +5341,7 @@ async function collectStatus(directory, state, ledger) {
       blindMapping,
       holds: await openHolds(directory),
       current,
+      rebindsNothing,
     }),
   }
 }
@@ -5547,14 +5503,13 @@ async function reportStatus(options) {
 
 // 처방이 자리에 달린 막힘 — VALID_RED 뒤 테스트를 바꿨고 harness 예산이 다 쓰였어도 테스트를 VALID_RED 바이트로 되돌리면 GREEN이 다시 열린다
 const GUIDE_FIX = {
-  'VALID_RED→IMPLEMENTED_GREEN:BUDGET_EXHAUSTED': 'revert the test files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL',
+  'VALID_RED→IMPLEMENTED_GREEN:BUDGET_EXHAUSTED': '[tests] revert the test files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL',
 }
 
-/** guide가 막힘마다 보이는 처방 한 줄 — 자리에 달린 처방이 있으면 그것, 아니면 그 거부 코드의 처방, 둘 다 없으면 없다. */
-function guideFix(from, to, code) {
-  const placed = GUIDE_FIX[`${from}→${to}:${code}`]
-  if (placed) return `fix ${code}: ${placed}`
-  return Object.hasOwn(NEXT_ACTIONS, code) ? `fix ${code}: ${NEXT_ACTIONS[code]}` : null
+/** guide가 막힘마다 보이는 처방 한 줄(부류와 함께) — 자리에 달린 처방이 있으면 그것, 아니면 그 거부 코드의 처방, 둘 다 없으면 없다. */
+function guideFix(from, to, code, dir) {
+  const line = GUIDE_FIX[`${from}→${to}:${code}`] ?? refusalLine(code, dir)
+  return line ? `fix ${code}: ${line}` : null
 }
 
 async function reportGuide(options) {
@@ -5598,7 +5553,7 @@ async function reportGuide(options) {
     protocol: deliveryProtocol,
   })
   // 단계 줄이 guide로 보낸 막힘마다 그 거부 코드의 처방 한 줄 — 막힘 이름만으로 다음 행동을 추측하지 않게 한다
-  const fixes = (guide.action?.blockers ?? []).map((code) => guideFix(status?.currentState, guide.action.to, code)).filter(Boolean).map((line) => `${line}\n`)
+  const fixes = (guide.action?.blockers ?? []).map((code) => guideFix(status?.currentState, guide.action.to, code, options.dir)).filter(Boolean).map((line) => `${line}\n`)
   process.stdout.write(options.json ? `${JSON.stringify(guide, null, 2)}\n` : `${phase}${renderGuidance(guide)}${fixes.join('')}`)
 }
 
@@ -6429,14 +6384,10 @@ async function workerRun(options) {
       const timeout = Number(options.timeoutMs ?? 600000)
       if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 3600000)
         throw new CliError('USAGE', '--timeout-ms must be 1..3600000', 2)
-      await spendBudget({
-        dir: directory,
-        spend: 'product',
-        reason: `implementation worker ${packet.taskId}/${packet.attemptId}`,
-        workerAttemptId: packet.attemptId,
-      })
+      // the dispatch is one product attempt: its recorded run is the spend (ledgerSpend), so the cap is checked before it
+      if (state.budgets.product.spent >= state.budgets.product.limit) throw new CliError('BUDGET_EXHAUSTED', 'no product attempts remain')
       await writeFile(reservationPath, JSON.stringify({ ...reservation, workerDispatched: true }))
-      await execute({
+      const refused = await execute({
         dir: directory,
         label: `worker:${packet.taskId}`,
         command: invocation.command,
@@ -6453,7 +6404,13 @@ async function workerRun(options) {
           capability: invocation.capability,
           inputSha256: sha256(invocation.input),
         },
-      })
+      }).then(
+        () => null,
+        (error) => error,
+      )
+      // the run state shows the spend now, refused or not, not only after the next transition writes it
+      await withDirectoryLock(directory, 'state', async () => writeState(directory, await readConsistentState(directory)))
+      if (refused) throw refused
       ledger = await readLedger(directory)
       worker = ledger.find((event) => event.type === 'run' && event.runId === packet.attemptId)
     }
@@ -6695,9 +6652,7 @@ async function main() {
   else if (command === 'red') await executeThenTransition(options, 'VALID_RED')
   else if (command === 'green') await executeThenTransition(options, 'IMPLEMENTED_GREEN')
   else if (command === 'transition') await transition(options)
-  else if (command === 'budget') await spendBudget(options)
   else if (command === 'review-packet') await reviewPacket(options)
-  else if (command === 'review-extend') await extendReview(options)
   else if (command === 'review-brief') await reviewBrief(options)
   else if (command === 'blind-input') await blindInput(options)
   else if (command === 'reproduce') await writeReproductions(options)
@@ -6706,7 +6661,7 @@ async function main() {
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, close, budget, status, guide, metrics, review-packet, review-extend, review-brief, blind-input, reproduce, worker-packet or worker-run',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, close, status, guide, metrics, review-packet, review-brief, blind-input, reproduce, worker-packet or worker-run',
       2,
     )
 }
@@ -6724,7 +6679,10 @@ if (process.argv[1] && (await realpath(resolve(process.argv[1])).catch(() => nul
   } catch {
     dirOption = null
   }
-  const next = cliError.next ? `next: ${cliError.next}\n` : nextActionLine(cliError.code, { dir: dirOption })
+  // a line the command wrote for this case (the verifier's finding classes, close's reviewer files) keeps its words under the code's class
+  const fixClass = REFUSALS[cliError.code]?.[0]
+  const tagged = fixClass ? `[${fixClass}] ${cliError.next}` : cliError.next
+  const next = cliError.next ? `next: ${tagged}\n` : nextActionLine(cliError.code, { dir: dirOption })
   process.stderr.write(`${cliError.code}: ${cliError.message}\n${next}`)
   process.exitCode = cliError.exitCode
 }

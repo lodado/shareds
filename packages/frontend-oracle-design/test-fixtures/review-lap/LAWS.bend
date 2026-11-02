@@ -11,6 +11,12 @@ law round_two_split:
   for p: Bool
   {M.Lap.iff(M.Lap.blocks(M.R2{}, f, p), Bool.and(M.Lap.is_claim(f), Bool.not(M.Lap.proposes(M.R2{}, f, p)))) == True{} : Bool}
 
+# a note (no wrong implementation the locked tests pass) never blocks and is a proposal in every round
+law note_proposes:
+  for r: M.Round
+  for p: Bool
+  {Bool.and(Bool.not(M.Lap.blocks(r, M.Note{}, p)), M.Lap.proposes(r, M.Note{}, p)) == True{} : Bool}
+
 # a backed security finding blocks in every round
 law security_every_round:
   for r: M.Round

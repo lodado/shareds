@@ -81,7 +81,7 @@ function actionInstructions(currentState, to) {
     return {
       ...instruction,
       steps: [
-        'Spend the harness budget for the changed harness bytes, then obtain a fresh reported RED.',
+        'Obtain a fresh reported RED on the changed harness bytes; binding it counts against the harness budget.',
         ...instruction.steps,
       ],
     }

@@ -57,6 +57,6 @@ law no_third_round:
 law same_input_one_round:
   {M.Graph.rounds(M.Graph.rev_c(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Save{}, M.Step{}], M.Graph.init()))) == 1n : Nat}
 
-# An edit of the Bend files changes the projected card the card reviews read, never the model analyst's input
+# An edit of the Bend files changes the projected card the card review reads, never the model analyst's input
 law bend_edit_asks_card_reviews:
   {M.Graph.asks_card_only(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Edit{M.BendFiles{}, M.Keeps{}}, M.Step{}], M.Graph.init())) == True{} : Bool}

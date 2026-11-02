@@ -84,10 +84,10 @@ or global mock added after `VALID_RED` meets the same harness gate as a test edi
 that loads another config or preload must name a registered harness file.
 
 A file registered with `--harness-path` can be changed until a reported RED is recorded with those
-bytes. If it is changed again after `VALID_RED`, completion is blocked with `HARNESS_BUDGET_REQUIRED`
-when the harness budget is unused, and with `HARNESS_RED_REQUIRED` when a new reported RED→GREEN with
-the changed bytes has not been run. Do not register a production file as a harness to route around the
-ordering gate.
+bytes. If it is changed again after `VALID_RED`, completion is blocked with `HARNESS_RED_REQUIRED`
+until a new reported RED→GREEN with the changed bytes has run; that binding is one harness spend, and
+a binding past the cap is `BUDGET_EXHAUSTED`. Do not register a production file as a harness to route
+around the ordering gate.
 
 ## As-is — what RED checks per row
 

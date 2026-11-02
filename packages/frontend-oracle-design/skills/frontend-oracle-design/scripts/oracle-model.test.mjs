@@ -936,7 +936,7 @@ test('init derives the law proof label from a locked Formal Model card, and its 
   ])
   assert.equal(locked.status, 0, locked.stderr)
 
-  const init = (labels, reason = null) =>
+  const init = (labels) =>
     node('oracle-run.mjs', [
       'init',
       '--dir',
@@ -946,7 +946,6 @@ test('init derives the law proof label from a locked Formal Model card, and its 
       '--scan-root',
       join(repository, 'src'),
       ...labels.flatMap((label) => ['--required-label', label]),
-      ...(reason ? ['--reason', reason] : []),
     ])
   const labels = async () => JSON.parse(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')).requiredLabels
   // the card implies the proof run: init adds it and names it, the agent types only the repository check
@@ -955,14 +954,16 @@ test('init derives the law proof label from a locked Formal Model card, and its 
   assert.match(derived.stdout, /^LABEL_AUTO bend-proof:reported$/m)
   assert.deepEqual(await labels(), ['behavior', 'bend-proof:reported'])
 
-  const corrected = init(['lint:exit'], 'lint was left out')
-  assert.equal(corrected.status, 0, corrected.stderr)
-  assert.match(corrected.stdout, /^RUN_STATE_AMENDED state:ORACLE_READY labels:lint:exit,bend-proof:reported /)
-  assert.match(corrected.stdout, /^LABEL_AUTO bend-proof:reported$/m)
-  assert.deepEqual(await labels(), ['lint:exit', 'bend-proof:reported'])
+  // 0.129.0: init never amends a started run (the `--reason` amendment is gone): the labels stay as init set them
+  const again = init(['lint:exit'])
+  assert.equal(again.status, 1)
+  assert.match(again.stderr, /^RUN_ARTIFACTS_EXIST: /)
+  assert.deepEqual(await labels(), ['behavior', 'bend-proof:reported'])
 
-  // a typed proof label is kept as typed and not announced again
-  const typed = init(['behavior', 'bend-proof:reported'], 'behavior is the card test')
+  // a typed proof label is kept as typed and not announced again (a fresh run: the started one is cleared)
+  await rm(join(oracleDirectory, 'run-state.json'))
+  await rm(join(oracleDirectory, 'runs.jsonl'))
+  const typed = init(['behavior', 'bend-proof:reported'])
   assert.equal(typed.status, 0, typed.stderr)
   assert.doesNotMatch(typed.stdout, /LABEL_AUTO/)
   assert.deepEqual(await labels(), ['behavior', 'bend-proof:reported'])

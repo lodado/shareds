@@ -2073,6 +2073,7 @@ test('O22: finding 스키마를 검증하고 명시적인 NON_ORACLE_OPINION은 
       finding: '오류 표시가 없다',
       evidence: 'r-003',
       fix: 'error UI 추가',
+      wrongPasses: 'a product that shows no error passes every row',
     },
     {
       id: 'f-2',
@@ -2111,6 +2112,43 @@ test('O22: finding 스키마를 검증하고 명시적인 NON_ORACLE_OPINION은 
   assert.match(rejectedSeverity.stderr, /severity/)
 })
 
+test('a repair claim blocks only when it names a wrong implementation every locked test passes; any other claim is a proposal', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  // the field's H3: the adapter never compared onError's arguments, and two mutants passed every test
+  const claim = { id: 'f-1', row: 'O2', classification: 'EVIDENCE_GAP', severity: 'high', finding: 'onError arguments are never asserted', evidence: 'r-003', fix: 'assert them' }
+  const check = async (findings, name, ...flags) => run('findings', ...flags, '--file', await findingsFile(t, findings, name), '--oracle', oracle)
+
+  // a named wrong pass changes a verdict, so it blocks whatever its severity label
+  const named = await check([{ ...claim, severity: 'low', wrongPasses: 'onError(undefined, error) and onError(query, new Error()) pass 54/54' }], 'named.json', '--ir')
+  assert.equal(named.status, 0, named.stderr)
+  assert.deepEqual(JSON.parse(named.stdout).blocking.map(({ id }) => id), ['f-1'])
+
+  // a high label alone is not the criterion: the claim is recorded as a proposal with the reason, never a blocker
+  const unnamed = await check([claim], 'unnamed.json')
+  assert.equal(unnamed.status, 0, unnamed.stderr)
+  assert.equal(
+    unnamed.stdout,
+    'FINDINGS_OK blocking:0 advisory:0 proposals:1\nPROPOSAL f-1 high onError arguments are never asserted (demoted: names no wrong implementation every locked test passes (wrongPasses) and no reproduction)\n',
+  )
+
+  // the stop classes keep their routes, a reproduction is a witness, and a rowless critical/high finding is the global safety rule
+  const rowless = { evidence: 'r-003', fix: 'decide it' }
+  const kept = await check([
+    { ...claim, id: 'p-1', classification: 'POLICY_GAP' },
+    { ...claim, id: 'v-1', classification: 'ENVIRONMENT_DEFECT' },
+    { ...claim, id: 'r-1', classification: 'PRODUCT_DEFECT', reproduction: { file: 'src/save.test.mjs', test: 'second click', code: 'assert.equal(posts, 1)' } },
+    { ...rowless, id: 's-1', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'the session token is logged' },
+    { ...rowless, id: 'm-1', classification: 'POLICY_GAP', severity: 'medium', finding: 'retry after logout is undecided' },
+  ], 'kept.json', '--ir')
+  assert.equal(kept.status, 0, kept.stderr)
+  assert.deepEqual(JSON.parse(kept.stdout).blocking.map(({ id }) => id), ['p-1', 'v-1', 'r-1', 's-1', 'm-1'])
+
+  // a blank wrongPasses is refused, never read as a witness
+  const blank = await check([{ ...claim, wrongPasses: ' ' }], 'blank.json')
+  assert.equal(blank.status, 1)
+  assert.match(blank.stderr, /^FINDINGS_INVALID: .*finding f-1: wrongPasses names the wrong implementation every locked test passes, a non-empty string/)
+})
+
 test('O23: 2-sample 교집합만 완료를 차단하고 한쪽 finding은 advisory로 남긴다', async (t) => {
   const oracle = await cardFile(t, EVIDENCE_CARD)
   const shared = {
@@ -2121,6 +2159,7 @@ test('O23: 2-sample 교집합만 완료를 차단하고 한쪽 finding은 adviso
     finding: '오류 표시 없음',
     evidence: 'r-003',
     fix: 'error UI',
+    wrongPasses: 'a product that shows no error passes every row',
   }
   const first = await findingsFile(t, [shared], 'first.json')
   const second = await findingsFile(
@@ -2161,6 +2200,7 @@ test('O23: 서로 다른 high finding과 행 없는 high finding은 단독으로
         finding: '오류 메시지가 없다',
         evidence: 'r-003',
         fix: '오류 메시지 추가',
+        wrongPasses: 'a product without the message passes every row',
       },
       {
         id: 'f-2',
@@ -2184,6 +2224,7 @@ test('O23: 서로 다른 high finding과 행 없는 high finding은 단독으로
         finding: '오류 상태에서 입력이 사라진다',
         evidence: 'r-003',
         fix: '입력 유지',
+        wrongPasses: 'a product that clears the input passes every row',
       },
     ],
     'second.json',
@@ -2204,6 +2245,7 @@ test('O23: 같은 key의 중복 지적은 가장 높은 severity와 그 출처�
     classification: 'PRODUCT_DEFECT',
     evidence: 'r-003',
     fix: 'error UI 추가',
+    wrongPasses: 'a product that shows no error passes every row',
   }
   // findingKey는 대소문자·구두점을 지우므로 아래 네 본문은 모두 같은 key다. 구두점만 다르게 두면
   // 어느 원본이 유지됐는지 stdout 한 줄로 구분된다 — CLI 스키마를 넓히지 않고 출처를 관측한다.
@@ -2317,6 +2359,7 @@ test('O23: 문장이 달라도 같은 행·분류·겹치는 인용이 1:1이면
     evidence,
     quote,
     fix: 'guard',
+    wrongPasses: 'the delivered product passes every row',
   })
   const pendingGuard = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L2-L3 pending second input sends two requests', 'if (pending) return')
   const lateWrite = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L6', 'setList(response)')
@@ -2398,6 +2441,7 @@ test('O23: review 명령은 v2 findings를 packet·revision·evidence map에 묶
     finding: '오류 표시가 없다',
     evidence: 'r-003',
     fix: 'error UI 추가',
+    wrongPasses: 'a product that shows no error passes every row',
   }
   const blocking = await reviewFixture(t, [blockingFinding], {
     map: { schemaVersion: 2, rows: { O3: { kind: 'reviewer', finding: 'f-1', role: 'code-reviewer' } } },
@@ -4456,7 +4500,7 @@ test('standalone legacy compatibility: contextual dimensions do not substitute M
 
 test('O13 existing finding intersection and standalone blocking rules remain unchanged', async (t) => {
   const oracle = await cardFile(t)
-  const finding = { id: 'high-standalone', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT', finding: 'synthetic high finding', evidence: 'r-003', fix: 'preserve existing blocker' }
+  const finding = { id: 'high-standalone', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT', finding: 'synthetic high finding', evidence: 'r-003', fix: 'preserve existing blocker', wrongPasses: 'the delivered product passes every row' }
   const file = await findingsDocument(t, { schemaVersion: 2, reviewerRole: 'code-reviewer', reviewerId: 'blocker', changeabilityReview: CHANGEABILITY_REVIEW, findings: [finding] }, 'high-standalone.json')
   const result = run('findings', '--file', file, '--oracle', oracle)
   assert.equal(result.status, 0, result.stderr)
@@ -4609,6 +4653,7 @@ test('findings: invalid PRODUCT_DEFECT code citations require correction at ever
     evidence: 'src/save.ts#L2-L3',
     ...(quote === undefined ? {} : { quote }),
     fix: 'keep the pending guard',
+    wrongPasses: 'the delivered product passes every row',
   })
 
   const quoted = run('findings', '--file', await findingsFile(t, [defect('high', 'if (pending)   return')]), '--oracle', oracle)

@@ -22,7 +22,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
-import { assertReviewIterationEvent, blockingRemedy, FINDINGS_BLOCKING_NEXT, splitConfirmFindings } from './oracle-iterations.mjs'
+import { assertReviewIterationEvent, blockingRemedy, changesVerdict, FINDINGS_BLOCKING_NEXT, splitConfirmFindings } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import { AUTO_TEST_CASES, VAGUE_WORDS, vagueHits } from './oracle-schema.mjs'
@@ -97,6 +97,8 @@ const CLASSIFICATIONS = [
 ]
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
+// 고치는 부류의 지적은 테스트 판정을 바꿀 때만 막는다(oracle-iterations.mjs changesVerdict) — 나머지는 개선안이다
+const NO_WRONG_PASS = 'names no wrong implementation every locked test passes (wrongPasses) and no reproduction'
 const REVIEWER_ROLES = ['code-reviewer', 'designer']
 
 const CHANGEABILITY_AXES = ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']
@@ -180,7 +182,7 @@ const NEXT_ACTIONS = {
   EVIDENCE_GENERATED_OUTSIDE_MODEL:
     'the model never judged this row — map a hand-written vitest or Playwright test that asserts its Then·Never·side effects',
   EVIDENCE_PENDING: 'complete the pending visual evidence before REVIEW_VERIFIED — IMPLEMENTED_GREEN is the honest stop',
-  EVIDENCE_STALE: 'a frozen name changed after VALID_RED — spend the harness budget and record a new reported RED',
+  EVIDENCE_STALE: 'a frozen name changed after VALID_RED — record a new reported RED; binding it counts against the harness budget',
   RED_EVIDENCE_MISSING: 'run the mapped test with the reporter so the failing name is recorded',
   RED_EVIDENCE_UNVERIFIABLE: 'an exit-only or setup failure is not RED — re-run with the reporter and a failing mapped row',
   RED_CAUSE_INFRA: "repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED",
@@ -2251,8 +2253,8 @@ function normalizeFindings(document, rows, source) {
       throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id} cites unknown card row ${finding.row}`)
     }
 
-    const reproduction = reproductionIssue(finding)
-    if (reproduction) throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id}: ${reproduction}`)
+    const witness = reproductionIssue(finding) ?? wrongPassesIssue(finding)
+    if (witness) throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id}: ${witness}`)
 
     const mandatory = finding.severity === 'critical' || finding.severity === 'high'
     if (!finding.row && !mandatory && !['POLICY_GAP', 'NON_ORACLE_OPINION'].includes(finding.classification)) {
@@ -2282,6 +2284,19 @@ function reproductionIssue(finding) {
   if (/^[a-z]:/i.test(file) || posix.isAbsolute(file) || file.split('/').includes('..') || !isTestPath(file))
     return `reproduction.file ${reproduction.file} must be a repository-relative test path`
   return null
+}
+
+/** `wrongPasses` — the wrong implementation every locked test passes, the verdict a blocking claim changes. */
+function wrongPassesIssue(finding) {
+  const named = finding.wrongPasses
+  if (named === undefined || (typeof named === 'string' && named.trim())) return null
+  return 'wrongPasses names the wrong implementation every locked test passes, a non-empty string'
+}
+
+/** Of two copies of one finding the higher severity stays; at equal severity the one that names a wrong pass. */
+function keepsCopy(kept, finding) {
+  if (!kept || severityRank(finding) < severityRank(kept)) return true
+  return severityRank(finding) === severityRank(kept) && Boolean(finding.wrongPasses) && !kept.wrongPasses
 }
 
 function assertEmbeddedLedger(ledger) {
@@ -2423,6 +2438,12 @@ function citedPair(left, right) {
   return { ...kept, alsoReportedAs: { ...other, matchedBy: 'citation' } }
 }
 
+/** The proposals a review records: none outside round 2 unless a claim was demoted, round 2's list otherwise. */
+function proposalList(unwitnessed, confirmProposals) {
+  if (!confirmProposals && unwitnessed.length === 0) return null
+  return [...unwitnessed, ...(confirmProposals ?? [])]
+}
+
 async function findingsResult(options) {
   if (!options.file || !options.oracle) {
     throw new CliError('USAGE', 'findings requires --file and --oracle', 2)
@@ -2460,8 +2481,7 @@ async function findingsResult(options) {
     const retained = new Map()
     for (const finding of [...claims(primary), ...claims(secondary)]) {
       const key = findingKey(finding)
-      const kept = retained.get(key)
-      if (!kept || severityRank(finding) < severityRank(kept)) retained.set(key, finding)
+      if (keepsCopy(retained.get(key), finding)) retained.set(key, finding)
     }
 
     // 문장만 다른 같은 결함 — 한쪽에만 있는 key끼리 같은 인용으로 1:1 대응할 때만 짝짓는다. 상대 후보가 둘 이상이면
@@ -2494,11 +2514,18 @@ async function findingsResult(options) {
     advisory = opinions(primary)
   }
 
+  // a repair-class claim blocks only when it changes a test verdict: a wrong implementation every locked test passes
+  // (wrongPasses) or a PRODUCT_DEFECT reproduction. POLICY_GAP and ENVIRONMENT_DEFECT stop the run and a rowless
+  // critical/high finding is the global safety rule; every other claim is an improvement proposal, recorded and not
+  // fixed, the same way round 2 demotes an unbacked claim
+  const unwitnessed = blocking.filter((finding) => !changesVerdict(finding)).map((finding) => ({ ...finding, demoted: NO_WRONG_PASS }))
+  blocking = blocking.filter(changesVerdict)
+
   // round 2 (confirm-fixes): only a backed previous·regression·security claim keeps blocking, the rest are proposals
   const packet = options.packet ? await readJson(options.packet, 'REVIEW_PACKET_INVALID').catch(() => null) : null
   const split = splitConfirmFindings(blocking, packet?.reviewScope)
   blocking = split.blocking
-  const proposals = split.proposals
+  const proposals = proposalList(unwitnessed, split.proposals)
   const proposalCount = proposals ? ` proposals:${proposals.length}` : ''
   const lines = [`FINDINGS_OK blocking:${blocking.length} advisory:${advisory.length}${proposalCount}`]
 

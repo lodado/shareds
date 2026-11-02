@@ -96,8 +96,8 @@ surviving questions remain after pruning, bundle the two rounds into the Draft i
 rounds with no branch to kill only adds round trips. Space discovery axes and A/B counterexamples
 ride the Draft too ([first response](../common.md#first-response--one-message-one-confirmation)). When the user explicitly requests a
 one-question-at-a-time interview (e.g. "grill me"), proceed in phase order without a round cap, for
-Design-only investigation only. Policy questions during Delivery still follow the 2 rounds of
-`oracle-run.mjs budget`.
+Design-only investigation only. Policy questions during Delivery still follow the 2-resume policy
+budget `oracle-run.mjs` reads off the ledger.
 
 At the end of each round, append the questions·answers·whether the recommendation was adopted and
 the pruning reasons to `.ai/oracles/<oracle-id>/journal.md`. Do not leave answers only in the

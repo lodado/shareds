@@ -23,10 +23,9 @@ own model rules (subagent-review, discovery).
 A refusal prints its code and next step and advances nothing, nor does a role return; never edit state,
 evidence or stage.json, or relock, to pass one.
 Use common's feedback classifications and Delivery's shared policy 2, harness 2, product 3 budgets,
-never per role: they live in the run state `init` creates, each use is one `oracle-run.mjs budget
---spend <name> --reason ...`, and the same change never spends twice. Spend `policy` before the NEEDS_DECISION
-transition a POLICY_GAP after init needs (keyed on the lock: once per revision; review blockers left after
-round 2 spend none), and `harness` per test or harness change after VALID_RED. Harness repairs remain
+never per role: `init` sets the caps and `oracle-run.mjs` reads each spend off the ledger (a resume after
+NEEDS_DECISION, a new test binding after VALID_RED, a failing production state), so no command spends one
+and the same change never counts twice. Harness repairs remain
 within $test allowances. Exhaustion is FAIL with the last actual failure, its decision preserved.
 Check confirmation-lock on revision mismatch. In Delivery only, check delivery/ledger before an uncertain
 command or scope-changing recovery; delivery/red before test/harness correction on RED-to-GREEN;
@@ -47,7 +46,7 @@ Invoke $oracle-intake for approved source investigation and risk/capability disc
 Draft and Open questions under one confirmation, whose actual `yes` precedes any model authoring.
 Intake and authoring are not independence roles: below High run them in this controller context
 instead of fresh subagents, so references load once. Fresh contexts stay required only where an
-independence rule names them (analyst, cold-read, reverse-impossible, source-aware, delivery review).
+independence rule names them (analyst, card review, source-aware, delivery review).
 
 ## 2. Model
 
@@ -82,20 +81,21 @@ the scripts write stage.json. The lock still runs card lint itself, so a hand-wr
 record skips no check; repair a refusal in the author context.
 
 1. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
-   with card bytes alone: the `oracle-review-view.mjs card` reading view plus a byte copy of the card,
-   both written by step outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
-   Drive that nail and record root, falsifying observation and result in journal.md. In the same gate,
-   run the reverse two-sample read once per card: hand the impossible dispositions step extracts with
-   `scripts/oracle-verify.mjs card --ir`, the witness falsifier table from
+   with card bytes alone first: one card review reads the one input folder step writes outside the run
+   directory, the `oracle-review-view.mjs card` reading view plus a byte copy of the card before the rest.
+   Apply five questions per row, collapse to one root and its cheapest first nail. Drive that nail and
+   record root, falsifying observation and result in journal.md. With the cold read written, the same
+   reviewer goes on to run the reverse two-sample read once per card on the impossible dispositions step
+   extracts with `scripts/oracle-verify.mjs card --ir`, the witness falsifier table from
    [`card/interaction-sweep.md`](../card/interaction-sweep.md) and the `oracle-adequacy.mjs explore-input`
-   file to a second context-free reviewer.
-   Frame it as "one of these is wrong: build the counterexample". Promote every disagreement to needs-decision.
-   The review role owns the reviewer procedure; do not load it here.
+   file: "one of these is wrong: build the counterexample". One JSON returns both. A disagreement becomes
+   needs-decision only when every row lets through a behavior the approved sources forbid or never
+   decided; record any other as a proposal. The review role owns the reviewer procedure; do not load it here.
 2. When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies, obtain a source-aware fresh
    review before the Draft is shown (pre-authorized: before the lock), so its findings become Open questions:
    verbatim user messages/approved excerpts against every affected card decision,
-   linked P/O/D, Open question or justified N/A. It supplements, never replaces, card-only cold-read and
-   reverse-impossible review. If independence is unavailable, record only the contract-permitted
+   linked P/O/D, Open question or justified N/A. It supplements, never replaces, the card review.
+   If independence is unavailable, record only the contract-permitted
    same-context fallback and limitation. Never claim this satisfies a required independent High review.
    Step names it with the file its return is saved as; once that return is saved it counts rounds.
 3. Each review kind gets at most 2 rounds per revision: a return saved for a new input digest; the same
@@ -181,7 +181,7 @@ ledger and reports cite runIds instead of free-form claims. Never report an exec
 the ledger as passing; `red`/`green` bundle exec and transition into one call. Independent judgment execs and read-only investigation run as parallel
 tool calls in one message, not separate turns, on supported stable inputs. Approval, RED and adjudication
 stay serial. Delivery transitions are recorded only via `scripts/oracle-run.mjs transition` or composite
-commands invoking that same transition machinery. Iteration budgets are counted by `oracle-run.mjs budget`.
+commands invoking that same transition machinery. Iteration budgets are read off the ledger.
 Card-row evidence goes into evidence.json and is checked against actual run results with
 `scripts/oracle-verify.mjs evidence`. Record IMPLEMENTED_GREEN exactly once; resume from it, never record it again.
 

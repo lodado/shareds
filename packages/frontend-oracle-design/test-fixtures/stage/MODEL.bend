@@ -11,8 +11,8 @@ import Base
 # - FormalAt: p the package node (packageIssues at stage model), m the model node (derivation, cross-check, adequacy,
 #   proofs, laws), k the card node's lint (its hand-written sections), proj whether oracle.md's generated region is
 #   the projection of the package (a step projects it when p and m pass; check-card fails it otherwise), a the model
-#   analyst review, c the card reviews (cold-read and reverse-impossible, read the same card digest and are
-#   dispatched and saved together), seen the recorded checks against the files.
+#   analyst review, c the card review (one reviewer: its cold read of the card, then the reverse-impossible attack,
+#   in one return for the card digest), seen the recorded checks against the files.
 # - ContractAt: q the confirmation node (the user's approval, its source and the strict Space), k the card lint, c
 #   the cold-read review (first in the Contract graph), seen.
 # - Rev: the rounds a review ran (saved returns for distinct input digests, REVIEW_ROUNDS = 2) and whether a return
@@ -27,10 +27,10 @@ import Base
 # - PkgFile (Formal) owns p; it also changes the projection and both review inputs (the model input and the
 #   projected card).
 # - BendFiles (Formal) owns m; the projection records the digest of the inputs it read, the Bend files among them, so
-#   it also changes the projection and the card reviews' input (the model analyst reads the sources only).
+#   it also changes the projection and the card review's input (the model analyst reads the sources only).
 # - CardText (both profiles: oracle.md outside the generated region and the User Confirmation) owns k; it changes
-#   the card reviews' input.
-# - Approval (Contract: the User Confirmation section) owns q; the card reviews read the card without it.
+#   the card review's input.
+# - Approval (Contract: the User Confirmation section) owns q; the card review reads the card without it.
 #
 # Left out: an edit that brings back bytes or issues seen before (the model's edits are always new bytes); several
 # edits between two checks (`enabled` allows one); a return saved after its input changed (it counts a round on disk
@@ -434,7 +434,7 @@ def Graph.seen_of(s: Graph) -> Seen:
       Never{}
 
 # ---- the graph in each profile's order
-# Formal: package, model analyst (review), model, card, card reviews. Contract: cold-read (review), confirmation, card.
+# Formal: package, model analyst (review), model, card, card review. Contract: cold-read (review), confirmation, card.
 def Graph.first_k(k: Health) -> Label:
   match k:
     case Bad{}:
@@ -489,7 +489,7 @@ def Graph.owner2(q: Health) -> Part:
       CardText{}
 
 # the reviews step asks for: the ones before the first failing node with no return for their input and fewer than
-# two rounds (Formal: the analyst after the package, the card reviews after the card)
+# two rounds (Formal: the analyst after the package, the card review after the card)
 def Graph.wanted_a(p: Health, a: Rev) -> Bool:
   Bool.and(Graph.good(p), Graph.wantable(a))
 
@@ -1011,7 +1011,7 @@ def Graph.asked_c(s: Graph) -> Bool:
     case _:
       False{}
 
-# step asks for the card reviews and not the model analyst
+# step asks for the card review and not the model analyst
 def Graph.asks_card_only(+s: Graph) -> Bool:
   Bool.and(Graph.asked_c(s), Bool.not(Graph.asked_a(s)))
 

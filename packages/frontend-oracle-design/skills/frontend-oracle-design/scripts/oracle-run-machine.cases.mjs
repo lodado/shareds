@@ -33,17 +33,17 @@ async function provenLaws(t) {
   assert.equal(cells.status, 0, cells.stderr)
   const proven = JSON.parse(cells.stdout)
   assert.equal(proven.status, 'proven', `${proven.stdout}${proven.stderr}`)
-  assert.deepEqual(proven.cells, { generated: [{ law: 'spend_monotone', cases: 24 }], skipped: [], temporaryCopy: true })
+  assert.deepEqual(proven.cells, { generated: [{ law: 'spend_monotone', cases: 3 }], skipped: [], temporaryCopy: true })
 
-  // 15,552 states of the type × 19 commands; the proof has an arm per state of the type and per reached cell
+  // 11,664 states of the type × 17 commands; the proof has an arm per state of the type and per reached cell
   const reach = oracleModel('prove-reach', '--model', join(DELIVERY, 'MODEL.bend'), '--prefix', 'Del', '--safe', 'safe', '--max-cells', '300000', '--timeout-ms', '600000')
   assert.equal(reach.status, 0, reach.stderr)
   const reached = JSON.parse(reach.stdout)
   assert.equal(reached.status, 'proven', reach.stdout.slice(0, 2000))
   assert.deepEqual({ domain: reached.domain, reachable: reached.reachable, diameter: reached.diameter }, {
-    domain: { states: 15552, events: 19, cells: 295488 },
-    reachable: 1295,
-    diameter: 16,
+    domain: { states: 11664, events: 17, cells: 198288 },
+    reachable: 1335,
+    diameter: 20,
   })
 }
 
@@ -74,10 +74,8 @@ const WHY = {
   REVIEW_PACKET_REQUIRED: 'PacketMissing',
   REVIEW_PACKET_INVALID: 'PacketMissing',
   REVIEWER_EVIDENCE_INVALID: 'ReceiptMissing',
-  HARNESS_BUDGET_REQUIRED: 'BudgetRequired',
   EVIDENCE_STALE: 'EvidenceStale',
   BUDGET_EXHAUSTED: 'Exhausted',
-  RUN_ARTIFACTS_EXIST: 'AmendClosed',
   REVIEW_PACKET_STATE: 'WrongState',
   REVIEW_RECEIPT_STATE: 'WrongState',
   MISSING_REASON: 'NoReason',
@@ -175,11 +173,11 @@ function phaseLineDifference(model, state, line, checked) {
   return refused ? { phaseLine: line, refused, state: toPlain(state) } : null
 }
 const RED_TEST = "import test from 'node:test'\ntest('save > pending', () => { throw new Error('expected RED') })\n"
-// file edits change no ledger; every other accepted command writes the ledger except a free pre-RED spend
+// file edits change no ledger; every other accepted command writes it
 const EDITS = new Set(['EditProd', 'EditTest'])
 // coverage items the model reaches and the traces that cover them
-const ITEMS = 364
-const TRACES = 31
+const ITEMS = 316
+const TRACES = 27
 
 const listItems = (list) => {
   const items = []
@@ -303,13 +301,12 @@ function coveringTraces(model, cap = 30) {
 async function observe(directory) {
   const state = JSON.parse(await readFile(join(directory, 'run-state.json'), 'utf8'))
   const history = state.history ?? []
-  const spent = state.budgets.harness.spent
   return {
     at: STATE[state.state],
     red: state.harnessAtValidRed != null || history.some((entry) => entry.state === 'VALID_RED'),
     greened: history.some((entry) => entry.state === 'IMPLEMENTED_GREEN'),
-    spent,
-    renewed: spent > (state.harnessBudgetAtValidRed ?? 0),
+    spent: state.budgets.harness.spent,
+    resumes: state.budgets.policy.spent,
   }
 }
 
@@ -321,13 +318,13 @@ function expectedOf(model, state, message) {
     at: after.at.$,
     red: after.red,
     greened: after.greened,
-    spent: Number(after.harness.spent.$.slice(-1)),
-    renewed: after.harness.renewed,
+    spent: Number(after.spent.$.slice(-1)),
+    resumes: Number(after.resumes.$.slice(-1)),
   }
 }
 
 /** The CLI commands of each model event on one Low-risk workspace. */
-function deliveryCommands({ root, dir, lock }, session) {
+function deliveryCommands({ root, dir }, session) {
   const evidence = join(dir, 'evidence.json')
   const findings = join(dir, 'findings.json')
   const counter = { report: 0, prod: 0, test: 0, packet: 0, task: 0 }
@@ -355,8 +352,6 @@ function deliveryCommands({ root, dir, lock }, session) {
       await writeFile(join(root, 'src', 'extra.test.mjs'), `import assert from 'node:assert'\n${'assert.equal(1, 1)\n'.repeat(counter.test)}`)
       return done
     },
-    Spend: () => runAsync(['budget', '--dir', dir, '--spend', 'harness', '--reason', 'harness repair']),
-    Amend: () => runAsync(['init', '--dir', dir, '--lock', lock, '--risk', 'low', '--scan-root', root, '--required-label', 'behavior', '--reason', 'correct the labels']),
     MarkRed: () => transition('VALID_RED', '--evidence', evidence, '--row', 'O1'),
     MarkGreen: () => transition('IMPLEMENTED_GREEN', '--evidence', evidence, '--reason', 'existing behavior'),
     Review: async ({ to, holds }) => {
@@ -396,7 +391,7 @@ async function deliveryRun(t) {
   const statePath = join(dir, 'run-state.json')
   // a packet belongs to one GREEN visit: leaving IMPLEMENTED_GREEN drops it
   const session = { packet: null }
-  const commands = deliveryCommands({ root: fixture.root, dir, lock: fixture.lock }, session)
+  const commands = deliveryCommands({ root: fixture.root, dir }, session)
   const initialState = await readFile(statePath)
   return {
     dir,
@@ -413,7 +408,7 @@ async function deliveryRun(t) {
         const status = await runAsync(['status', '--dir', dir, '--json'])
         assert.equal(status.status, 0, status.stderr)
         const parsed = JSON.parse(status.stdout)
-        return { at: STATE[parsed.currentState], spent: parsed.remainingBudgets.harness.spent }
+        return { at: STATE[parsed.currentState], spent: parsed.remainingBudgets.harness.spent, resumes: parsed.remainingBudgets.policy.spent }
       } finally {
         await writeFile(statePath, current)
       }
@@ -431,7 +426,7 @@ async function sideEffects(run, message, observed, before) {
     found.push({ refusal: 'wrote' })
   if (observed.outcome === 'Took' && !EDITS.has(message.$) && !ledger.equals(before.ledger)) {
     const replayed = await run.replayed()
-    if (!isDeepStrictEqual(replayed, { at: observed.at, spent: observed.spent })) found.push({ replayed, observed })
+    if (!isDeepStrictEqual(replayed, { at: observed.at, spent: observed.spent, resumes: observed.resumes })) found.push({ replayed, observed })
   }
   return found
 }
@@ -498,18 +493,18 @@ async function conformance(t) {
   const { exported } = await compileBend({ entry: join(DELIVERY, 'MODEL.bend'), bin })
   const model = loadModel(exported)
   const { reachable, items, traces } = coveringTraces(model)
-  assert.equal(reachable, 1295)
+  assert.equal(reachable, 1335)
   assert.equal(items, ITEMS)
   assert.equal(traces.length, TRACES)
-  // every reached state can still reach FAIL; 276 cannot reach a reviewed state: ORACLE_READY or NEEDS_DECISION with
-  // production touched (the model has no revert, and VALID_RED and GREEN refuse a touched production), and VALID_RED
-  // with test edits and an exhausted harness budget
-  assert.deepEqual(progress(model), { cannotFail: 0, stuck: { AtReady: 147, AtDecision: 124, AtRed: 5 } })
+  // every reached state can still reach FAIL; 321 cannot reach a reviewed state: ORACLE_READY or NEEDS_DECISION with
+  // production touched (the model has no revert, and VALID_RED and GREEN refuse a touched production), NEEDS_DECISION
+  // with both resumes spent, and VALID_RED with test edits and both refreshes spent
+  assert.deepEqual(progress(model), { cannotFail: 0, stuck: { AtReady: 118, AtDecision: 183, AtRed: 20 } })
   // the phase line after every step names the model's hint; the table's events for it are checked once per model state
   const checked = new Set()
   const differences = (await pool(traces, 6, (trace) => replayTrace(t, model, trace, checked))).flat()
   assert.deepEqual(differences, [])
-  t.diagnostic(`phase line checked against the table on ${checked.size} of 1295 reached model states`)
+  t.diagnostic(`phase line checked against the table on ${checked.size} of 1335 reached model states`)
 }
 
 // ---- the review lap: IMPLEMENTED_GREEN to a review verdict, with the round and the class of round-2 findings
@@ -523,14 +518,14 @@ async function provenLapLaws(t) {
   assert.equal(cells.status, 0, cells.stderr)
   const proven = JSON.parse(cells.stdout)
   assert.equal(proven.status, 'proven', `${proven.stdout}${proven.stderr}`)
-  assert.deepEqual(proven.cells, { generated: [{ law: 'round_two_split', cases: 14 }, { law: 'security_every_round', cases: 6 }], skipped: [], temporaryCopy: true })
+  assert.deepEqual(proven.cells, { generated: [{ law: 'round_two_split', cases: 16 }, { law: 'note_proposes', cases: 6 }, { law: 'security_every_round', cases: 6 }], skipped: [], temporaryCopy: true })
   const reach = oracleModel('prove-reach', '--model', join(LAP, 'MODEL.bend'), '--prefix', 'Lap', '--safe', 'safe', '--timeout-ms', '300000')
   assert.equal(reach.status, 0, reach.stderr)
   const reached = JSON.parse(reach.stdout)
   assert.equal(reached.status, 'proven', reach.stdout.slice(0, 2000))
   assert.deepEqual({ domain: reached.domain, reachable: reached.reachable, diameter: reached.diameter }, {
-    domain: { states: 3072, events: 13, cells: 39936 },
-    reachable: 229,
+    domain: { states: 3072, events: 14, cells: 43008 },
+    reachable: 252,
     diameter: 9,
   })
 }
@@ -557,13 +552,18 @@ const ROUND = { R0: 0, R1: 1, R2: 2 }
 // coverage: the stage, round and every review fact but the run freshness and the noted proposal, the command, its outcome
 const lapItem = (s, message, outcome) =>
   `${s.at.$}|${s.round.$}|c:${s.current}|b:${s.bound}|k:${s.blocked}|p:${s.prior}|${JSON.stringify(message)}|${outcome}`
-const LAP_ITEMS = 572
-const LAP_TRACES = 46
+const LAP_ITEMS = 617
+const LAP_TRACES = 50
 
-/** One finding of the class a model claim names; regression lines come from the hunks of the cited packet's repair diff. */
+/**
+ * One finding of the class a model claim names, which names the wrong implementation the locked tests pass; a note names
+ * none. Regression lines come from the hunks of the cited packet's repair diff.
+ */
 function lapFindings(find, hunks) {
   if (find.$ === 'Clear') return []
-  const base = { id: 'F1', row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT', finding: 'lap finding', evidence: 'seen in the packet', fix: 'adjust it' }
+  const note = { id: 'F1', row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT', finding: 'lap finding', evidence: 'seen in the packet', fix: 'adjust it' }
+  if (find.$ === 'Note') return [note]
+  const base = { ...note, wrongPasses: 'the delivered product passes every row' }
   const kind = find.kind
   if (kind.$ === 'Previous') return [{ ...base, confirm: { class: 'previous', finding: 'F1' } }]
   if (kind.$ === 'Security') return [{ ...base, severity: kind.backed ? 'high' : 'medium', confirm: { class: 'security', category: 'permission' } }]
@@ -724,7 +724,7 @@ async function lapConformance(t) {
   const { exported } = await compileBend({ entry: join(LAP, 'MODEL.bend'), bin })
   const model = loadModel(exported, 'Lap', lapItem)
   const { reachable, items, traces } = coveringTraces(model)
-  assert.equal(reachable, 229)
+  assert.equal(reachable, 252)
   assert.equal(items, LAP_ITEMS)
   assert.equal(traces.length, LAP_TRACES)
   const phases = new Map()
@@ -737,7 +737,7 @@ async function lapConformance(t) {
     named[phase.command] = (named[phase.command] ?? 0) + 1
     if (phase.refused) refused[`${phase.command} → ${phase.refused}`] = (refused[`${phase.command} → ${phase.refused}`] ?? 0) + 1
   }
-  assert.deepEqual(named, { exec: 57, close: 37, report: 36 })
+  assert.deepEqual(named, { exec: 58, close: 39, report: 37 })
   // Finding: `close` is named where the model refuses it. Blocking: the receipt bound to the current packet blocks,
   // which the ledger does not record (receipts keep the findings digest only), so the line cannot tell; close reports
   // FINDINGS_BLOCKING with its fix in the call that binds the receipt. Unwitnessed and Followup are reached only off

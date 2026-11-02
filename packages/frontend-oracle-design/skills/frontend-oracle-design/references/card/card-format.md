@@ -306,7 +306,7 @@ including Low and Design-only.
 `## Terms` and `## Adequacy` are required on every card, with goals from the source text. Both, their
 locked world source and adequacy check are owned by [`adequacy.md`](../adequacy.md). Missing or
 incomplete content is `FAIL`; unresolved meanings or support are `NEEDS_DECISION`. The reverse-
-impossible reviewer uses the file `oracle-adequacy.mjs explore-input` derives, and its candidates go
+impossible read uses the file `oracle-adequacy.mjs explore-input` derives, and its candidates go
 through `triage` (adequacy.md).
 
 ## Cold-read gate — adversarial self-review
@@ -319,8 +319,8 @@ not a re-review, so this gate is the last cheap place to find a defect.
 
 ### Review round budget — at most 2
 
-Each card review (cold read, reverse-impossible, source-aware), the model analyst and the translation
-review gets at most 2 rounds per revision. A round is a return saved for a new input digest; the same input
+Each card review (Formal card review or Contract cold read, source-aware), the model analyst and the
+translation review gets at most 2 rounds per revision. A round is a return saved for a new input digest; the same input
 saved again adds none. The journal explains findings and scope decisions. A fresh defect hunt after
 every repair can keep expanding the modeled world rather than verify the agreed outcome.
 
@@ -329,9 +329,10 @@ every repair can keep expanding the modeled world rather than verify the agreed 
 2. **Round 2** only confirms that round 1's findings are resolved and that those repairs did not
    break an existing row or an earlier repair. Hand it round 1's finding IDs and the repair diff, not
    a request for a fresh defect hunt.
-3. A new round 2 finding blocks only when it contradicts an approved policy row or forces an
-   implementer to choose an expected value. Any other "this world is also possible" finding is
-   recorded as a residual risk in the card: not fixed, not blocking, no new round.
+3. In either round a finding blocks only when every row lets through a behavior an approved policy row
+   forbids, or it forces an implementer to choose an expected value. Any other, such as "this world is
+   also possible", an approved narrowing or a doubt about a test's own verdict, is recorded as a
+   proposal or residual risk in the card: not fixed, not blocking, no new round.
 4. A repair that adds more than 3 model states or message kinds is not a repair: stop and return the
    scope to `NEEDS_DECISION`, since the user owns widening the modeled world.
 5. The same row in the findings of both rounds is a card design defect, not a wording defect. Return

@@ -59,8 +59,8 @@ export const GRAPH = Object.freeze({
     { id: 'model-analyst', review: true },
     { id: 'model', label: 'MODELED' },
     { id: 'card', label: 'CHECKED' },
-    { id: 'cold-read', review: true },
-    { id: 'reverse-impossible', review: true },
+    // 카드 리뷰 하나 — cold read 뒤 reverse-impossible을 한 리뷰어가 한 입력 폴더로 읽고 JSON 하나로 돌려준다
+    { id: 'card-review', review: true },
     { id: 'source-aware', review: true, conditional: true },
   ]),
   'contract/v1': Object.freeze([
@@ -71,7 +71,11 @@ export const GRAPH = Object.freeze({
   ]),
 })
 // status가 라운드를 보이는 리뷰 종류 — 번역표 리뷰는 그래프 노드가 아니라 모델 노드의 문제(cross-check-unreviewed)가 부른다
-const ROUND_KINDS = ['model-analyst', 'translation', 'cold-read', 'reverse-impossible', 'source-aware']
+const ROUND_KINDS = ['model-analyst', 'translation', 'card-review', 'cold-read', 'source-aware']
+// 0.128까지의 Formal 카드 리뷰 라운드 — reverse-impossible은 Formal에만 있었고 cold-read와 같은 카드 digest를 읽었다
+const LEGACY_KINDS = { 'card-review': ['reverse-impossible'] }
+// 한 리뷰 종류의 반환이 저장된 이름들 — 지금 이름과 옛 이름
+export const roundKinds = (kind) => [kind, ...(LEGACY_KINDS[kind] ?? [])]
 // 리뷰 종류마다 라운드 상한 — 라운드는 새 입력 digest에 대해 저장된 반환 하나다(같은 digest는 라운드를 더하지 않는다)
 export const REVIEW_ROUNDS = 2
 // 같은 실패 목록이 고친 파일 상태 세 개에서 연달아 나오면 oracle-step.mjs가 멈추고 사용자에게 넘긴다(새 상한이 아니라 감지)
@@ -891,14 +895,15 @@ export function sameIssuesRun(checks = []) {
 
 /**
  * 한 리뷰 종류의 라운드 — 반환이 저장된 서로 다른 입력 digest 수: 검사가 기록한 것과 reviews/에 있는 반환 파일(기록 전에
- * 고쳐도 저장한 반환은 라운드다). digest는 파일 이름처럼 앞 12자로 비교한다.
+ * 고쳐도 저장한 반환은 라운드다). digest는 파일 이름처럼 앞 12자로 비교한다. 카드 리뷰는 옛 reverse-impossible 라운드도 센다.
  */
 export async function reviewRounds(directory, record, kind) {
   const names = await readdir(join(directory, 'reviews')).catch(() => [])
-  return new Set([
-    ...(record?.reviews ?? []).filter((entry) => entry.kind === kind).map((entry) => entry.digest.slice(0, 12)),
-    ...names.filter((name) => name.startsWith(`${kind}-`)).map((name) => name.slice(kind.length + 1, kind.length + 13)),
-  ]).size
+  const digests = roundKinds(kind).flatMap((each) => [
+    ...(record?.reviews ?? []).filter((entry) => entry.kind === each).map((entry) => entry.digest.slice(0, 12)),
+    ...names.filter((name) => name.startsWith(`${each}-`)).map((name) => name.slice(each.length + 1, each.length + 13)),
+  ])
+  return new Set(digests).size
 }
 
 /**

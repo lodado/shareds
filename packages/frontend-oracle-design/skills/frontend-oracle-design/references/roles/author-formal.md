@@ -147,7 +147,7 @@ performance/ops. A question goes ahead of the provisional Draft only when its an
 the actor or the side-effect class; axis discovery rides the provisional Draft. A requested one-question-at-a-time interview runs without a round cap. This does not change
 Delivery's shared policy budget. Before presenting the Draft, request the conditional source-aware fresh
 review in card/policy-sources and merge unresolved policy findings into Open questions. It supplements
-card-only cold-read and reverse-impossible review, never replaces them.
+the card review's card-only cold-read and reverse-impossible attack, never replaces them.
 
 The first substantive Draft or detailed design response includes verification design, not merely
 unit/integration/e2e labels or tool names. Show Case space choices and constraints, connect outcome-changing

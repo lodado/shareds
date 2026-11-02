@@ -11,10 +11,10 @@ def Laws.partial_reachable():
   ([M.Exec{False{}}, M.MarkRed{}, M.EditProd{}, M.Exec{True{}}, M.MarkGreen{}, M.Exec{True{}}, M.MakePacket{}, M.Attest{}, M.Review{M.ToPartial{}, True{}}], {==})
 
 def Laws.refresh_reachable():
-  ([M.Exec{False{}}, M.MarkRed{}, M.Spend{}, M.Exec{False{}}], {==})
+  ([M.Exec{False{}}, M.MarkRed{}, M.EditTest{}, M.Exec{False{}}], {==})
 
 def Laws.exhausted_reachable():
-  ([M.Exec{False{}}, M.MarkRed{}, M.Spend{}, M.EditTest{}, M.Spend{}, M.EditTest{}], {==})
+  ([M.Exec{False{}}, M.MarkRed{}, M.EditTest{}, M.Exec{False{}}, M.MarkRed{}, M.EditTest{}, M.Exec{False{}}, M.MarkRed{}, M.EditTest{}, M.Exec{False{}}], {==})
 
-def Laws.red_cycle_returns():
-  {==}
+def Laws.resume_exhausted_reachable():
+  ([M.Exec{False{}}, M.MarkRed{}, M.Stop{M.StopDecision{}, True{}}, M.Resume{}, M.Stop{M.StopDecision{}, True{}}, M.Resume{}, M.Stop{M.StopDecision{}, True{}}], {==})

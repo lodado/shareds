@@ -285,14 +285,14 @@ these routes. An unconfirmed problem candidate stays in the existing investigati
 `needs-evidence`, not a guessed defect classification. Current implementation, test observations,
 and reviewer preference are classification evidence, not policy sources.
 
-| Classification       | Meaning                                                                                             | Routing                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
-| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
-| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
-| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
-| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
+| Classification       | Meaning                                                                                             | Routing                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                |
+| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                 |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (one per new RED binding) |
+| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`            |
+| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                         |
+| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy           |
 
 - A revision mismatch is not a feedback classification. Stop using existing evidence for the changed
   revision and move to `NEEDS_DECISION` or `FAIL` per the lock rules. Preserve past artifacts and
@@ -1605,8 +1605,8 @@ sources at the four edges of the space and treat what they find as candidates:
 
 ### AI explorer
 
-Extend the existing reverse-impossible review; do not add a subagent. For a card with `## Adequacy`,
-add `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>` to its input: the
+It is the card review's reverse-impossible part; do not add a subagent. For a card with `## Adequacy`,
+step adds `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>` to its input: the
 source text, the Outcome Brief, the rows, Terms and Adequacy, the sensitivity and the declared
 out-of-world list, with a JSON schema. Unlike the model analyst, the explorer sees the card — its job
 is to break it. It returns candidates where every row passes and the user is still harmed:
@@ -2673,7 +2673,7 @@ performance/ops. A question goes ahead of the provisional Draft only when its an
 the actor or the side-effect class; axis discovery rides the provisional Draft. A requested one-question-at-a-time interview runs without a round cap. This does not change
 Delivery's shared policy budget. Before presenting the Draft, request the conditional source-aware fresh
 review in card/policy-sources and merge unresolved policy findings into Open questions. It supplements
-card-only cold-read and reverse-impossible review, never replaces them.
+the card review's card-only cold-read and reverse-impossible attack, never replaces them.
 
 The first substantive Draft or detailed design response includes verification design, not merely
 unit/integration/e2e labels or tool names. Show Case space choices and constraints, connect outcome-changing

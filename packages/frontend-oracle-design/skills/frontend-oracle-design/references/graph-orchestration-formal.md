@@ -65,8 +65,8 @@ graph verifier cannot be found, `FAIL` instead of falling back to sequential exe
   [worker commands](delivery/ledger.md#optional-task-scoped-implementation-worker). Read back the
   accepted state/run instead of recording GREEN twice. Worker transport does not select graph edges,
   authorize graph mode, or replace High mutation checks and independent review.
-- The graph `maxSteps` is only a runaway ceiling and does not replace the `oracle-run.mjs budget`
-  adjudication.
+- The graph `maxSteps` is only a runaway ceiling and does not replace the budget caps
+  `oracle-run.mjs` reads off the ledger.
 - Do not call `$frontend-oracle-design` recursively inside a graph Node. Apply only the currently
   loaded contract and the conditional references.
 - The `user-confirmation` gate stops at `WAITING_USER` before an explicit answer. Do not skip the

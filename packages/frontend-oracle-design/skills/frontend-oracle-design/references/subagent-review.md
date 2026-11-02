@@ -238,9 +238,9 @@ It must not set policy or add a product choice. If fresh
 independence is unavailable, record the same-context fallback and limitation. Do not claim this
 review as evidence of implementation readiness, and keep the card-only cold-read and reverse review.
 
-For Delivery review after GREEN, generate `review-input.json` with `oracle-run.mjs review-packet
---dir <dir> --decision <decision> --review-point <criterion> --output <packet>`. Always pass the
-canonical `review-checklist.md` and `changeability.md` points; add conditional criteria only when
+For Delivery review after GREEN, `oracle-step.mjs` (through `close`) generates `review-input.json` with
+`oracle-run.mjs review-packet --dir <dir> --decision <decision> --review-point <criterion> --output <packet>`:
+always the canonical `review-checklist.md` and `changeability.md` points, conditional criteria only when
 applicable, and `--context <manifest>` when selected. This is
 not the pre-approval analyst input above.
 
@@ -270,6 +270,11 @@ A quote it cannot find returns `FINDINGS_INVALID` at every severity for correcti
 not `NON_ORACLE_OPINION`: missing evidence does not prove preference. A finding about missing behavior has
 no line to quote; cite the row or run instead and the check does not apply. Each axis judgment records `axis`, `status`, `evidence`, and a
 `findingId` when it reports a finding.
+
+A `PRODUCT_DEFECT`, `EVIDENCE_GAP` or `HARNESS_DEFECT` blocks only when it changes a test verdict: it records
+`wrongPasses`, the wrong implementation every locked test passes, or a `reproduction`. Without either the verifier
+records it as an improvement proposal with that reason, never a blocker. `POLICY_GAP`, `ENVIRONMENT_DEFECT` and a
+rowless critical/high finding block as before.
 
 Below High, a `PRODUCT_DEFECT` that cites `path#La-Lb` may also record `reproduction: { file, test, code }`
 so round 2 can close without a confirmation dispatch. The controller appends `code` byte for byte to

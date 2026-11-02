@@ -287,4 +287,5 @@ sequence test (`SEQUENCE_EVIDENCE_MISSING`), and every `covered()` `F*` frame ne
 `needs-decision` frames are exempt. `oracle-verify.mjs evidence-scaffold` emits both
 keys when the card declares them, and the `VALID_RED` transition freezes them alongside the row
 mapping — swapping a `PATH*` or `sequence` name for another passing test after RED is
-`HARNESS_BUDGET_REQUIRED`·`EVIDENCE_STALE`, the same gate the row mapping already had.
+`EVIDENCE_STALE` until a fresh RED binds it (one harness spend), the same gate the row mapping
+already had.

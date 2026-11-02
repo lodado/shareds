@@ -188,7 +188,8 @@ const ROUNDS = { NoRound: 0, Saved1: 1, Stale1: 1, Saved2: 2, Stale2: 2 }
 /**
  * What `oracle-stage.mjs status` shows in a model state: no record before the first step, the label of a check of these
  * files, the run of the same issues (the record keeps it after an edit that leaves them; another issue list starts
- * over), the review rounds (Formal: the analyst and the two card reviews, which read one card; Contract: cold-read).
+ * over), the review rounds (Formal: the analyst and the card review, its cold read and reverse-impossible in one return;
+ * Contract: cold-read).
  */
 function wantedRecord(model, state) {
   const plain = toPlain(state)
@@ -199,7 +200,7 @@ function wantedRecord(model, state) {
   if (record.current) record.stage = LABEL[toPlain(model.label(state)).$]
   if (plain.seen.$ !== 'Moved') record.sameIssues = RUN[plain.seen.run.$]
   const formal = plain.$ === 'FormalAt'
-  record.reviews = { 'model-analyst': formal ? ROUNDS[plain.a.$] : 0, 'cold-read': ROUNDS[plain.c.$], 'reverse-impossible': formal ? ROUNDS[plain.c.$] : 0 }
+  record.reviews = { 'model-analyst': formal ? ROUNDS[plain.a.$] : 0, 'card-review': formal ? ROUNDS[plain.c.$] : 0, 'cold-read': formal ? 0 : ROUNDS[plain.c.$] }
   return record
 }
 

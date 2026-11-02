@@ -8,11 +8,10 @@ import ./MODEL.bend as M
 # Report only where the run is closed. The CLI's printed line is sampled by the replay, not proven here. The laws
 # below are the cells and witnesses `prove` checks.
 
-# a harness spend never lowers the spent count
+# a spend never lowers the spent count
 law spend_monotone:
-  for f: Bool
-  for h: M.Harness
-  {Nat.is_le(M.Del.spent_rank(M.Del.spent_of(h)), M.Del.spent_rank(M.Del.spent_of(M.Del.spend(f, h)))) == True{} : Bool}
+  for n: M.Spent
+  {Nat.is_le(M.Del.spent_rank(n), M.Del.spent_rank(M.Del.bump(n))) == True{} : Bool}
 
 # Witness: a run reaches REVIEW_VERIFIED, so the laws do not hold merely because nothing happens
 law verified_reachable:
@@ -24,17 +23,17 @@ law partial_reachable:
   exs t: List<M.Msg>
   {M.Del.is_partial(M.Del.at(M.Del.run_all(t, M.Del.init()))) == True{} : Bool}
 
-# Witness: a VALID_RED refresh is accepted after a harness spend
+# Witness: a VALID_RED refresh is accepted after a test edit
 law refresh_reachable:
   exs t: List<M.Msg>
   {Bool.and(M.Del.is_red(M.Del.at(M.Del.run_all(t, M.Del.init()))), M.Del.took(M.Del.decide(M.Del.run_all(t, M.Del.init()), M.MarkRed{}))) == True{} : Bool}
 
-# Witness: the harness budget runs out, and the next counted spend is refused
+# Witness: two refreshes spend the harness budget, and the next refresh is refused
 law exhausted_reachable:
   exs t: List<M.Msg>
-  {M.Del.refused_as(M.Del.decide(M.Del.run_all(t, M.Del.init()), M.Spend{}), M.Exhausted{}) == True{} : Bool}
+  {M.Del.refused_as(M.Del.decide(M.Del.run_all(t, M.Del.init()), M.MarkRed{}), M.Exhausted{}) == True{} : Bool}
 
-# Finding: NEEDS_DECISION → ORACLE_READY → VALID_RED → NEEDS_DECISION returns to the same state with no budget spent,
-# so this cycle is not bounded by the model (only the ledger grows)
-law red_cycle_returns:
-  {M.Del.same(M.Del.run_all([M.Stop{M.StopDecision{}, True{}}, M.Resume{}, M.MarkRed{}], M.Del.run_all([M.Exec{False{}}, M.MarkRed{}], M.Del.init())), M.Del.run_all([M.Exec{False{}}, M.MarkRed{}], M.Del.init())) == True{} : Bool}
+# Witness: NEEDS_DECISION → ORACLE_READY → VALID_RED → NEEDS_DECISION is bounded: the third resume is refused
+law resume_exhausted_reachable:
+  exs t: List<M.Msg>
+  {M.Del.refused_as(M.Del.decide(M.Del.run_all(t, M.Del.init()), M.Resume{}), M.Exhausted{}) == True{} : Bool}

@@ -157,8 +157,8 @@ label that needs `:reported`/`:exit` (`LABEL_NOT_REQUIRED`).
   `node_modules`·build-output exclusion list. **A gitignored path is not counted as a production
   change.** If something is real production but gitignored, clean up `--scan-root` or the ignore
   settings first.
-- Run `init` once scaffold, runner config and test dependencies exist. Before `VALID_RED`, `init --reason`
-  again replaces only labels, milestones and harness paths (the ledger records an `amend`).
+- Run `init` once scaffold, runner config and test dependencies exist; it refuses a directory that
+  records runs (`RUN_ARTIFACTS_EXIST`).
 
 ## Current-step guide and resume
 
@@ -196,15 +196,15 @@ runId. State writes use temp file + atomic rename; never hand-edit `run-state.js
   is not enforced by default for Low/Medium.
 - The nondeterministic source scan is based on a known token list — do not use a detection failure as
   evidence of integrity.
-- Call `oracle-run.mjs budget --spend policy|harness|product --reason ...` on every budget use.
+- No command spends a budget; the ledger shows each spend: policy per resume after `NEEDS_DECISION`,
+  harness per new test binding a RED refresh or a GREEN on a changed harness rests on, product per
+  production state a run failed on after `VALID_RED` and per worker dispatch.
   If `BUDGET_EXHAUSTED`, do not route around it with another budget; report `FAIL`.
-  Before `VALID_RED`, harness repairs are free (`BUDGET_NOT_NEEDED`).
-  After RED, harness identity includes the frozen test-binding semantics (`rows`, `paths`, `frames`,
-  `sequence`) from the selected evidence map as well as the existing test/harness file digest.
-  A mapping-only correction counts once; formatting and non-binding notes do not count again.
-  Legacy pre-RED spends keep their file-only identity. An unreadable bound
-  map is an error, not a reason to omit it from identity. Spending still requires fresh RED→GREEN
-  for changed bindings; it neither increases the two-spend limit nor reopens terminal `FAIL`.
+  Before `VALID_RED`, harness repairs are free. A binding is the test/harness file digests plus the
+  frozen test-binding semantics (`rows`, `paths`, `frames`, `sequence`) of the evidence map; one
+  binding counts once, and formatting or non-binding notes are no new binding. An unreadable bound map
+  is an error, not a reason to omit it. A spend still needs a fresh RED→GREEN for the changed binding;
+  it neither raises the two-spend limit nor reopens terminal `FAIL`.
 
 ## Optional task-scoped implementation worker
 

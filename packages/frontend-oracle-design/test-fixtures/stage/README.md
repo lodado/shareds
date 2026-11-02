@@ -17,7 +17,7 @@ state field abstracts and what is left out.
    return is saved, then counts it like a card review.
 3. An edit changes only the node its part owns and takes the saved return away from the reviews whose input the part
    feeds; a package or Bend edit also leaves the card projection out of date (it records the digest of both) until
-   the next step projects it, so it feeds the card reviews too, while the model analyst reads the sources only.
+   the next step projects it, so it feeds the card review too, while the model analyst reads the sources only.
 4. The lock is accepted exactly when every deterministic node passes on the bytes it reads (a stale projection fails
    the card); it reads no review. `--check` changes nothing in the oracle directory and fails exactly when the lock
    would be refused.
@@ -38,7 +38,7 @@ state field abstracts and what is left out.
 - `LAWS.bend`: four cell laws (`run_counts`, `save_rounds`, `first_failing`, `first_failing_contract`), two
   witnesses (a Formal package and a Contract card reach the lock), and five traces: the stop on the third edited
   state and not the second, no third card review round, one round for a return saved twice, and a Bend edit that
-  asks for the card reviews again and not the model analyst.
+  asks for the card review again and not the model analyst.
 - `PROOF.bend`: the witness traces.
 
 `oracle-model.mjs prove --dir test-fixtures/stage` generates the cell arms and checks the laws in a temporary copy.

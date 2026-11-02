@@ -64,6 +64,21 @@ export const REVIEW_ROUND_LIMIT = 2
 
 const SECURITY_CATEGORIES = ['security', 'permission', 'data-loss']
 
+// the classes a review repairs; POLICY_GAP and ENVIRONMENT_DEFECT stop the run instead
+const REPAIR_CLASSES = ['PRODUCT_DEFECT', 'EVIDENCE_GAP', 'HARNESS_DEFECT']
+
+/**
+ * Whether a claim changes a test verdict, the only ground a review finding blocks on: a stop class (POLICY_GAP,
+ * ENVIRONMENT_DEFECT), a repair claim naming the wrong implementation every locked test passes (`wrongPasses`, either
+ * copy of a cited pair) or a PRODUCT_DEFECT reproduction, or a rowless critical/high finding (the global security,
+ * permission and data-loss rule). Any other claim is an improvement proposal.
+ */
+export function changesVerdict(finding) {
+  if (!REPAIR_CLASSES.includes(finding?.classification)) return true
+  if (finding.wrongPasses || finding.alsoReportedAs?.wrongPasses || finding.reproduction) return true
+  return (finding.row ?? '-') === '-' && ['critical', 'high'].includes(finding.severity)
+}
+
 const GIT_ESCAPES = { n: '\n', t: '\t' }
 
 /** A path as git prints it: C-quoted when it holds unusual bytes (`"b/\\303\\251.mjs"`), with its `b/` side prefix. */
@@ -138,11 +153,12 @@ export function confirmClass(finding, scope) {
     return { class: 'proposal', demoted: `security needs category ${SECURITY_CATEGORIES.join('|')} and severity critical|high` }
   }
   if (claim?.class === 'previous') {
+    // only a round-1 claim that blocked: a round-1 proposal was never owed a repair
     const raised = (scope.previousFindings ?? [])
       .filter((previous) => claim.reviewerId === undefined || previous.reviewerId === claim.reviewerId)
-      .flatMap((previous) => (previous.findings ?? []).filter((entry) => entry?.classification !== 'NON_ORACLE_OPINION').map((entry) => entry.id))
+      .flatMap((previous) => (previous.findings ?? []).filter((entry) => entry?.classification !== 'NON_ORACLE_OPINION' && changesVerdict(entry)).map((entry) => entry.id))
     if (typeof claim.finding === 'string' && raised.includes(claim.finding)) return { class: 'previous' }
-    return { class: 'proposal', demoted: `${claim.finding ?? '?'} is not a round-1 claim` }
+    return { class: 'proposal', demoted: `${claim.finding ?? '?'} is not a round-1 claim that blocked` }
   }
   if (claim?.class === 'regression') return regressionClass(claim, scope)
   if (claim?.class === undefined) return { class: 'proposal' }

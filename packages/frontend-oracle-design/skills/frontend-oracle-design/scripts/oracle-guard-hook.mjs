@@ -489,7 +489,7 @@ async function guardWrite(payload, cwd) {
       (await addsWeakening(toolName, input, absolutePath))
     ) {
       deny(
-        `TEST_WEAKENED: ${portable} — this write adds a forbidden token (${WEAKENING_TOKENS.join(', ')}) to a test after VALID_RED. Keep the test at its RED strength; a harness defect is repaired within the $test allowances and counted with budget --spend harness.`,
+        `TEST_WEAKENED: ${portable} — this write adds a forbidden token (${WEAKENING_TOKENS.join(', ')}) to a test after VALID_RED. Keep the test at its RED strength; a harness defect is repaired within the $test allowances; the fresh RED that binds it counts against the harness budget.`,
       )
       return
     }
