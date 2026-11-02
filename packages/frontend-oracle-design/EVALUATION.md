@@ -1,3 +1,105 @@
+# 0.124.0: the phase line names a command the next step accepts on the Delivery states the replays visit; known exceptions below
+
+## Why
+
+Wave F3-b of the self-FSM plan. The `phase:` line's `next:` was prose generated per state: nothing checked that the
+command it printed was one the run would accept. A refused next costs a turn and a wrong-turn repair ("oh right").
+
+## Change
+
+- Table (oracle-run-machine.cases.mjs `NEXT_COMMANDS`, 13 entries): next command → model event(s) per model
+  (Delivery, review lap, authoring): `red`, `green`, `exec`, `close`, `guide`, `report`, `begin`, `walk`, walk with a
+  reason, `lock`, `extend`, the `init` hand-off and the `revise` decision. `nextCommandOf` reads the printed line;
+  `nextRefusal` asks the model whether the mapped events are accepted in the replayed state.
+- Conformance: the existing replays now check the printed `next:` against the table once per distinct model state:
+  Delivery 182 of 1,295 reached states, authoring 452 states, review lap 130 states. This is sampled: the CLI is only
+  checked on the states the replay traces visit.
+- Delivery model (test-fixtures/delivery): `Del.hint` over the full state (Red, Green, Exec, Close, Guide, Report) and
+  `Del.hint_accepted`, now part of `Del.safe`. `prove-reach --prefix Del --safe safe` proves on all 1,295 reachable
+  states that the model's hint is accepted (Guide only where neither RED nor GREEN is; Report only in reviewed,
+  decision or failure states). The old `hint_legal` cell law and its relation are folded into it (25 relations; LAWS
+  keeps `spend_monotone`). The proof is about the model's hint; the CLI's printed line is the sampled part above.
+  Authoring already proved `hint_accepted` in `Auth.safe`.
+- Mismatches the replay found on the real CLI, fixed in oracle-run.mjs (`guardBlockers`, `requiredRunNotPassing`,
+  `phaseTarget`), each failing before the fix:
+  1. ORACLE_READY with production changed since init: the line said `red`, which refuses
+     PRODUCTION_TOUCHED_BEFORE_RED. Now the RED packet carries that blocker and the line says `guide`.
+  2. VALID_RED with test bytes changed and no harness spend: `green` refused HARNESS_BUDGET_REQUIRED. Now a blocker.
+  3. Test bytes changed after a spend: `green` refused EVIDENCE_STALE. The line now names `red` (renew RED).
+  4. IMPLEMENTED_GREEN with no passing run after GREEN, or a required label whose latest run fails or is stale:
+     `close` ran a full reviewer round trip and then ended REVIEW_RERUN_REQUIRED or REQUIRED_LABEL_GRADE. The line now
+     names `exec` first. The check is the review gate's own `assertRequiredRuns` rule; a failure under a label that
+     is not required does not count, since the gate accepts the earlier pass then.
+- `guide` text output prints `fix <CODE>: <action>` for every blocker with a known action. At VALID_RED with test
+  bytes changed and the harness budget already at its limit, the fix for BUDGET_EXHAUSTED says to revert the test
+  files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL (a revert clears the guard).
+- `close` and the review packet's witness (the verifier refuses a packet made before a passing reported run of the
+  GREEN label on its bytes, REVIEW_PACKET_INVALID, after the reviewer already answered it; on round 2 that loses the
+  round): `close` refuses before writing a packet with no such run (REVIEW_RERUN_REQUIRED, next: `exec`), and refuses
+  an existing unwitnessed packet before any receipt (REVIEW_PACKET_INVALID, next: `exec`, then a new --packet path).
+  REVIEW_PACKET_STALE's fix now says `exec` before the new packet; REVIEW_PACKET_INVALID has a fix entry.
+- Regression: oracle-run.cases.mjs "the phase line never names a command its guard refuses" (cases 1–3; case 4 in the
+  changed guide test and "the review line asks for a rerun when a required label's latest run fails"), "guide on
+  test bytes changed after VALID_RED with the harness budget spent names the revert before FAIL", "close never writes
+  or reviews a packet without a passing run on its bytes". Intentional test change: the guide test expected `close`
+  right after GREEN; it now expects `exec`, then `close --run` after a fresh passing run.
+- Not applied from review round 1: naming `exec` whenever the round's packet has no witness. In all 17 Unwitnessed
+  lap states the model already has a fresh pass (its Review refuses Stale before Unwitnessed), and `exec` changes
+  neither the model state nor the recorded packet, so the line would name `exec` forever. Where no pass exists on
+  the current bytes the line already names `exec` (NO_FRESH_GREEN_RUN).
+
+## Profile (F3-b part 2, copies in the scratchpad only)
+
+Largest real cards: review-reply-web (517 KB card) and adapter-isomorphism-r3 (441 KB). Cold = result and lint caches
+off; warm = cached.
+
+| command                       | cold   | warm   |
+| ----------------------------- | ------ | ------ |
+| `card --draft` (517 KB)       | 2.2 s  | 0.22 s |
+| `derive`                      | 1.07 s | 0.09 s |
+| `stage status --brief`        | 0.03 s | 0.03 s |
+| `card --locked` (441 KB)      | 0.85 s | 0.21 s |
+| `lock verify`                 | 0.92 s | 0.30 s |
+| `run status --brief`, `guide` | 1.1 s  | 0.45 s |
+| `stage advance --to CHECKED`  | 7.6 s  | 0.19 s |
+
+Only the walk gate is over 2 s, and only cold. `--cpu-prof` on it (7.67 s): `crossCheckAgainstModel` 72.6% inclusive,
+`exploreConfigurations` 66%, of which `allowedAfter` 42% (the model's `next` on the whole history, its argument copy
+by `structuredClone` 30%, canonical event keys 22%). A per-history memo of `next` was tried and reverted: each history
+is asked once (the one-step-ahead comparison asks about children of a node that is then merged and never visited), so
+it had no hits and was slower (8.8 s vs 7.6 s, same output). The remaining cost is the argument copy that keeps
+compiled models from mutating shared events and the canonical keys that decide merges; changing either changes a
+safety or equivalence guarantee, so nothing was changed.
+
+## Open facts (not fixed)
+
+- Review lap: the model still refuses `close` on 22 of the 37 visited lap states whose line names it. Blocking (3)
+  is not visible in the ledger the line reads. Unwitnessed (17) is reached only through a standalone `review-packet`
+  made before the pass (`close` no longer writes or accepts such a packet); there the CLI closes with a new packet
+  path on the same bytes, but the model keeps a repeated packet's witness, so the replay still counts them refused.
+  Followup (2) is reached by editing while a round-1 packet waits. Pinned in the lap replay as known findings.
+- `review-packet` itself still writes a packet with no witness (the lap model's Packet accepts it).
+- `guide --to X` with blockers still names X's command; the fix lines follow it.
+- The evidence-mapping drift part of the GREEN check is not in `status`, so a line can still name `green` there.
+- The phase line does not know about packets made at new paths on the same bytes (only the round's first packet is
+  in the ledger); `close` checks the packet it is given.
+- `review-packet` and `walk` were not timed on the copies (`review-packet` needs a review point the copy lacks).
+
+## Verification
+
+- The new phase-line cases failed on the 0.123.0 CLI (mismatches 1–4 above) and pass on this one.
+- Suite time of the Bend cases, 0.123.0 → after review round 1: Delivery prove 24.1 → 23.8 s, Delivery conformance
+  50.3 → 48.2 s, lap conformance 30.0 → 32.4 s, authoring conformance 88.2 → 83.3 s (net within noise; the per-state
+  check adds ~2.5 s to the lap replay). Lap refused-close counts unchanged after round 1: Blocking 3, Unwitnessed 17,
+  Followup 2.
+- No skill doc changed: Formal delivery closure and role-review bundle bytes unchanged. `pnpm bundles:generate`: 22
+  bundles, no diff; `npx prettier --check` on this file, the fixture README and the bundles: clean.
+- `pnpm lint`: 0 errors, 405 warnings (same as 0.123.0).
+- `pnpm test`: 1329 tests (1325 at 0.123.0 plus the phase-line guard case and the three round-1 cases), 1329 pass,
+  0 fail, one run on the final bytes.
+- Review: independent Opus round 1 (0 blocker, 3 major, 3 minor, 1 nit): all applied except the `exec`-on-unwitnessed
+  part of major 2 (evidence above, under Change).
+
 # 0.123.0: delivery review ends at round 2, and round 2 blocks only on what its packet backs
 
 ## Why

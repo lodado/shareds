@@ -711,35 +711,82 @@ def Del.next(h: List<Msg>) -> List<Msg>:
 type Hint is Data:
   HintRed{}
   HintGreen{}
+  HintExec{}
   HintClose{}
+  HintGuide{}
   HintReport{}
 
-def Del.hint(p: Phase) -> Hint:
-  match p:
-    case AtReady{}:
+# The phase's own command (`red`, `green`, `close`) unless its guard refuses it on the state: production touched
+# before VALID_RED names `guide`; test bytes changed after VALID_RED name a fresh `red` once a harness spend renewed
+# the budget, else `guide`; at IMPLEMENTED_GREEN without a fresh passing run after the GREEN entry, `exec`.
+def Del.ready_hint(touched: Bool) -> Hint:
+  match touched:
+    case True{}:
+      HintGuide{}
+    case False{}:
       HintRed{}
-    case AtRed{}:
-      HintGreen{}
-    case AtGreen{k}:
-      HintClose{}
-    case _:
-      HintReport{}
 
-# The named command is legal there: `red` and `green` name a protocol edge of the state, `close` starts at
-# IMPLEMENTED_GREEN, and `close --check-report` skips the review only in the closed states.
-def Del.hint_legal_as(h: Hint, +p: Phase) -> Bool:
+def Del.drift_hint(renewed: Bool) -> Hint:
+  match renewed:
+    case True{}:
+      HintRed{}
+    case False{}:
+      HintGuide{}
+
+def Del.red_hint(dirty: Bool, renewed: Bool) -> Hint:
+  match dirty:
+    case True{}:
+      Del.drift_hint(renewed)
+    case False{}:
+      HintGreen{}
+
+def Del.close_hint(ready: Bool) -> Hint:
+  match ready:
+    case True{}:
+      HintClose{}
+    case False{}:
+      HintExec{}
+
+def Del.hint(s: Del) -> Hint:
+  match s:
+    case Del{p, red, touched, +r, dirty, h, g}:
+      match p:
+        case AtReady{}:
+          Del.ready_hint(touched)
+        case AtRed{}:
+          Del.red_hint(dirty, Del.renewed(h))
+        case AtGreen{k}:
+          Del.close_hint(Bool.and(Del.passed(r), Bool.and(Del.fresh(r), Del.since(r))))
+        case _:
+          HintReport{}
+
+# The events a command runs in one call: `red` and `green` run the tests (failing, passing) and record the transition.
+def Del.after_exec(+s: Del, pass: Bool, m: Msg) -> Bool:
+  Del.took(Del.decide(Del.step(s, Exec{pass}), m))
+
+# `close` makes the packet, binds the receipt of a clear review and records REVIEW_VERIFIED (no hold is open).
+def Del.close_takes(+s: Del) -> Bool:
+  Bool.and(Del.took(Del.decide(s, MakePacket{})), Bool.and(Del.took(Del.decide(Del.step(s, MakePacket{}), Attest{})), Del.took(Del.decide(Del.run_all([MakePacket{}, Attest{}], s), Review{ToVerified{}, False{}}))))
+
+# The named command is accepted there. `guide` reads the state and is named only where neither `red` nor `green`
+# would be accepted; `close --check-report` reads it in the closed states.
+def Del.hint_accepted_as(h: Hint, +s: Del) -> Bool:
   match h:
     case HintRed{}:
-      Del.red_edge(p)
+      Del.after_exec(s, False{}, MarkRed{})
     case HintGreen{}:
-      Del.green_edge(p)
+      Del.after_exec(s, True{}, MarkGreen{})
+    case HintExec{}:
+      Del.took(Del.decide(s, Exec{True{}}))
     case HintClose{}:
-      Del.is_green(p)
+      Del.close_takes(s)
+    case HintGuide{}:
+      Bool.not(Bool.or(Del.after_exec(s, False{}, MarkRed{}), Del.after_exec(s, True{}, MarkGreen{})))
     case HintReport{}:
-      Bool.or(Del.reviewed(p), Bool.or(Del.is_decision(p), Del.is_fail(p)))
+      Bool.or(Del.reviewed(Del.at(s)), Bool.or(Del.is_decision(Del.at(s)), Del.is_fail(Del.at(s))))
 
-def Del.hint_legal(+p: Phase) -> Bool:
-  Del.hint_legal_as(Del.hint(p), p)
+def Del.hint_accepted(+s: Del) -> Bool:
+  Del.hint_accepted_as(Del.hint(s), s)
 
 # ---- vocabulary of the laws
 def Del.is_mark_red(m: Msg) -> Bool:
@@ -976,12 +1023,8 @@ def Del.Q_resume_only_decision(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
 def Del.Q_edits_stale_runs(+s: Del, +m: Msg, +t: Del, o: Last) -> Bool:
   Bool.and(Del.imp(Del.is_edit(m), Bool.not(Del.fresh(Del.run(t)))), Del.imp(Del.is_exec(m), Del.fresh(Del.run(t))))
 
-# Q_hint_legal: the phase line names a command that is legal in the state the command leaves
-def Del.Q_hint_legal(s: Del, m: Msg, +t: Del, o: Last) -> Bool:
-  Del.hint_legal(Del.at(t))
-
 def Del.cell_with(+s: Del, +m: Msg, +t: Del, +o: Last) -> Bool:
-  Bool.and(Del.Q_refused_keeps(s, m, t, o), Bool.and(Del.Q_fail_absorbs(s, m, t, o), Bool.and(Del.Q_fail_refuses_transitions(s, m, t, o), Bool.and(Del.Q_fail_always_open(s, m, t, o), Bool.and(Del.Q_decision_open(s, m, t, o), Bool.and(Del.Q_red_needs_fresh_failure(s, m, t, o), Bool.and(Del.Q_red_needs_untouched_production(s, m, t, o), Bool.and(Del.Q_refresh_needs_spend(s, m, t, o), Bool.and(Del.Q_red_entry(s, m, t, o), Bool.and(Del.Q_green_needs_fresh_pass(s, m, t, o), Bool.and(Del.Q_green_skip_untouched(s, m, t, o), Bool.and(Del.Q_green_keeps_binding(s, m, t, o), Bool.and(Del.Q_review_needs_receipt(s, m, t, o), Bool.and(Del.Q_review_entry(s, m, t, o), Bool.and(Del.Q_packet_rebinds(s, m, t, o), Bool.and(Del.Q_amend_before_red(s, m, t, o), Bool.and(Del.Q_pre_red_spend_free(s, m, t, o), Bool.and(Del.Q_budget_monotone(s, m, t, o), Bool.and(Del.Q_budget_exhausted(s, m, t, o), Bool.and(Del.Q_history_kept(s, m, t, o), Bool.and(Del.Q_forward(s, m, t, o), Bool.and(Del.Q_refresh_bounded(s, m, t, o), Bool.and(Del.Q_back_edges_keep(s, m, t, o), Bool.and(Del.Q_resume_only_decision(s, m, t, o), Bool.and(Del.Q_edits_stale_runs(s, m, t, o), Del.Q_hint_legal(s, m, t, o))))))))))))))))))))))))))
+  Bool.and(Del.Q_refused_keeps(s, m, t, o), Bool.and(Del.Q_fail_absorbs(s, m, t, o), Bool.and(Del.Q_fail_refuses_transitions(s, m, t, o), Bool.and(Del.Q_fail_always_open(s, m, t, o), Bool.and(Del.Q_decision_open(s, m, t, o), Bool.and(Del.Q_red_needs_fresh_failure(s, m, t, o), Bool.and(Del.Q_red_needs_untouched_production(s, m, t, o), Bool.and(Del.Q_refresh_needs_spend(s, m, t, o), Bool.and(Del.Q_red_entry(s, m, t, o), Bool.and(Del.Q_green_needs_fresh_pass(s, m, t, o), Bool.and(Del.Q_green_skip_untouched(s, m, t, o), Bool.and(Del.Q_green_keeps_binding(s, m, t, o), Bool.and(Del.Q_review_needs_receipt(s, m, t, o), Bool.and(Del.Q_review_entry(s, m, t, o), Bool.and(Del.Q_packet_rebinds(s, m, t, o), Bool.and(Del.Q_amend_before_red(s, m, t, o), Bool.and(Del.Q_pre_red_spend_free(s, m, t, o), Bool.and(Del.Q_budget_monotone(s, m, t, o), Bool.and(Del.Q_budget_exhausted(s, m, t, o), Bool.and(Del.Q_history_kept(s, m, t, o), Bool.and(Del.Q_forward(s, m, t, o), Bool.and(Del.Q_refresh_bounded(s, m, t, o), Bool.and(Del.Q_back_edges_keep(s, m, t, o), Bool.and(Del.Q_resume_only_decision(s, m, t, o), Del.Q_edits_stale_runs(s, m, t, o)))))))))))))))))))))))))
 
 def Del.cell_ok(+s: Del, +m: Msg) -> Bool:
   Del.cell_with(s, m, Del.step(s, m), Del.decide(s, m))
@@ -994,6 +1037,7 @@ def Del.all_ok(+s: Del, ms: List<Msg>) -> Bool:
       Bool.and(Del.cell_ok(s, m), Del.all_ok(s, rest))
 
 # The every-trace safety def: in every state a trace reaches, every law holds for every command the environment
-# allows, and VALID_RED is recorded whenever the run is at it. `oracle-model.mjs prove-reach --safe safe` proves it.
+# allows, VALID_RED is recorded whenever the run is at it, and the phase line names a command accepted there.
+# `oracle-model.mjs prove-reach --safe safe` proves it.
 def Del.safe(+s: Del) -> Bool:
-  Bool.and(Del.imp(Del.is_red(Del.at(s)), Del.red(s)), Bool.and(Del.hint_legal(Del.at(s)), Del.all_ok(s, Del.enabled(s))))
+  Bool.and(Del.imp(Del.is_red(Del.at(s)), Del.red(s)), Bool.and(Del.hint_accepted(s), Del.all_ok(s, Del.enabled(s))))

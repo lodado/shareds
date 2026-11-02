@@ -7324,7 +7324,10 @@ test('guide text opens with the phase and one command for the state or the selec
   assert.equal(run(['guide', '--rejection', 'STATE_INVALID']).stdout.startsWith('authority: advisory'), true, 'no run, no phase')
 
   await reachGreen(oracleDirectory, root)
-  const reviewLine = /^phase 6\/6 Review and close · next: oracle-run\.mjs close --dir \S+ --packet <packet> --decision <implementation-decision\.md> --review-point <point> --run <runId> --evidence <evidence> --check-report <report>$/
+  // no passing run after the GREEN entry yet: close never runs the tests, so the review would refuse REVIEW_RERUN_REQUIRED
+  assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs exec --dir \S+ --label <label> -- <command>$/)
+  assert.equal(greenRun(oracleDirectory, 'review-1').status, 0)
+  const reviewLine = /^phase 6\/6 Review and close · next: oracle-run\.mjs close --dir \S+ --packet <packet> --decision <implementation-decision\.md> --review-point <point> --run r-004 --evidence <evidence> --check-report <report>$/
   assert.match(firstLine(), reviewLine)
   // the same command resumes after the packet exists — phase 6 no longer points back at review-packet
   const packetPath = join(oracleDirectory, 'review-input.json')
@@ -7332,6 +7335,110 @@ test('guide text opens with the phase and one command for the state or the selec
   assert.match(firstLine(), reviewLine)
   assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'FAIL', '--reason', 'environment unavailable']).status, 0)
   assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs close --dir \S+ --check-report <report>$/)
+})
+
+test('the phase line never names a command its guard refuses: production touched before RED, test bytes changed after it', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  const firstLine = () => {
+    const brief = run(['status', '--dir', oracleDirectory, '--brief'])
+    assert.equal(brief.status, 0, brief.stderr)
+    return brief.stdout.split('\n')[0]
+  }
+  const guided = (to) => run(['guide', '--dir', oracleDirectory, '--to', to]).stdout
+  const save = join(root, 'src', 'save.mjs')
+  const original = await readFile(save, 'utf8').catch(() => null)
+  await writeFile(save, 'export const save = 2\n')
+  // red and green both refuse PRODUCTION_TOUCHED_BEFORE_RED: the line names guide, which lists the blocker and its fix
+  assert.match(firstLine(), /^phase 4\/6 RED · next: oracle-run\.mjs guide --dir \S+ --to VALID_RED · /)
+  assert.match(guided('VALID_RED'), /^blockers: .*PRODUCTION_TOUCHED_BEFORE_RED.*\n[\s\S]*^fix PRODUCTION_TOUCHED_BEFORE_RED: revert the production files/m)
+  if (original === null) await rm(save)
+  else await writeFile(save, original)
+  assert.match(firstLine(), /^phase 4\/6 RED · next: oracle-run\.mjs red --dir /)
+
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'extra.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  // test bytes changed after VALID_RED with no new harness spend: green refuses HARNESS_BUDGET_REQUIRED
+  assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs guide --dir \S+ --to IMPLEMENTED_GREEN · /)
+  assert.match(guided('IMPLEMENTED_GREEN'), /^fix HARNESS_BUDGET_REQUIRED: `budget --spend harness/m)
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'new test file']).status, 0)
+  // after the spend green refuses EVIDENCE_STALE: the line names a fresh RED, which the spend allows
+  assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs red --dir \S+ --label <label> --evidence <evidence> --row <row> -- <command> · /)
+})
+
+test('guide on test bytes changed after VALID_RED with the harness budget spent names the revert before FAIL', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  const firstLine = () => run(['status', '--dir', oracleDirectory, '--brief']).stdout.split('\n')[0]
+  await reachValidRed(oracleDirectory, root)
+  const testFile = join(root, 'src', 'save.test.mjs')
+  // two spends, each followed by a refreshed VALID_RED: the budget is used up and the baseline is at the limit
+  for (const round of [1, 2]) {
+    await writeFile(testFile, `import assert from 'node:assert'\nassert.equal(1, 1)\n// helper ${round}\n`)
+    assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', `helper ${round}`]).status, 0)
+    redRun(oracleDirectory)
+    const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+    assert.equal(transition(oracleDirectory, 'VALID_RED', latest).status, 0)
+  }
+  const frozen = await readFile(testFile, 'utf8')
+  await writeFile(testFile, `${frozen}// one more edit\n`)
+  assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs guide --dir \S+ --to IMPLEMENTED_GREEN · /)
+  // a spend is refused now, but putting the tests back to the VALID_RED bytes clears the guard
+  const guided = run(['guide', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN']).stdout
+  assert.match(guided, /^fix BUDGET_EXHAUSTED: revert the test files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL$/m)
+  await writeFile(testFile, frozen)
+  assert.match(firstLine(), /^phase 5\/6 GREEN · next: oracle-run\.mjs green --dir /)
+})
+
+test('close never writes or reviews a packet without a passing run on its bytes; after exec a new packet path closes', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  await reachGreen(oracleDirectory, root)
+  assert.equal(greenRun(oracleDirectory, 'review-1').status, 0)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 7\n')
+  const findings = join(oracleDirectory, 'findings.json')
+  const close = (packet, runId) => run(closeArgs(oracleDirectory, packet, '--run', runId, '--findings', findings, '--task-id', 'review-1'))
+
+  // no pass on the repaired bytes: close refuses before writing the packet instead of after a reviewer round trip
+  const early = join(oracleDirectory, 'review-early.json')
+  const refused = close(early, 'r-004')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^REVIEW_RERUN_REQUIRED: no passing reported run of the GREEN label on the current bytes — a packet made now would have no witness\nnext: run `oracle-run\.mjs exec /)
+  assert.equal(existsSync(early), false)
+
+  // review-packet still writes one; close refuses that packet before any receipt, and its fix names a new path
+  const unwitnessed = join(oracleDirectory, 'review-unwitnessed.json')
+  assert.equal(run(strictReviewPacketArgs(oracleDirectory, unwitnessed)).status, 0)
+  assert.equal(greenRun(oracleDirectory, 'review-2').status, 0)
+  const rejected = close(unwitnessed, 'r-005')
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^REVIEW_PACKET_INVALID: \S*review-unwitnessed\.json was made before a passing run on its bytes — the review would refuse it\nnext: after `exec` on the current bytes, rerun the same close with a new --packet path/)
+  assert.doesNotMatch(rejected.stdout, /RECEIPT/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+
+  // a new packet path on the same bytes embeds the pass: the review records REVIEW_VERIFIED
+  const fresh = join(oracleDirectory, 'review-fresh.json')
+  const pending = close(fresh, 'r-005')
+  assert.equal(pending.status, 1)
+  assert.match(pending.stderr, /^CLOSE_PENDING: waiting for reviewer output: --findings\n/)
+  const packetRaw = readFileSync(fresh, 'utf8')
+  bindReviewDocument(findings, createHash('sha256').update(packetRaw).digest('hex'), JSON.parse(packetRaw).targetRevision)
+  const reviewed = close(fresh, 'r-005')
+  assert.match(reviewed.stdout, /^STATE_REVIEW_VERIFIED run:r-005$/m)
+  assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
+})
+
+test("the review line asks for a rerun when a required label's latest run fails, not for a failure under another label", async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  const firstLine = () => run(['status', '--dir', oracleDirectory, '--brief']).stdout.split('\n')[0]
+  await reachGreen(oracleDirectory, root)
+  assert.equal(greenRun(oracleDirectory, 'review-1').status, 0)
+  // a failing run under the label `red`, which is not required: the review gate still accepts r-004
+  redRun(oracleDirectory)
+  assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs close --dir \S+ .* --run r-004 /)
+  // the required label fails after the pass: the gate refuses REQUIRED_LABEL_GRADE, so the line asks for a rerun
+  const report = join(oracleDirectory, 'behavior-failing.ndjson')
+  const failing = resolve(oracleDirectory, '../../../packages/oracle-red-fixture.test.mjs')
+  run(['exec', '--dir', oracleDirectory, '--label', 'behavior', '--adapter', 'node-test', '--report', report, '--', process.execPath, '--test', failing])
+  assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs exec --dir \S+ --label <label> -- <command> · /)
+  assert.match(run(['guide', '--dir', oracleDirectory, '--to', 'REVIEW_VERIFIED']).stdout, /^blockers: .*NO_FRESH_GREEN_RUN/m)
 })
 
 function closeArgs(oracleDirectory, packetPath, ...extra) {

@@ -205,7 +205,10 @@ const NEXT_ACTIONS = {
     'record the blind mapping with `review-receipt --role blind-mapper` against this input and revision',
   BLIND_INPUT_INVALID:
     'generate the blind input with `blind-input` — it carries only the contract rows and the test sources',
-  REVIEW_PACKET_STALE: 'the input changed since the packet — generate a new one at a new `close --packet` path, never edit it',
+  REVIEW_PACKET_STALE:
+    'the input changed since the packet — `exec` the GREEN command on the current bytes, then `close` with a new --packet path; never edit it',
+  REVIEW_PACKET_INVALID:
+    'the packet is unreadable or no passing run on its bytes preceded it — `exec` on the current bytes, then `close` with a new --packet path; after round 2, NEEDS_DECISION',
   CLOSE_PENDING: 'supply the reviewer output or report named above, then rerun the same `close`',
   REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
   SNAPSHOT_STALE: 're-run the cited label on the current bytes and cite the new run',
@@ -2119,8 +2122,22 @@ function lastEntryFor(state, name) {
   return [...state.history].reverse().find((entry) => entry.state === name) ?? null
 }
 
+/** 바뀐 경로 중 production — 테스트와 등록된 harness 파일을 뺀 나머지. */
+function productionChanges(changed, harnessPaths = []) {
+  return changed.filter((path) => !isTestPath(path) && !harnessPaths.includes(path))
+}
+
+/** 스냅샷의 테스트 파일 digest — VALID_RED가 묶은 testBindings.tests와 같은 모양이다. */
+function testDigests(current) {
+  return Object.fromEntries(
+    Object.keys(current)
+      .filter(isTestPath)
+      .map((path) => [path, current[path]]),
+  )
+}
+
 function assertNoProductionChange(changed, harnessPaths = []) {
-  const production = changed.filter((path) => !isTestPath(path) && !harnessPaths.includes(path))
+  const production = productionChanges(changed, harnessPaths)
 
   if (production.length > 0) {
     throw new CliError(
@@ -3474,14 +3491,9 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     await assertTestsNotWeakened(state, scanRoot)
     if (state.testBindings) {
       const currentEvidenceSha256 = await testEvidenceDigest(options.evidence)
-      const currentTests = Object.fromEntries(
-        Object.keys(current)
-          .filter(isTestPath)
-          .map((path) => [path, current[path]]),
-      )
       if (
         currentEvidenceSha256 !== state.testBindings.evidenceSha256 ||
-        !sameDigests(currentTests, state.testBindings.tests)
+        !sameDigests(testDigests(current), state.testBindings.tests)
       ) {
         if (state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
           throw new CliError('HARNESS_BUDGET_REQUIRED', 'evidence mapping or test bytes changed after VALID_RED')
@@ -4860,7 +4872,39 @@ function isReviewTransition(to) {
   return targetKind(deliveryProtocol, to) === 'review'
 }
 
-function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping }) {
+/**
+ * transition이 지금 바이트만으로 거부할 RED·GREEN — 단계 줄이 거부될 `red`·`green`을 권하지 않게 같은 사실을 막힘으로
+ * 보인다: VALID_RED 전 production 변경, VALID_RED 뒤 바뀐 테스트 바이트(새 harness 지출 전이면 예산 또는 소진, 뒤면 새 RED). 판정은
+ * 그대로 transition 몫이다 — 증거 매핑 변경처럼 인수에 달린 거부는 여기서 보이지 않는다.
+ */
+function guardBlockers(to, state, current) {
+  if (to !== 'VALID_RED' && to !== 'IMPLEMENTED_GREEN') return []
+  if (state.state === 'ORACLE_READY') {
+    return productionChanges(changedPaths(state.snapshot, current), state.harnessPaths).length > 0 ? ['PRODUCTION_TOUCHED_BEFORE_RED'] : []
+  }
+  if (to !== 'IMPLEMENTED_GREEN' || state.state !== 'VALID_RED' || !state.testBindings) return []
+  if (sameDigests(testDigests(current), state.testBindings.tests)) return []
+  const harness = state.budgets.harness
+  if (harness.spent > (state.harnessBudgetAtValidRed ?? 0)) return ['EVIDENCE_STALE']
+  // 지출할 예산이 없으면 지출 처방도 거부된다(BUDGET_EXHAUSTED) — 그 코드의 처방(FAIL 보고)을 바로 보인다
+  return [harness.spent >= harness.limit ? 'BUDGET_EXHAUSTED' : 'HARNESS_BUDGET_REQUIRED']
+}
+
+/**
+ * 리뷰 전이가 assertRequiredRuns로 거부할 필수 label — 마지막 run이 없거나, 통과가 아니거나, 지금 바이트의 run이 아니다. 다른
+ * label·명령의 실패는 세지 않는다: 전이가 그 실패로 거부하지 않는다.
+ */
+function requiredRunNotPassing(to, state, runEntries, stale) {
+  if (!isReviewTransition(to)) return false
+  return (state.requiredLabels ?? []).some((label) => {
+    const latest = runEntries.filter((entry) => entry.label === label).at(-1)
+    if (!latest || stale.has(latest.runId)) return true
+    const graded = label.endsWith(':exit') ? latest.grade === 'exit-only' : latest.grade === 'reported' && hasOnlyPassedTests(latest)
+    return latest.exitCode !== 0 || Boolean(latest.signal) || !graded
+  })
+}
+
+function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping, current }) {
   const requires = protocolRequiredFlags(deliveryProtocol, to, deliveryFacts(state, blindMapping ?? null))
   const packetBlockers = []
   let candidateRuns = []
@@ -4890,7 +4934,7 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
       }
     }
     candidateRuns = entries.map((entry) => entry.runId).reverse()
-    if (candidateRuns.length === 0) packetBlockers.push(wantsFailing ? 'NO_FRESH_RED_RUN' : 'NO_FRESH_GREEN_RUN')
+    if (candidateRuns.length === 0 || requiredRunNotPassing(to, state, runEntries, stale)) packetBlockers.push(wantsFailing ? 'NO_FRESH_RED_RUN' : 'NO_FRESH_GREEN_RUN')
     if (
       evidence.status === 'pending' &&
       evidence.missingRows?.length > 0 &&
@@ -4907,6 +4951,7 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
       })
       if (blocker) packetBlockers.push(blocker)
     }
+    packetBlockers.push(...guardBlockers(to, state, current))
     if (to === 'IMPLEMENTED_GREEN') {
       // 연속 통과 게이트: 같은 명령의 신선한 연속 통과가 부족하면 지금 인용해도 FLAKINESS_GATE다.
       const required = REQUIRED_CONSECUTIVE_PASSES[state.risk] ?? 1
@@ -4951,7 +4996,7 @@ function blindMappingReport(to, blindMapping) {
   return { blindMapping }
 }
 
-function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds }) {
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds, current }) {
   const dir = portablePath(process.cwd(), directory)
   return nextTargets(deliveryProtocol, state.state).map((to) => {
     const { requires, packetBlockers, candidateRuns } = transitionPacket(to, {
@@ -4961,6 +5006,7 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       blockers,
       evidence,
       blindMapping,
+      current,
     })
     // 열린 hold가 있으면 완전한 REVIEW_VERIFIED는 막히고 PARTIAL_VERIFIED가 그 자리다 — transition이 같은 규칙을 강제한다
     const holdBlocker = reviewHoldBlocker(to, holds.length)
@@ -5302,6 +5348,7 @@ async function collectStatus(directory, state, ledger) {
       evidence,
       blindMapping,
       holds: await openHolds(directory),
+      current,
     }),
   }
 }
@@ -5368,19 +5415,32 @@ function reviewRecordLines(state) {
 const PHASE_TARGET = { ORACLE_READY: 'VALID_RED', VALID_RED: 'IMPLEMENTED_GREEN', IMPLEMENTED_GREEN: 'REVIEW_VERIFIED' }
 // 그 단계의 명령(red·green 실행, 리뷰 작업)이 스스로 푸는 막힘 — 그 밖의 막힘(잠금 어긋남, 빠진 증거 행, 열린 hold…)이면 guide로 보낸다
 const PHASE_WORK_BLOCKER = /^(?:NO_FRESH_(?:RED|GREEN)_RUN|FLAKINESS_GATE_\d+_CONSECUTIVE|BLIND_MAP_REQUIRED)$/
+// close는 테스트를 돌리지 않는다 — 리뷰 목표의 이 막힘은 close가 아니라 exec가 푼다
+const REVIEW_RERUN_BLOCKER = /^(?:NO_FRESH_GREEN_RUN|FLAKINESS_GATE_\d+_CONSECUTIVE)$/
+
+/** 단계의 목표 — VALID_RED 뒤 테스트가 바뀌었고 harness 지출이 새로 있으면 GREEN 전에 새 RED가 먼저다(EVIDENCE_STALE). */
+function phaseTarget(statusResult) {
+  const target = PHASE_TARGET[statusResult.currentState]
+  if (target !== 'IMPLEMENTED_GREEN') return target
+  const packet = statusResult.nextActions.find((action) => action.to === target)
+  if (packet?.blockers.includes('EVIDENCE_STALE')) return 'VALID_RED'
+  return target
+}
 
 /**
  * `phase N/6 <name> · next: <command>` — 지금 상태(또는 guide가 고른 목표)의 명령 하나. 플래그는 그 전이 패킷의 requires에서
- * 가져온다. 안내일 뿐이다: 고르는 일과 판정은 그대로 guide --to와 transition 몫이다.
+ * 가져온다. 안내일 뿐이다: 고르는 일과 판정은 그대로 guide --to와 transition 몫이다. 표 "next 명령 → 모델 이벤트"는
+ * oracle-run-machine.cases.mjs의 NEXT_COMMANDS다.
  */
 function deliveryPhaseLine(directory, statusResult, to) {
-  const target = to ?? PHASE_TARGET[statusResult.currentState]
+  const target = to ?? phaseTarget(statusResult)
   const packet = statusResult.nextActions.find((action) => action.to === target)
   const dir = portablePath(process.cwd(), directory)
   let next
   if (!packet) next = `oracle-run.mjs close --dir ${dir} --check-report <report>`
   // guide --to가 이미 그 목표를 펼쳤으면 막힘은 바로 아래 blockers에 있다 — 같은 guide를 다시 권하지 않는다
   else if (!to && packet.blockers.some((blocker) => !PHASE_WORK_BLOCKER.test(blocker))) next = `oracle-run.mjs guide --dir ${dir} --to ${target}`
+  else if (isReviewTransition(target) && packet.blockers.some((blocker) => REVIEW_RERUN_BLOCKER.test(blocker))) next = `oracle-run.mjs exec --dir ${dir} --label <label> -- <command>`
   else if (target === 'VALID_RED' || target === 'IMPLEMENTED_GREEN') {
     const flags = packet.requires.filter((flag) => flag !== '--run').map((flag) => `${flag} <${flag.slice(2)}>`)
     next = [`oracle-run.mjs ${target === 'VALID_RED' ? 'red' : 'green'} --dir ${dir} --label <label>`, ...flags, '-- <command>'].join(' ')
@@ -5448,6 +5508,18 @@ async function reportStatus(options) {
   process.stdout.write(`${lines.join('\n')}\n`)
 }
 
+// 처방이 자리에 달린 막힘 — VALID_RED 뒤 테스트를 바꿨고 harness 예산이 다 쓰였어도 테스트를 VALID_RED 바이트로 되돌리면 GREEN이 다시 열린다
+const GUIDE_FIX = {
+  'VALID_RED→IMPLEMENTED_GREEN:BUDGET_EXHAUSTED': 'revert the test files to the VALID_RED bytes, then `green`; otherwise NEEDS_DECISION or FAIL',
+}
+
+/** guide가 막힘마다 보이는 처방 한 줄 — 자리에 달린 처방이 있으면 그것, 아니면 그 거부 코드의 처방, 둘 다 없으면 없다. */
+function guideFix(from, to, code) {
+  const placed = GUIDE_FIX[`${from}→${to}:${code}`]
+  if (placed) return `fix ${code}: ${placed}`
+  return Object.hasOwn(NEXT_ACTIONS, code) ? `fix ${code}: ${NEXT_ACTIONS[code]}` : null
+}
+
 async function reportGuide(options) {
   const allowed = new Set(['dir', 'to', 'rejection', 'json'])
   const unexpected = Object.entries(options).find(
@@ -5488,7 +5560,9 @@ async function reportGuide(options) {
     rejection,
     protocol: deliveryProtocol,
   })
-  process.stdout.write(options.json ? `${JSON.stringify(guide, null, 2)}\n` : `${phase}${renderGuidance(guide)}`)
+  // 단계 줄이 guide로 보낸 막힘마다 그 거부 코드의 처방 한 줄 — 막힘 이름만으로 다음 행동을 추측하지 않게 한다
+  const fixes = (guide.action?.blockers ?? []).map((code) => guideFix(status?.currentState, guide.action.to, code)).filter(Boolean).map((line) => `${line}\n`)
+  process.stdout.write(options.json ? `${JSON.stringify(guide, null, 2)}\n` : `${phase}${renderGuidance(guide)}${fixes.join('')}`)
 }
 
 // close가 리뷰 단계를 건너뛰고 보고서 검사로 가는 상태 — 단계 6의 끝 상태들이다
@@ -5605,11 +5679,55 @@ async function closeInputs(options, directory) {
     throw closePending('this run needs a blind row mapping', 'rerun the same close adding --blind-input <file inside the Oracle directory>')
   }
   const packetWritten = !(await fileExists(options.packet))
-  if (packetWritten) await reviewPacket({ ...options, output: options.packet })
-  else process.stdout.write(`CLOSE_SKIP review-packet: ${shownPath(options.packet)} exists\n`)
+  if (packetWritten) {
+    await assertWitnessForNewPacket(directory, state)
+    await reviewPacket({ ...options, output: options.packet })
+  } else {
+    process.stdout.write(`CLOSE_SKIP review-packet: ${shownPath(options.packet)} exists\n`)
+    await assertPacketWitnessed(options.packet)
+  }
   const blindWritten = blindRequired && !(await fileExists(options.blindInput))
   if (blindWritten) await blindInput({ dir: options.dir, output: options.blindInput })
   return { state, blindRequired, packetWritten, blindWritten }
+}
+
+/**
+ * 패킷의 증인 — 패킷이 담은 원장에 그 바이트(revision)에서 GREEN 라벨의 보고된 통과가 있다. 검증기가 findings를 읽기 전에 보는
+ * 조건과 같다(oracle-verify.mjs "does not target the implementation worktree"): 없으면 리뷰어 왕복 뒤 전이가 거부한다.
+ */
+function witnessed(history, ledger, revision) {
+  const greenEntry = [...(history ?? [])].reverse().find((entry) => entry.state === 'IMPLEMENTED_GREEN')
+  const greenRun = greenEntry ? ledger.find((entry) => entry.runId === greenEntry.runId) : null
+  const passes = (entry) => entry?.worktreeSha256 === revision && entry.exitCode === 0 && entry.grade === 'reported'
+  const label = greenRun?.label
+  const rerun = label ? ledger.find((entry) => entry.type === 'run' && entry.label === label && passes(entry)) : null
+  return passes(rerun ?? greenRun)
+}
+
+/** close가 지금 쓸 패킷에 증인이 없으면 쓰기 전에 멈춘다 — 그 패킷은 리뷰어를 한 번 부른 뒤 거부되고 2라운드면 라운드를 잃는다. */
+async function assertWitnessForNewPacket(directory, state) {
+  const ledger = await readLedger(directory)
+  const checkpoint = ledger.findIndex((entry) => entry.type === 'checkpoint')
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  if (witnessed(state.history, checkpoint >= 0 ? ledger.slice(checkpoint) : ledger, sha256(JSON.stringify(current)))) return
+  const error = new CliError('REVIEW_RERUN_REQUIRED', 'no passing reported run of the GREEN label on the current bytes — a packet made now would have no witness')
+  error.next = `run \`oracle-run.mjs exec --dir ${portablePath(process.cwd(), directory)} --label <GREEN label> -- <GREEN command>\`, then rerun the same close`
+  throw error
+}
+
+/** 이미 있는 패킷에 증인이 없으면 영수증을 쓰기 전에 거부한다 — 읽을 수 없는 패킷은 closeReview가 자기 코드로 거부한다. */
+async function assertPacketWitnessed(path) {
+  let packet
+  try {
+    packet = JSON.parse(await readFile(resolve(path), 'utf8'))
+  } catch {
+    return
+  }
+  if (witnessed(packet?.state?.history, packet?.ledger ?? [], packet?.targetSnapshot?.worktreeSha256)) return
+  const error = new CliError('REVIEW_PACKET_INVALID', `${shownPath(path)} was made before a passing run on its bytes — the review would refuse it`)
+  error.next = 'after `exec` on the current bytes, rerun the same close with a new --packet path; after round 2, NEEDS_DECISION'
+  throw error
 }
 
 /** transition이 판정할 증거로 blind 매핑 필요 여부를 정한다 — --evidence가 있으면 그 파일, 없으면 기록된 증거 경로. */

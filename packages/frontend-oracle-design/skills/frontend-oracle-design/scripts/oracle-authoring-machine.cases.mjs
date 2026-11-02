@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { sha256 } from './oracle-fs.mjs'
 import { compileBend } from './oracle-model.mjs'
+import { NEXT_COMMANDS, nextCommandOf, nextRefusal } from './oracle-run-machine.cases.mjs'
 import { assertReadyToLock, assertRelockPinned, inputsPin, markLocked } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { toPlain } from './oracle-types.mjs'
@@ -367,16 +368,8 @@ const WHY = {
   ITERATION_CEILING_REACHED: 'Ceiling',
 }
 const SPELLING = { ToDiscovering: 'DISCOVERING', ToModeled: 'MODELED', ToChecked: 'CHECKED', ToDrafted: 'DRAFTED', ToReady: 'ORACLE_READY', ToNothing: 'NOT_A_STAGE' }
-// the command `status --brief` names next, by the model's hint
-const HINT = {
-  HintBegin: /· next: oracle-stage\.mjs begin --dir /,
-  HintWalk: /· next: oracle-cycle\.mjs walk --dir \S+ ·/,
-  HintWalkReason: /· next: oracle-cycle\.mjs walk --dir \S+ --reason /,
-  HintLock: /· next: oracle-lock\.mjs create /,
-  HintInit: /· next: oracle-run\.mjs init /,
-  HintExtend: /· next: oracle-stage\.mjs extend --dir \S+ --approval /,
-  HintRevise: /· next: NEEDS_DECISION: the user rewrites the sources/,
-}
+// the NEXT_COMMANDS entry `status --brief` names next, by the model's hint
+const AUTHORING_NEXT = { HintBegin: 'begin', HintWalk: 'walk', HintWalkReason: 'walkReason', HintLock: 'lock', HintInit: 'init', HintExtend: 'extend', HintRevise: 'revise' }
 const KIND = 'cold-read'
 const TEXT_KEY = KIND
 const DISPATCH_KEY = `${KIND}:dispatch`
@@ -527,16 +520,25 @@ function recordEffects({ observed, before, after, previous, record }) {
   return { budgetWithoutHistory: budgetMoved && previous.history.length === record.history.length }
 }
 
-/** `status --brief` against the model: the next command, the authoring round, the STALE mark. */
-function phaseLineDifference(model, state, brief, recorded) {
+/**
+ * `status --brief` against the model: the next command, the authoring round, the STALE mark; once per model state,
+ * the events NEXT_COMMANDS gives the named command are accepted there (a marker has none).
+ */
+function phaseLineDifference(model, state, brief, recorded, checked) {
   const hint = toPlain(model.hint(state)).$
   const { budget } = toPlain(state)
   const round = `authoring round ${roundIn(budget.round.$)}/${roundIn(budget.limit.$)}`
   const stale = toPlain(model.stale(state))
   const line = brief.stdout
-  const named = brief.status === 0 && HINT[hint].test(line)
-  if (named && (!recorded || line.includes(round)) && line.includes('STALE:') === stale) return null
-  return { phaseLine: line || brief.stderr, wanted: { hint, round, stale } }
+  const command = brief.status === 0 ? nextCommandOf(line) : null
+  if (command !== AUTHORING_NEXT[hint] || (recorded && !line.includes(round)) || line.includes('STALE:') !== stale)
+    return { phaseLine: line || brief.stderr, wanted: { hint, round, stale } }
+  const key = keyOf(state)
+  if (checked.has(key)) return null
+  checked.add(key)
+  const entry = NEXT_COMMANDS[command]
+  const refused = entry.marker ? null : nextRefusal(model, state, entry.authoring(toPlain(state)))
+  return refused ? { phaseLine: line, refused } : null
 }
 
 const outcomeOfResult = (result) => {
@@ -546,7 +548,7 @@ const outcomeOfResult = (result) => {
 }
 
 /** Replay one trace; every step must end where the model says. Returns the differences and what the record kept. */
-async function replayTrace(model, fixture, repo, trace) {
+async function replayTrace(model, fixture, repo, trace, checked) {
   await cp(fixture.base, repo, { recursive: true })
   const directory = join(repo, PACKAGE_DIR)
   const recordPath = join(directory, 'stage.json')
@@ -571,7 +573,7 @@ async function replayTrace(model, fixture, repo, trace) {
     state = model.step(state, message)
     tally.steps += 1
     const brief = await runNode(repo, 'oracle-stage.mjs', ['status', '--brief', '--dir', directory], AUTHORING_ENV)
-    const phase = phaseLineDifference(model, state, brief, now.record !== null)
+    const phase = phaseLineDifference(model, state, brief, now.record !== null, checked)
     if (phase) return { differences: [{ ...where, ...phase }], tally }
   }
   return { differences: [], tally }
@@ -587,7 +589,8 @@ async function conformance(t) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-authoring-machine-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const fixture = await template(root)
-  const results = await pool(traces, 6, (trace, index) => replayTrace(model, fixture, join(root, `trace-${index}`), trace))
+  const checked = new Set()
+  const results = await pool(traces, 6, (trace, index) => replayTrace(model, fixture, join(root, `trace-${index}`), trace, checked))
   assert.deepEqual(
     results.flatMap(({ differences }) => differences),
     [],
@@ -595,7 +598,7 @@ async function conformance(t) {
   const steps = results.reduce((sum, { tally }) => sum + tally.steps, 0)
   const budgetWithoutHistory = results.reduce((sum, { tally }) => sum + tally.budgetWithoutHistory, 0)
   assert.equal(steps, traces.flat().length)
-  t.diagnostic(`${traces.length} traces, ${steps} steps; ${budgetWithoutHistory} accepted budget changes wrote no history entry`)
+  t.diagnostic(`${traces.length} traces, ${steps} steps; ${budgetWithoutHistory} accepted budget changes wrote no history entry; phase line checked against the table on ${checked.size} model states`)
   // Finding: the round, limit, approvals and review inputs live only in the top-level record; review-input and extend
   // change them without a history entry, so they cannot be rebuilt from history
   assert.ok(budgetWithoutHistory > 0, 'review-input and extend change the budget without a history entry')

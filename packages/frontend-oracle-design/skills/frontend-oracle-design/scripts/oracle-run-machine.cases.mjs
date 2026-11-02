@@ -31,7 +31,7 @@ async function provenLaws(t) {
   assert.equal(cells.status, 0, cells.stderr)
   const proven = JSON.parse(cells.stdout)
   assert.equal(proven.status, 'proven', `${proven.stdout}${proven.stderr}`)
-  assert.deepEqual(proven.cells, { generated: [{ law: 'hint_legal', cases: 9 }, { law: 'spend_monotone', cases: 24 }], skipped: [], temporaryCopy: true })
+  assert.deepEqual(proven.cells, { generated: [{ law: 'spend_monotone', cases: 24 }], skipped: [], temporaryCopy: true })
 
   // 15,552 states of the type × 19 commands; the proof has an arm per state of the type and per reached cell
   const reach = oracleModel('prove-reach', '--model', join(DELIVERY, 'MODEL.bend'), '--prefix', 'Del', '--safe', 'safe', '--max-cells', '300000', '--timeout-ms', '600000')
@@ -80,25 +80,86 @@ const WHY = {
   REVIEW_RECEIPT_STATE: 'WrongState',
   MISSING_REASON: 'NoReason',
 }
-// The command `status --brief` names next (deliveryPhaseLine) after every step, by run state. It is the phase's own
-// command, not one that would be accepted: at ORACLE_READY with production touched it still names `red`, which
-// PRODUCTION_TOUCHED_BEFORE_RED refuses until production is reverted.
-const HINT = {
-  AtReady: 'red',
-  AtRed: 'green',
-  AtGreen: 'close --packet',
-  AtVerified: 'close --check-report',
-  AtPartial: 'close --check-report',
-  AtDecision: 'close --check-report',
-  AtFail: 'close --check-report',
+/**
+ * The `next:` command of a phase line (`oracle-run.mjs status --brief` and `guide`, `oracle-stage.mjs status --brief`)
+ * and the model events it runs in one call, per model: `delivery` (test-fixtures/delivery), `lap`
+ * (test-fixtures/review-lap, from the state, since `close` picks its own steps) and `authoring`
+ * (test-fixtures/stage/authoring). A `marker` names a step no model event stands for: a read (`guide` lists the
+ * blocker and its fix, `close --check-report` checks the final report in a closed state), the user's approval or
+ * decision, or the hand-off to the Delivery run. Every next the replays reach matches exactly one entry; lines they
+ * never reach are not in the table: `oracle-run.mjs status --brief` after `init`, the Contract profile's
+ * `advance --to` and `rewind --to DISCOVERING`, and the transition example `guide --to` prints for a stop target
+ * (NEEDS_DECISION, FAIL).
+ */
+export const NEXT_COMMANDS = {
+  red: { line: /· next: oracle-run\.mjs red --dir /, delivery: () => [{ $: 'Exec', pass: false }, { $: 'MarkRed' }] },
+  green: { line: /· next: oracle-run\.mjs green --dir /, delivery: () => [{ $: 'Exec', pass: true }, { $: 'MarkGreen' }] },
+  exec: { line: /· next: oracle-run\.mjs exec --dir /, delivery: () => [{ $: 'Exec', pass: true }], lap: () => [{ $: 'Exec' }] },
+  close: {
+    line: /· next: oracle-run\.mjs close --dir \S+ --packet /,
+    delivery: () => [{ $: 'MakePacket' }, { $: 'Attest' }, { $: 'Review', to: { $: 'ToVerified' }, holds: false }],
+    lap: lapClose,
+  },
+  guide: { line: /· next: oracle-run\.mjs guide --dir \S+ --to /, marker: 'read' },
+  report: { line: /· next: oracle-run\.mjs close --dir \S+ --check-report /, marker: 'read' },
+  begin: { line: /· next: oracle-stage\.mjs begin --dir /, authoring: () => [{ $: 'Begin' }] },
+  walk: { line: /· next: oracle-cycle\.mjs walk --dir \S+ ·/, authoring: () => [{ $: 'Walk', reason: false }] },
+  walkReason: { line: /· next: oracle-cycle\.mjs walk --dir \S+ --reason /, authoring: () => [{ $: 'Walk', reason: true }] },
+  lock: { line: /· next: oracle-lock\.mjs create /, authoring: () => [{ $: 'Lock' }] },
+  // the event the CLI accepts once the user approved; asking first is the user decision
+  extend: { line: /· next: oracle-stage\.mjs extend --dir \S+ --approval /, authoring: () => [{ $: 'Approve', right: true }] },
+  init: { line: /· next: oracle-run\.mjs init /, marker: 'hand-off' },
+  revise: { line: /· next: NEEDS_DECISION: the user rewrites the sources/, marker: 'decision' },
 }
-const expectedHint = (state) => HINT[toPlain(state).at.$]
-/** `red`, `green`, `guide --to <state>`, `close --packet` or `close --check-report` from a phase line. */
-function hintOf(line) {
-  const match = /· next: oracle-run\.mjs (\w+) --dir \S+( --to \w+| --packet| --check-report)?/.exec(line)
-  if (!match) return line
-  if (match[1] === 'red' || match[1] === 'green') return match[1]
-  return `${match[1]}${match[2] ?? ''}`
+
+/**
+ * The close steps on a lap state: after round 2 with moved bytes it closes the repair on the round-2 packet
+ * (PARTIAL_VERIFIED); with the round's packet current and a receipt bound it records the verdict; otherwise it makes
+ * the packet when none is current and binds the reviewer's return, taken as clear (a blocking return is the
+ * reviewer's verdict, which close reports as FINDINGS_BLOCKING).
+ */
+function lapClose(s) {
+  const verdict = (to) => ({ $: 'Review', to: { $: to } })
+  const attest = { $: 'Attest', find: { $: 'Clear' } }
+  if (s.round.$ === 'R2' && !s.current) return s.bound ? [verdict('ToPartial')] : [attest, verdict('ToPartial')]
+  if (s.round.$ !== 'R0' && s.current) return s.bound ? [verdict('ToVerified')] : [attest, verdict('ToVerified')]
+  return [{ $: 'Packet' }, attest, verdict('ToVerified')]
+}
+
+/** The NEXT_COMMANDS entry a phase line names, or the line itself when it names none or more than one. */
+export function nextCommandOf(line) {
+  const keys = Object.keys(NEXT_COMMANDS).filter((key) => NEXT_COMMANDS[key].line.test(line))
+  return keys.length === 1 ? keys[0] : line
+}
+
+/** The first refusal the model gives the events of a next command from `state`, or null when it accepts them all. */
+export function nextRefusal(model, state, events) {
+  let at = state
+  for (const event of events) {
+    const outcome = toPlain(model.decide(at, event))
+    if (outcome.$ !== 'Took') return `${event.$}:${outcome.why.$}`
+    at = model.step(at, event)
+  }
+  return null
+}
+
+// the NEXT_COMMANDS entry of each model hint of the delivery fixture
+const DELIVERY_NEXT = { HintRed: 'red', HintGreen: 'green', HintExec: 'exec', HintClose: 'close', HintGuide: 'guide', HintReport: 'report' }
+
+/**
+ * The printed next against the model, once per reached model state: it names the model's hint, and the events the
+ * table gives it are accepted there (a marker has none). Returns the difference, or null.
+ */
+function phaseLineDifference(model, state, line, checked) {
+  const key = nextCommandOf(line)
+  const wanted = DELIVERY_NEXT[toPlain(model.hint(state)).$]
+  if (key !== wanted) return { phaseLine: line, wanted, state: toPlain(state) }
+  const stateKey = JSON.stringify(toPlain(state))
+  if (checked.has(stateKey)) return null
+  checked.add(stateKey)
+  const entry = NEXT_COMMANDS[key]
+  const refused = entry.marker ? null : nextRefusal(model, state, entry.delivery(toPlain(state)))
+  return refused ? { phaseLine: line, refused, state: toPlain(state) } : null
 }
 const RED_TEST = "import test from 'node:test'\ntest('save > pending', () => { throw new Error('expected RED') })\n"
 // file edits change no ledger; every other accepted command writes the ledger except a free pre-RED spend
@@ -127,7 +188,7 @@ function loadModel(exported, prefix = 'Del', item = deliveryItem) {
     (...args) =>
       exported[`${prefix}.${name}`](...args.map((argument) => structuredClone(argument)))
   const enabled = call('enabled')
-  return { init: call('init'), step: call('step'), decide: call('decide'), enabled: (state) => listItems(enabled(state)), item }
+  return { init: call('init'), step: call('step'), decide: call('decide'), hint: call('hint'), enabled: (state) => listItems(enabled(state)), item }
 }
 
 function itemOf(model, state, message) {
@@ -362,8 +423,8 @@ async function sideEffects(run, message, observed, before) {
   return found
 }
 
-/** Replay one trace on the CLI; every step must end where the model says. Returns the differences. */
-async function replayTrace(t, model, trace) {
+/** Replay one trace on the CLI; every step must end where the model says, and the phase line name what the table maps to an accepted event. Returns the differences. */
+async function replayTrace(t, model, trace, checked) {
   const run = await deliveryRun(t)
   const differences = []
   let state = model.init()
@@ -380,8 +441,8 @@ async function replayTrace(t, model, trace) {
     if (differences.length > 0) return differences
     state = model.step(state, message)
     const brief = await run.brief()
-    const hint = brief.status === 0 ? hintOf(brief.stdout) : brief.stderr
-    if (hint !== expectedHint(state)) return [{ ...where, phaseLine: hint, wanted: expectedHint(state), state: toPlain(state) }]
+    const phase = phaseLineDifference(model, state, brief.status === 0 ? brief.stdout.split('\n')[0] : brief.stderr, checked)
+    if (phase) return [{ ...where, ...phase }]
   }
   return differences
 }
@@ -420,8 +481,11 @@ async function conformance(t) {
   // production touched (the model has no revert, and VALID_RED and GREEN refuse a touched production), and VALID_RED
   // with test edits and an exhausted harness budget
   assert.deepEqual(progress(model), { cannotFail: 0, stuck: { AtReady: 147, AtDecision: 124, AtRed: 5 } })
-  const differences = (await pool(traces, 6, (trace) => replayTrace(t, model, trace))).flat()
+  // the phase line after every step names the model's hint; the table's events for it are checked once per model state
+  const checked = new Set()
+  const differences = (await pool(traces, 6, (trace) => replayTrace(t, model, trace, checked))).flat()
   assert.deepEqual(differences, [])
+  t.diagnostic(`phase line checked against the table on ${checked.size} of 1295 reached model states`)
 }
 
 // ---- the review lap: IMPLEMENTED_GREEN to a review verdict, with the round and the class of round-2 findings
@@ -553,6 +617,7 @@ async function lapRun(t) {
   return {
     dir,
     perform: (message) => commands[message.$](message),
+    brief: () => runAsync(['status', '--dir', dir, '--brief']),
     /** status --brief on the run-state.json init wrote: the ledger alone must give back the verdict and its record. */
     async replayedBrief() {
       const current = await readFile(statePath)
@@ -571,10 +636,27 @@ async function observeLap(directory) {
   return { state, at: STATE[state.state], round: state.reviewIterations?.inputs?.snapshot?.round ?? 0 }
 }
 
+/**
+ * The phase line on a lap state, read once per model state (`phases` keeps them): the NEXT_COMMANDS entry it names
+ * and, for a command, the model's first refusal of the events the table gives it.
+ */
+async function lapPhase(run, model, state, phases) {
+  const key = JSON.stringify(toPlain(state))
+  if (phases.has(key)) return
+  phases.set(key, null)
+  const brief = await run.brief()
+  const line = brief.status === 0 ? brief.stdout.split('\n')[0] : brief.stderr
+  const command = nextCommandOf(line)
+  const entry = NEXT_COMMANDS[command]
+  if (!entry || !(entry.marker || entry.lap)) phases.set(key, { command: line })
+  else phases.set(key, { command, refused: entry.marker ? null : nextRefusal(model, state, entry.lap(toPlain(state))) })
+}
+
 /** Replay one lap trace on the CLI; every step must end where the model says, and an accepted verdict must record what the model says. */
-async function replayLap(t, model, trace) {
+async function replayLap(t, model, trace, phases) {
   const run = await lapRun(t)
   let state = model.init()
+  await lapPhase(run, model, state, phases)
   for (const [index, message] of trace.entries()) {
     const before = { state: await readOr(join(run.dir, 'run-state.json')), ledger: await readOr(join(run.dir, 'runs.jsonl')) }
     const plain = toPlain(message)
@@ -592,6 +674,7 @@ async function replayLap(t, model, trace) {
     const verdict = await verdictDifference(run, s, plain, observed.outcome === 'Took' ? recorded : null)
     if (verdict) return [{ ...where, ...verdict }]
     state = model.step(state, message)
+    await lapPhase(run, model, state, phases)
   }
   return []
 }
@@ -618,8 +701,25 @@ async function lapConformance(t) {
   assert.equal(reachable, 229)
   assert.equal(items, LAP_ITEMS)
   assert.equal(traces.length, LAP_TRACES)
-  const differences = (await pool(traces, 6, (trace) => replayLap(t, model, trace))).flat()
+  const phases = new Map()
+  const differences = (await pool(traces, 6, (trace) => replayLap(t, model, trace, phases))).flat()
   assert.deepEqual(differences, [])
+  // the phase line on every lap state a trace visits: the commands it names, and the model's refusals of their events
+  const named = {}
+  const refused = {}
+  for (const phase of phases.values()) {
+    named[phase.command] = (named[phase.command] ?? 0) + 1
+    if (phase.refused) refused[`${phase.command} → ${phase.refused}`] = (refused[`${phase.command} → ${phase.refused}`] ?? 0) + 1
+  }
+  assert.deepEqual(named, { exec: 57, close: 37, report: 36 })
+  // Finding: `close` is named where the model refuses it. Blocking: the receipt bound to the current packet blocks,
+  // which the ledger does not record (receipts keep the findings digest only), so the line cannot tell; close reports
+  // FINDINGS_BLOCKING with its fix in the call that binds the receipt. Unwitnessed and Followup are reached only off
+  // the line: a packet made by `review-packet` while the line named `exec` (`close` refuses to write such a packet
+  // and refuses one before any receipt), or bytes edited while a round-1 packet waited for its reviewer. In every
+  // Unwitnessed state the model has a fresh pass (Stale is refused first); the CLI's way out is `close` with a new
+  // packet path on the same bytes, which embeds that pass, while the model keeps a repeated packet's witness.
+  assert.deepEqual(refused, { 'close → Review:Blocking': 3, 'close → Review:Unwitnessed': 17, 'close → Packet:Followup': 2 })
 }
 
 export const deliveryMachineCases = [

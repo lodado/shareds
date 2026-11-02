@@ -3,12 +3,10 @@ import ./MODEL.bend as M
 
 # Laws of the Delivery run model. The every-trace law is MODEL.bend's `Del.safe` (every Q_ relation on every
 # command the environment allows, in every state a trace reaches): `oracle-model.mjs prove-reach --model MODEL.bend
-# --prefix Del --safe safe` proves it with the kernel. The laws below are the cells and witnesses `prove` checks.
-
-# the phase line names a legal command in every run state
-law hint_legal:
-  for p: M.Phase
-  {M.Del.hint_legal(p) == True{} : Bool}
+# --prefix Del --safe safe` proves it with the kernel, including the model's hint (`Del.hint_accepted`) on every
+# reached state: Red, Green, Exec and Close are accepted events; Guide only where red and green are both refused,
+# Report only where the run is closed. The CLI's printed line is sampled by the replay, not proven here. The laws
+# below are the cells and witnesses `prove` checks.
 
 # a harness spend never lowers the spent count
 law spend_monotone:
