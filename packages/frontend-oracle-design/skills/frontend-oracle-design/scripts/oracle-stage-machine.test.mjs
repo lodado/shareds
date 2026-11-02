@@ -24,6 +24,7 @@ import {
 import { compileBend } from './oracle-model.mjs'
 import { deliveryMachineCases } from './oracle-run-machine.cases.mjs'
 import { readStage } from './oracle-stage.mjs'
+import { stepCases } from './oracle-step.cases.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { parseBendTypes, toPlain, typeIR, valuesOf } from './oracle-types.mjs'
 
@@ -270,3 +271,6 @@ for (const args of deliveryMachineCases) test(...args)
 
 // the authoring machine: stage record, round budget, walk and the stage half of the lock, proven and driven the same way
 for (const args of authoringMachineCases) test(...args)
+
+// oracle-step.mjs, the driver over both machines: the shared next table, its stops, and real runs end to end
+for (const args of stepCases) test(...args)

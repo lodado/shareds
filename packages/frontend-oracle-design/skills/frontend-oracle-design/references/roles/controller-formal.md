@@ -5,6 +5,10 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
 
 ## Phases
 
+Drive the run with `oracle-step.mjs --dir <dir>` and do what its last line, `NEXT FOR YOU:`, says. It runs
+the mechanical next command itself (begin, walk, red, green, exec, close, guide, report) with every
+argument filled, and stops for a file to write, a reviewer to dispatch, or the user's approval or decision.
+
 Six phases group the stage and Delivery states: a view, not new states, budgets or gates. Start each
 Progress message (common's table) and every answer to a progress question with the line from
 `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`

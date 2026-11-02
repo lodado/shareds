@@ -75,7 +75,7 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
 const verifyScript = join(scriptDirectory, 'oracle-verify.mjs')
 // reference-graph.json이 `항상`으로 선언한 리뷰 포인트 — packet에 빠지면 reviewer가 판정 기준 없이 읽는다.
-const canonicalReviewPoints = [
+export const canonicalReviewPoints = [
   { name: 'review-checklist.md', path: resolve(scriptDirectory, '../references/review-checklist.md') },
   { name: 'changeability.md', path: resolve(scriptDirectory, '../references/changeability.md') },
 ]
@@ -418,11 +418,11 @@ async function runnerHarnessPaths(root, worktree) {
   return { paths: [...new Set(paths)].sort(), unresolved, suggested }
 }
 
-function selectedDigests(snapshot, paths) {
+export function selectedDigests(snapshot, paths) {
   return Object.fromEntries(paths.map((path) => [path, snapshot[path] ?? null]))
 }
 
-function sameDigests(left, right) {
+export function sameDigests(left, right) {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
@@ -4896,7 +4896,12 @@ function guardBlockers(to, state, current) {
  */
 function requiredRunNotPassing(to, state, runEntries, stale) {
   if (!isReviewTransition(to)) return false
-  return (state.requiredLabels ?? []).some((label) => {
+  return requiredLabelsNotPassing(state, runEntries, stale).length > 0
+}
+
+/** The required labels whose latest run is missing, stale or not a pass — oracle-step.mjs reruns them before GREEN and review. */
+export function requiredLabelsNotPassing(state, runEntries, stale) {
+  return (state.requiredLabels ?? []).filter((label) => {
     const latest = runEntries.filter((entry) => entry.label === label).at(-1)
     if (!latest || stale.has(latest.runId)) return true
     const graded = label.endsWith(':exit') ? latest.grade === 'exit-only' : latest.grade === 'reported' && hasOnlyPassedTests(latest)
@@ -5429,8 +5434,8 @@ function phaseTarget(statusResult) {
 
 /**
  * `phase N/6 <name> · next: <command>` — 지금 상태(또는 guide가 고른 목표)의 명령 하나. 플래그는 그 전이 패킷의 requires에서
- * 가져온다. 안내일 뿐이다: 고르는 일과 판정은 그대로 guide --to와 transition 몫이다. 표 "next 명령 → 모델 이벤트"는
- * oracle-run-machine.cases.mjs의 NEXT_COMMANDS다.
+ * 가져온다. 안내일 뿐이다: 고르는 일과 판정은 그대로 guide --to와 transition 몫이다. next 명령 표는 oracle-next.mjs의
+ * NEXT_LINES(oracle-step.mjs가 읽는다)이고, 그 모델 이벤트는 oracle-run-machine.cases.mjs의 NEXT_COMMANDS다.
  */
 function deliveryPhaseLine(directory, statusResult, to) {
   const target = to ?? phaseTarget(statusResult)
@@ -6619,11 +6624,27 @@ async function breaksSyntax(target, original, planned) {
   return result.status === 0 ? null : (result.stderr.split('\n').find((line) => /Error/.test(line)) ?? 'syntax error').trim()
 }
 
-async function main() {
-  deliveryProtocol = compileDeliveryProtocol(
+async function loadDeliveryProtocol() {
+  deliveryProtocol ??= compileDeliveryProtocol(
     JSON.parse(await readFile(join(scriptDirectory, '../references/delivery.protocol.json'), 'utf8')),
     { referenceNodeIds: (await loadGraph()).nodes.map(({ id }) => id) },
   )
+}
+
+/**
+ * The first line of `status --brief` and what it is read from, for oracle-step.mjs in the same process: the replayed
+ * state, the ledger and the status. Reads only; the line is the one `status --brief` prints.
+ */
+export async function deliveryBrief(directory) {
+  await loadDeliveryProtocol()
+  const ledger = await readLedger(directory)
+  const state = replayState(await readState(directory), ledger)
+  const status = await collectStatus(directory, state, ledger)
+  return { line: briefStatusLine(directory, state, ledger, status).split('\n')[0], state, ledger, status }
+}
+
+async function main() {
+  await loadDeliveryProtocol()
   const [command, ...args] = process.argv.slice(2)
   const options = parseOptions(args)
 

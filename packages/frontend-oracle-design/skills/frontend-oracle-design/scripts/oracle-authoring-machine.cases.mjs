@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { sha256 } from './oracle-fs.mjs'
 import { compileBend } from './oracle-model.mjs'
-import { NEXT_COMMANDS, nextCommandOf, nextRefusal } from './oracle-run-machine.cases.mjs'
+import { NEXT_COMMANDS, nextCommandOf, nextRefusal, stepPlanDifference } from './oracle-run-machine.cases.mjs'
 import { assertReadyToLock, assertRelockPinned, inputsPin, markLocked } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { toPlain } from './oracle-types.mjs'
@@ -573,8 +573,12 @@ async function replayTrace(model, fixture, repo, trace, checked) {
     state = model.step(state, message)
     tally.steps += 1
     const brief = await runNode(repo, 'oracle-stage.mjs', ['status', '--brief', '--dir', directory], AUTHORING_ENV)
+    const firstVisit = !checked.has(keyOf(state))
     const phase = phaseLineDifference(model, state, brief, now.record !== null, checked)
     if (phase) return { differences: [{ ...where, ...phase }], tally }
+    // oracle-step.mjs on the same state: the entry it picks and the commands it would run
+    const planned = firstVisit ? await stepPlanDifference(directory, nextCommandOf(brief.stdout)) : null
+    if (planned) return { differences: [{ ...where, phaseLine: brief.stdout, ...planned }], tally }
   }
   return { differences: [], tally }
 }
@@ -590,6 +594,15 @@ async function conformance(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   const fixture = await template(root)
   const checked = new Set()
+  // oracle-step.mjs reads the phase line in this process: give it the lowered caps the stage commands run with
+  const caps = { ORACLE_REWIND_CAP: process.env.ORACLE_REWIND_CAP, ORACLE_ROUND_CEILING: process.env.ORACLE_ROUND_CEILING }
+  Object.assign(process.env, { ORACLE_REWIND_CAP: AUTHORING_ENV.ORACLE_REWIND_CAP, ORACLE_ROUND_CEILING: AUTHORING_ENV.ORACLE_ROUND_CEILING })
+  t.after(() => {
+    for (const [name, value] of Object.entries(caps)) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  })
   const results = await pool(traces, 6, (trace, index) => replayTrace(model, fixture, join(root, `trace-${index}`), trace, checked))
   assert.deepEqual(
     results.flatMap(({ differences }) => differences),

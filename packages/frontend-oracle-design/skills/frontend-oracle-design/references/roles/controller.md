@@ -15,7 +15,8 @@ write state. Lock mismatch stops, never auto-relocks. Source-set or meaning chan
 Design-only ends at actual design state without consumer execution or production/dependency edits.
 
 Explicit Delivery invokes `$test`, uses one ledger and shared budgets, actual required command labels
-and the current `oracle-run.mjs guide`. Accept VALID_RED before invoking `$oracle-implement`.
+and the current `oracle-run.mjs guide`. `oracle-step.mjs --dir <dir>` runs the mechanical next command with
+its arguments filled; do what its last line, `NEXT FOR YOU:`, says. Accept VALID_RED before invoking `$oracle-implement`.
 ALREADY_SATISFIED is zero-production only. Return harness corrections to `$test`. Record GREEN once.
 Dispatch independent Delivery review on fresh matching evidence and issue receipts only from actual
 returns. Re-run required verification on final bytes after findings. Reviewer returns are not acceptance.

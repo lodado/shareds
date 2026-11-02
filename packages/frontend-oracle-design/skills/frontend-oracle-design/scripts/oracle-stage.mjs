@@ -891,7 +891,7 @@ async function status(directory) {
  * 진행 한 줄 — 사용자가 "언제 끝남"을 묻기 전에 컨트롤러가 찍는다: 지금 단계와 자리, 그 단계에 머문 시간, 저작 예산,
  * 이 단계에서 보낸 독립 디스패치와 경과, 남은 단계. 판정을 대신하지 않는다 — 관문은 advance·lock이 연다.
  */
-async function briefStatus(directory, nowMs = Date.now()) {
+export async function briefStatus(directory, nowMs = Date.now()) {
   const dir = relative(process.cwd(), directory) || '.'
   const record = await readStage(directory)
   if (!record) return phaseLine(null, `oracle-stage.mjs begin --dir ${dir}`)

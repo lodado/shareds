@@ -1,3 +1,76 @@
+# 0.125.0: one entry point, `oracle-step.mjs`, runs the mechanical next command and prints the rest
+
+## Why
+
+Wave S1 of the simplification plan. The agent read the phase line, typed the command it named, and assembled
+arguments by hand (a `close` takes up to 12 flags). Each hand-assembled step can be refused and costs a turn.
+
+## Change
+
+- `oracle-step.mjs --dir <dir>` reads the phase line (`deliveryBrief` when run-state.json exists, else the stage
+  `briefStatus`), runs the next command when it is in `AUTO` (begin, walk, red, green, exec, close, guide, report) with
+  every argument filled, and reads the line again. It stops on a non-zero exit (one action printed), on a phase line
+  already seen in the same call, on an empty plan, on CLOSED, and after 8 commands. The answer is at most six lines
+  (the commands run on one line); the last is `NEXT FOR YOU: ...`. Lock, extend, init, the NEEDS_DECISION revise,
+  walk with a reason, reviewer dispatch, mutation flags (High risk) and a new packet path for an unwitnessed packet
+  are printed, never run. Besides the reports/ folder for the test reports it names, step writes only what the
+  commands it runs write.
+- Close never guesses: it binds reviewer returns only when as many answer the packet as the risk needs (1, High 2),
+  otherwise it lists them (`--findings`/`--intersect` pick); a task id the agent passes wins; from host receipts it
+  takes only a task recorded after the round began and not bound in the ledger, and lists the candidates when equal
+  returns (every clear review shares a digest) leave more than one. A new round's packet waits for an updated
+  implementation-decision.md when the file still equals the one the last packet carried.
+- GREEN is not rerun on production and test bytes a GREEN or exec of its label already failed on after VALID_RED.
+- A `--dir` with spaces is swapped for one word before the table match; printed paths are quoted when needed.
+- The line regexes moved out of the test table into `oracle-next.mjs` (`NEXT_LINES`, `nextCommandOf`); the cases file
+  keeps the model events (`NEXT_EVENTS`) and still exports `NEXT_COMMANDS` with the same shape.
+- oracle-run.mjs exports `deliveryBrief`, `canonicalReviewPoints` and `requiredLabelsNotPassing` (the rule
+  `requiredRunNotPassing` already used); oracle-stage.mjs exports `briefStatus`. No command output changed.
+- Controller docs: one paragraph in controller-formal.md and one sentence in controller.md say to run step and do
+  what its last line says.
+
+## Tests
+
+- The replays now also ask step on the first visit of each model state: the planned command is the table entry the
+  line names, and the calls are that entry's AUTO command (or the `exec` runs step puts before it). Delivery: 182 of
+  1,295 reached states; authoring: 452 states (72 traces, 2,012 steps); review lap: every lap state whose line is
+  checked.
+- oracle-step.cases.mjs (registered from oracle-stage-machine.test.mjs, 11 cases): a property over the table that a
+  non-AUTO or unknown line yields no call, the revise and unknown-line wording, a spaced `--dir`; loop stops on
+  refusal, refused walk, unchanged line, A-B-A, empty plan and cap (FLAKINESS_GATE goes on within the cap); host
+  receipts (two clear round-2 returns listed, an older bound clear receipt skipped, a named task wins); too many and
+  too few returns; the stale decision; the unwitnessed packet's printed close (equal to the refused one with only
+  `--packet` changed); no GREEN on bytes a GREEN failed on; blind mapping and High risk mutation close; a real-CLI run
+  from no stage record to DRAFTED (then the lock instruction); a real-CLI Delivery run from ORACLE_READY to a checked
+  report, whose `close` arguments equal a list built from the run's own files and which the CLI then accepts; a
+  refused `red` stops after one run with one action.
+- Independent Opus review round 1 (3 major, 5 minor, 2 nit): all applied. Round 2 found the GREEN guard dead (the
+  harness digests are objects, compared with `!==`) and a test that hid it with strings: fixed with `sameDigests` and
+  object digests; no regression, no security finding.
+
+## Open facts (not fixed)
+
+- The first `red` needs `--label <label> -- <command>` when the ledger has no run yet.
+- Without host receipts the reviewer task id must be passed (`--task-id`, `--intersect-task-id`).
+- `init` is printed with the label `repo-test` and a scan root from the source paths; the user edits it.
+- Step keeps no state between calls: an agent that keeps calling it on a line that swings between two states loops
+  in its own turns; within one call a repeated line stops it.
+- oracle-step.mjs is 577 lines (aim was 350).
+- Round 2 improvement proposals, left as they are: after an environment-caused failed GREEN there is no rerun through
+  step; at High risk with no packet yet and one earlier return, step names an `intersect-<new revision>` file for a
+  packet that does not exist; the stale-decision check is skipped when the last packet file is missing; blind-map
+  receipts have no time filter; the return list does not mark the blocking ones; a hand-named packet that sorts before
+  `packet-<rev>-2.json` makes step pick the invalid one again.
+
+## Verification
+
+- `node --test oracle-stage-machine.test.mjs` (Bend replays and the step cases): 22 pass, 0 fail.
+- `node --test oracle-run.shard-*.test.mjs`: 227 pass, 0 fail.
+- skill-contract, mandatory-verification, reference-bundles and workflow-docs tests: 136 pass (with oracle-stage.test
+  before the review: 182). Bundles regenerated with no diff.
+- `pnpm lint`: 0 errors, 405 warnings (same as 0.124.0); the changed files linted from HEAD through stdin have the same
+  per-file warning counts (oracle-run.mjs 60, oracle-stage.mjs 3, the rest 0), the new files none.
+
 # 0.124.0: the phase line names a command the next step accepts on the Delivery states the replays visit; known exceptions below
 
 ## Why

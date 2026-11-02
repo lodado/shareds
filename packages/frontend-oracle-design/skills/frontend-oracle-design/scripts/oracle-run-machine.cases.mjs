@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { repairHunks } from './oracle-iterations.mjs'
 import { compileBend } from './oracle-model.mjs'
+import { NEXT_LINES, nextCommandOf } from './oracle-next.mjs'
 import { bindReviewDocument, runAsync, strictReviewPacketArgs, workspace } from './oracle-run.cases.mjs'
+import { AUTO, AUTO_COMMAND, stepPlan } from './oracle-step.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { toPlain } from './oracle-types.mjs'
 
@@ -81,35 +83,54 @@ const WHY = {
   MISSING_REASON: 'NoReason',
 }
 /**
- * The `next:` command of a phase line (`oracle-run.mjs status --brief` and `guide`, `oracle-stage.mjs status --brief`)
- * and the model events it runs in one call, per model: `delivery` (test-fixtures/delivery), `lap`
- * (test-fixtures/review-lap, from the state, since `close` picks its own steps) and `authoring`
- * (test-fixtures/stage/authoring). A `marker` names a step no model event stands for: a read (`guide` lists the
- * blocker and its fix, `close --check-report` checks the final report in a closed state), the user's approval or
- * decision, or the hand-off to the Delivery run. Every next the replays reach matches exactly one entry; lines they
- * never reach are not in the table: `oracle-run.mjs status --brief` after `init`, the Contract profile's
- * `advance --to` and `rewind --to DISCOVERING`, and the transition example `guide --to` prints for a stop target
- * (NEEDS_DECISION, FAIL).
+ * The model events each `next:` command of oracle-next.mjs NEXT_LINES runs in one call, per model: `delivery`
+ * (test-fixtures/delivery), `lap` (test-fixtures/review-lap, from the state, since `close` picks its own steps) and
+ * `authoring` (test-fixtures/stage/authoring). A `marker` names a step no model event stands for: a read (`guide` lists
+ * the blocker and its fix, `close --check-report` checks the final report in a closed state), the user's approval or
+ * decision, or the hand-off to the Delivery run. Every next the replays reach matches exactly one entry.
  */
-export const NEXT_COMMANDS = {
-  red: { line: /· next: oracle-run\.mjs red --dir /, delivery: () => [{ $: 'Exec', pass: false }, { $: 'MarkRed' }] },
-  green: { line: /· next: oracle-run\.mjs green --dir /, delivery: () => [{ $: 'Exec', pass: true }, { $: 'MarkGreen' }] },
-  exec: { line: /· next: oracle-run\.mjs exec --dir /, delivery: () => [{ $: 'Exec', pass: true }], lap: () => [{ $: 'Exec' }] },
+const NEXT_EVENTS = {
+  red: { delivery: () => [{ $: 'Exec', pass: false }, { $: 'MarkRed' }] },
+  green: { delivery: () => [{ $: 'Exec', pass: true }, { $: 'MarkGreen' }] },
+  exec: { delivery: () => [{ $: 'Exec', pass: true }], lap: () => [{ $: 'Exec' }] },
   close: {
-    line: /· next: oracle-run\.mjs close --dir \S+ --packet /,
     delivery: () => [{ $: 'MakePacket' }, { $: 'Attest' }, { $: 'Review', to: { $: 'ToVerified' }, holds: false }],
     lap: lapClose,
   },
-  guide: { line: /· next: oracle-run\.mjs guide --dir \S+ --to /, marker: 'read' },
-  report: { line: /· next: oracle-run\.mjs close --dir \S+ --check-report /, marker: 'read' },
-  begin: { line: /· next: oracle-stage\.mjs begin --dir /, authoring: () => [{ $: 'Begin' }] },
-  walk: { line: /· next: oracle-cycle\.mjs walk --dir \S+ ·/, authoring: () => [{ $: 'Walk', reason: false }] },
-  walkReason: { line: /· next: oracle-cycle\.mjs walk --dir \S+ --reason /, authoring: () => [{ $: 'Walk', reason: true }] },
-  lock: { line: /· next: oracle-lock\.mjs create /, authoring: () => [{ $: 'Lock' }] },
+  guide: { marker: 'read' },
+  report: { marker: 'read' },
+  begin: { authoring: () => [{ $: 'Begin' }] },
+  walk: { authoring: () => [{ $: 'Walk', reason: false }] },
+  walkReason: { authoring: () => [{ $: 'Walk', reason: true }] },
+  lock: { authoring: () => [{ $: 'Lock' }] },
   // the event the CLI accepts once the user approved; asking first is the user decision
-  extend: { line: /· next: oracle-stage\.mjs extend --dir \S+ --approval /, authoring: () => [{ $: 'Approve', right: true }] },
-  init: { line: /· next: oracle-run\.mjs init /, marker: 'hand-off' },
-  revise: { line: /· next: NEEDS_DECISION: the user rewrites the sources/, marker: 'decision' },
+  extend: { authoring: () => [{ $: 'Approve', right: true }] },
+  init: { marker: 'hand-off' },
+  revise: { marker: 'decision' },
+}
+/** The runtime table (oracle-next.mjs, which oracle-step.mjs reads) with the model events of each entry. */
+export const NEXT_COMMANDS = Object.fromEntries(Object.entries(NEXT_LINES).map(([key, line]) => [key, { line, ...NEXT_EVENTS[key] }]))
+export { nextCommandOf }
+
+/** The table and its events name the same commands. */
+function nextEventsCover() {
+  assert.deepEqual(Object.keys(NEXT_EVENTS).sort(), Object.keys(NEXT_LINES).sort())
+}
+
+const sameCommand = (left, right) => left[0] === right[0] && left[1] === right[1]
+
+/**
+ * What oracle-step.mjs would do on a state a replay reached: it names the entry the phase line names, and runs only an
+ * AUTO entry's own command (GREEN and a review rerun may first run `exec` for other required labels). Null when so.
+ */
+export async function stepPlanDifference(directory, wanted) {
+  const plan = await stepPlan(directory)
+  if (plan.key !== wanted) return { step: plan.key, wanted }
+  if (!plan.calls) return null
+  const calls = plan.calls.map((call) => [call.script, call.args[0]])
+  const own = (call, index) => sameCommand(call, AUTO_COMMAND[plan.key]) || (index < calls.length - 1 && sameCommand(call, AUTO_COMMAND.exec))
+  if (AUTO.has(plan.key) && calls.every(own)) return null
+  return { step: plan.key, calls }
 }
 
 /**
@@ -124,12 +145,6 @@ function lapClose(s) {
   if (s.round.$ === 'R2' && !s.current) return s.bound ? [verdict('ToPartial')] : [attest, verdict('ToPartial')]
   if (s.round.$ !== 'R0' && s.current) return s.bound ? [verdict('ToVerified')] : [attest, verdict('ToVerified')]
   return [{ $: 'Packet' }, attest, verdict('ToVerified')]
-}
-
-/** The NEXT_COMMANDS entry a phase line names, or the line itself when it names none or more than one. */
-export function nextCommandOf(line) {
-  const keys = Object.keys(NEXT_COMMANDS).filter((key) => NEXT_COMMANDS[key].line.test(line))
-  return keys.length === 1 ? keys[0] : line
 }
 
 /** The first refusal the model gives the events of a next command from `state`, or null when it accepts them all. */
@@ -440,11 +455,21 @@ async function replayTrace(t, model, trace, checked) {
     for (const effect of await sideEffects(run, plain, observed, before)) differences.push({ ...where, ...effect })
     if (differences.length > 0) return differences
     state = model.step(state, message)
-    const brief = await run.brief()
-    const phase = phaseLineDifference(model, state, brief.status === 0 ? brief.stdout.split('\n')[0] : brief.stderr, checked)
+    const phase = await phaseAfter(run, model, state, checked)
     if (phase) return [{ ...where, ...phase }]
   }
   return differences
+}
+
+/** The phase line after a step against the model and the table, and on a state seen first, what oracle-step.mjs would run there. */
+async function phaseAfter(run, model, state, checked) {
+  const brief = await run.brief()
+  const line = brief.status === 0 ? brief.stdout.split('\n')[0] : brief.stderr
+  const firstVisit = !checked.has(JSON.stringify(toPlain(state)))
+  const phase = phaseLineDifference(model, state, line, checked)
+  if (phase || !firstVisit) return phase
+  const planned = await stepPlanDifference(run.dir, nextCommandOf(line))
+  return planned ? { phaseLine: line, ...planned } : null
 }
 
 async function pool(items, size, work) {
@@ -469,6 +494,7 @@ async function pool(items, size, work) {
 }
 
 async function conformance(t) {
+  nextEventsCover()
   const bin = await installedBend(t)
   if (!bin) return
   const { exported } = await compileBend({ entry: join(DELIVERY, 'MODEL.bend'), bin })
@@ -648,7 +674,9 @@ async function lapPhase(run, model, state, phases) {
   const line = brief.status === 0 ? brief.stdout.split('\n')[0] : brief.stderr
   const command = nextCommandOf(line)
   const entry = NEXT_COMMANDS[command]
-  if (!entry || !(entry.marker || entry.lap)) phases.set(key, { command: line })
+  const planned = await stepPlanDifference(run.dir, command)
+  if (planned) phases.set(key, { command: line, planned })
+  else if (!entry || !(entry.marker || entry.lap)) phases.set(key, { command: line })
   else phases.set(key, { command, refused: entry.marker ? null : nextRefusal(model, state, entry.lap(toPlain(state))) })
 }
 
