@@ -564,6 +564,17 @@ test('the lock refuses files that change while it judges them: the card, or a Be
     assert.match(locked.stderr, /^STAGE_STALE: the files changed while the lock judged them/, name)
     await assert.rejects(readFile(join(repo, PACKAGE_DIR, 'oracle.lock.json')), { code: 'ENOENT' })
   }
+  // W2 #4: every node passes with a todo left (no judge reads it), but a locked package holds none — closure reads product
+  const repo = join(root, 'todo')
+  await cp(base, repo, { recursive: true })
+  const packagePath = join(repo, PACKAGE_DIR, 'oracle.package.json')
+  const pkg = JSON.parse(await readFile(packagePath, 'utf8'))
+  await writeFile(packagePath, `${JSON.stringify({ ...pkg, faultModel: { todo: 'the faults closure plants' } }, null, 2)}\n`)
+  const lockArgs = ['create', '--oracle', join(PACKAGE_DIR, 'oracle.md'), '--lock', join(PACKAGE_DIR, 'oracle.lock.json')]
+  const locked = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-lock.mjs'), ...lockArgs], { cwd: repo, encoding: 'utf8', env })
+  assert.equal(locked.status, 1, `${locked.stdout}${locked.stderr}`)
+  assert.match(locked.stderr, /^STAGE_GATE: a locked package holds no todo: set or remove \(set <pointer> null\) \/faultModel/)
+  await assert.rejects(readFile(join(repo, PACKAGE_DIR, 'oracle.lock.json')), { code: 'ENOENT' })
 })
 
 const reflect = (cwd, ...args) => node(cwd, 'oracle-reflect.mjs', args)

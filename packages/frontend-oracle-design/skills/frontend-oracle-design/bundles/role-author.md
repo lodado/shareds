@@ -754,8 +754,8 @@ card projection gives them `O*` IDs, and a `row` pin in the package keeps an ID 
 so evidence never moves to a different meaning. Never create empty `O*` rows, placeholder policies or a
 pending approval to get past the model stage. For retries, delays, staleness, error kinds, remounts or
 request counts, model them with [`model-patterns.md`](model-patterns.md) instead of folding them into one
-event. Start from [`model-package.example.json`](model-package.example.json),
-a complete package that passes `validate --stage model`; replace every value. Do not take `cat` of a fixture's
+event. Start from the skeleton oracle-step.mjs writes ([`model-package.example.json`](model-package.example.json)):
+each field a todo in decision order, filled with `oracle-package.mjs set`. Do not take `cat` of a fixture's
 `oracle.package.json` as a template (47KB of discovery records), and do not start from `MODEL.bend` or a
 hand-written card: a card without a package has the legacy shape and review rejects it for new work. A package whose touched code exposes no Props, shared
 API, state union or trust-boundary type may declare `typeContract: {notApplicable, paths}` — the reason
@@ -2084,119 +2084,209 @@ Failure text → cause → fix:
 {
   "packageVersion": 2,
   "id": "pending-save",
-  "spaceVersion": 1,
+  "sources": {
+    "todo": "every source text the request rests on, the Space discovery record and this package (self: true), each {id S<n>, kind, jurisdiction, standard, location repo:<path>[#anchor], approval}"
+  },
+  "requirements": {
+    "todo": "one {id R<n>, source S<n>, quote} per source sentence, the whole sentence verbatim with its full stop"
+  },
   "intent": {
-    "actor": "a person who presses Save twice while the first save request is still pending",
-    "observableSuccess": "exactly one save request is sent and the button reads as pending until it settles",
-    "nonGoals": "retry after failure, offline queueing, server-side idempotency",
-    "worstRegression": "the second press sends a second save request",
-    "reversibility": "revert the form change; no data is migrated",
-    "risk": "Medium",
+    "risk": {
+      "todo": "the risk the user accepted",
+      "oneOf": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    "actor": {
+      "todo": "who acts and in what situation"
+    },
+    "observableSuccess": {
+      "todo": "what the user sees when it works"
+    },
+    "nonGoals": {
+      "todo": "what this change leaves out"
+    },
+    "worstRegression": {
+      "todo": "the worst thing a regression does"
+    },
+    "reversibility": {
+      "todo": "how the change is undone"
+    },
     "openQuestions": []
   },
-  "sources": [
-    {
-      "id": "S1",
-      "kind": "product-policy",
-      "jurisdiction": "save form behavior",
-      "standard": "the user's request",
-      "location": "repo:README.md#save-policy",
-      "approval": "approved"
-    },
-    {
-      "id": "S2",
-      "kind": "product-policy",
-      "jurisdiction": "adequacy world model",
-      "standard": "Bend world",
-      "location": "repo:src/features/save/__test__/formal/World.bend",
-      "approval": "approved"
-    },
-    {
-      "id": "S4",
-      "kind": "product-policy",
-      "jurisdiction": "oracle space axes",
-      "standard": "the user's answers in Space discovery",
-      "location": "repo:.ai/oracles/pending-save/sources/space-discovery.md",
-      "approval": "approved"
-    },
-    {
-      "id": "S3",
-      "kind": "project-constraint",
-      "jurisdiction": "oracle model package",
-      "standard": "oracle-package v2",
-      "location": "repo:.ai/oracles/pending-save/oracle.package.json",
-      "approval": "approved",
-      "self": true
-    }
-  ],
-  "requirements": [
-    {
-      "id": "R1",
-      "source": "S1",
-      "quote": "While a save request is pending, a second submit sends no request."
-    }
-  ],
-  "world": {
-    "source": "S2",
-    "prefix": "Save"
+  "spaceDiscovery": {
+    "todo": "the approved S* that registers sources/space-discovery.md once the user confirmed its Case space"
   },
-  "terms": [
-    {
-      "id": "T1",
-      "context": "form",
-      "name": "presses while pending",
-      "role": "controllable",
-      "field": "presses",
-      "path": "test: the adapter submits twice before the first request settles",
-      "definition": "how many times Save is pressed before the first response",
-      "not": "the number of requests sent",
-      "source": "S1",
-      "status": "confirmed",
-      "family": "Order"
+  "families": {
+    "Data": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
     },
-    {
-      "id": "T2",
-      "context": "network",
-      "name": "requests sent",
-      "role": "observable",
-      "field": "requests",
-      "path": "fetch mock call count read by the adapter",
-      "definition": "how many save requests reached the network layer",
-      "not": "the number of button presses",
-      "source": "S1",
-      "status": "confirmed"
+    "Value": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
+    },
+    "Async": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
+    },
+    "Order": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
+    },
+    "Entry": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
+    },
+    "Environment": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
+    },
+    "Platform": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
+    },
+    "Inherited": {
+      "todo": "the S4 Case space row for this family: modeled by the behavior model, excluded with the S* that allows it, or remove it (set <path> null) when a controllable term maps it (terms[].family)",
+      "oneOf": [
+        "modeled: behavior",
+        "excluded: <reason citing an approved S*>"
+      ]
     }
-  ],
-  "assumptions": [],
-  "goals": [
-    {
-      "id": "G1",
-      "kind": "safety",
-      "cites": ["S1"],
-      "author": "controller",
-      "requirements": ["R1"]
+  },
+  "world": {
+    "source": {
+      "todo": "the S* of the analyst's World.bend"
+    },
+    "prefix": {
+      "todo": "the world record type (UpperCamel; not Kind, Type, Data or a name Base declares)"
     }
-  ],
+  },
+  "terms": {
+    "todo": "one term per World.bend field (and the concepts and derived values the rows use), each {id T<n>, context, name, role, field, path, definition, not, source, status}"
+  },
+  "assumptions": {
+    "todo": "the world assumptions ([] when none), each {id A<n> (a World.bend def), source, falsifier, owner, evidence, riskIfFalse, testability, status}"
+  },
+  "goals": {
+    "todo": "the goals read from the source text (one safety goal at least), each {id G<n> (a World.bend def), kind, cites [S*], author}"
+  },
   "examples": [],
   "hazards": {
-    "permission-change": "n/a: S1 the policy has no permission",
-    "concurrent-change": "n/a: S1 one form",
-    "display-vs-commit": "n/a: S1 the policy states no display rule",
-    "effect-count": "modeled: requests",
-    "identity-reference": "n/a: S1 no identity is involved",
-    "feature-composition": "n/a: S1 one form",
-    "carry-over": "n/a: S1 one attempt",
-    "order-timing": "modeled: presses"
+    "permission-change": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "concurrent-change": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "display-vs-commit": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "effect-count": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "identity-reference": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "feature-composition": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "carry-over": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    },
+    "order-timing": {
+      "todo": "decide this hazard: the world fields that model it, n/a with the S* that rules it out, or the Open question that asks it",
+      "oneOf": [
+        "modeled: <terms[].field ...>",
+        "n/a: S<n> <reason>",
+        "question: Q<n>"
+      ]
+    }
   },
-  "spaceDiscovery": "S4",
-  "families": {
-    "Data": "excluded: S4 one form, no list or volume",
-    "Value": "excluded: S4 the form's field values do not change the request count",
-    "Async": "excluded: S4 the save response is not awaited by this policy; only the presses before it count",
-    "Entry": "excluded: S4 one form opened fresh",
-    "Environment": "excluded: S4 no viewport or theme rule",
-    "Platform": "excluded: S1 any browser the repo supports behaves alike",
-    "Inherited": "excluded: S4 the form opens fresh, nothing from an earlier screen reaches it"
+  "asyncCells": {
+    "todo": "per async operation, all seven cells decided before the model is written: {operation, cells: {<cell>: {decision: source | default | n/a, ref: S*} or {decision: question, ref: Q* | H*}}}"
+  },
+  "crossCheck": {
+    "todo": "the translation table: per S4 dimension {world: <field>} or {classify: <behavior model def>} with values {<declared value>: <world value or constructor>}; declared defaults to spaceDiscovery"
+  },
+  "product": {
+    "todo": "Delivery closure reads it after GREEN and a locked package never changes: {adapter, worldAdapter, files, runs, maxLength} (planned repo paths), or remove it (set <path> null) for a design-only run"
+  },
+  "faultModel": {
+    "todo": "the faults closure plants in product.files ([] when none): {id F<n>, class, file, find, replace, note}"
+  },
+  "policies": {
+    "todo": "the decided policies, each {id P<n>, text, sources [approved S*]}"
+  },
+  "contract": {
+    "todo": "the contract predicates, each {key, def (a World.bend def) or outside, policies [P*], given, when, then, never, sideEffects}; then/never name what a test checks, and a verdict word (success, same, change …) needs a term whose name holds it"
+  },
+  "behavior": {
+    "todo": "the behavior model, after asyncCells: {model: S* of MODEL.bend, laws: S* of LAWS.bend, prefix, bound, observation, outOfScope, notFormalized, conformance: a contract key, lawRows: [{name, kind, cites [P*]}]}; an effect law needs a witness law for its policy"
+  },
+  "notApplicable": {
+    "todo": "a sourced N/A for each auto test case no contract row covers (중복, 오류, 재시도, 빈-데이터, 로딩, out-of-order, 취소): {text naming it, sources [approved S*]}; [] when the rows cover all seven"
+  },
+  "typeContract": {
+    "todo": "no exported Props, shared API, state union or trust-boundary type: {notApplicable: <why>, paths: [repo:<investigated file>]}; otherwise remove it (set <path> null) and run the type-contract:reported label"
   }
 }
 
@@ -2464,13 +2554,13 @@ whatever is already loaded.
    axis or candidate returns there through the controller, never silently becomes an agent decision.
    When the user named the card path, the provisional Draft written there moves to
    `provisional-draft.md` in the same folder before `project-card` writes the projected card.
-3. Write the model package from sources, starting from
-   [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
-   card. Use package-authoring and model-authoring reference routes with their dependencies.
+3. Fill the package skeleton oracle-step.mjs wrote (each undecided field a `{"todo"}` in decision order, the
+   same as [`model-package.example.json`](../model-package.example.json)) from sources, never from MODEL.bend
+   or a hand-written card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
-   Write the file once; change it only with `oracle-package.mjs patch --set|--append|--remove '<pointer>'`
-   (`'/sources/[id=S2]'` selects by a field; quote it) and read it with `get --pointer`. A script that
-   re-dumps the package costs a model turn per edit and is a defect.
+   Write each value with `oracle-package.mjs set --dir <oracle dir> '<pointer>' <value>` (JSON or plain
+   text; `'/sources/[id=S2]'` selects by a field; quote it): it refuses a value its rule breaks with the fix
+   line and names the next todo. Read with `get --pointer`. A script that re-dumps the package is a defect.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
    by repeatedly rewriting the proof.

@@ -469,18 +469,24 @@ Claude Code 기본 한도 안에서 돌아오고, 길게 막을 때는 Bash `tim
 
 ```bash
 node skills/scripts/oracle-package.mjs get --package .ai/oracles/<id>/oracle.package.json [--pointer '/sources/[id=S2]']
-node skills/scripts/oracle-package.mjs patch --package .ai/oracles/<id>/oracle.package.json \
-  --set '/requirements/[id=R5]/quote="..."' --append '/sources={"id":"S9",...}' --remove '/aiRuns/0'
+node skills/scripts/oracle-package.mjs set --dir .ai/oracles/<id> '/intent/risk' Medium \
+  '/requirements/[id=R5]/quote' '"..."' '/sources/-' '{"id":"S9",...}' '/aiRuns/0' null
+node skills/scripts/oracle-package.mjs skeleton --id <id> [--out <oracle.package.json>]
 ```
 
-0.103.0부터 패키지를 Python heredoc으로 고치지 않습니다. `get`은 포인터가 없으면 맨 위 키의 모양만, 있으면
-그 값을 JSON으로 찍습니다. `patch`는 JSON pointer에 `[<필드>=<값>]` 조각(배열에서 그 필드가 그 값인 원소, 예:
-`[id=S2]`, `[key=…]`)을 더해 set·append·remove를 차례로 적용하고 한 번에 씁니다. zsh가 `[...]`를 glob으로 읽지
-않게 포인터는 작은따옴표로 감쌉니다. 값은 JSON이라 문자열도 따옴표가 있어야 합니다. 중간 가지가 없거나 값이
-JSON이 아니면 아무것도 쓰지 않고, 내용이 같으면 다시 쓰지 않습니다(`PACKAGE_UNCHANGED`). 객체에 없던 키를 만들면
-`(new key)`로 알립니다. `stage.json`이 ORACLE_READY이거나 읽을 수 없거나, 패키지 옆에 `oracle.lock.json`이 있으면
-`PACKAGE_LOCKED`(또는 `STAGE_INVALID`)로 거부하고, 심볼릭 링크는 따라가지 않습니다. 쓴 뒤에는 패키지 노드와 같은
-구조 검사 결과를 보여 주기만 하고 막지는 않습니다.
+0.128.0부터 `oracle-step.mjs`가 패키지가 없는 폴더에 뼈대(`oracle.package.json`, 정할 필드마다
+`{"todo", "oneOf"}`가 결정 순서로)와 S4 뼈대(`sources/space-discovery.md`: Case space 헤더와 family 8행, State
+Model 없음)를 쓰고, 패키지는 `set`으로만 채웁니다(`patch`는 없어졌습니다). 규칙은
+`scripts/oracle-schema.mjs`의 표 한 곳에 있고 패키지 노드·`set`·뼈대가 모두 그 표를 읽습니다. `get`은 포인터가
+없으면 맨 위 키의 모양만, 있으면 그 값을 JSON으로 찍습니다. `set`은 JSON pointer에 `[<필드>=<값>]` 조각(배열에서
+그 필드가 그 값인 원소, 예: `[id=S2]`, `[key=…]`)을 더해 쌍마다 값을 쓰고(값은 JSON, 아니면 글자 그대로의 문자열,
+`null`은 지움, 마지막 조각 `-`는 배열 끝에 추가) 한 번에 씁니다. zsh가 `[...]`를 glob으로 읽지 않게 포인터는
+작은따옴표로 감쌉니다. 쓰기 전에 표로 판정해, 그 행이 거절하는 값, 먼저 정할 필드(`after`)가 남은 쓰기, 표에 없는
+키, todo를 되돌리는 쓰기는 아무것도 쓰지 않고(`SET_REFUSED`) 행의 고칠 줄을 찍습니다. 통과하면 임시 파일을 rename해
+쓰고 남은 todo 수와 다음 필드, 아직 빠진 것, 계약 행이나 N/A가 아직 덮지 않은 자동 TC를 알립니다. 내용이 같으면 다시
+쓰지 않고(`PACKAGE_UNCHANGED`), 객체에 없던 키를 만들면 `(new key)`로 알립니다. `stage.json`이 ORACLE_READY이거나
+읽을 수 없거나, 패키지 옆에 `oracle.lock.json`이 있으면 `PACKAGE_LOCKED`(또는 `STAGE_INVALID`)로 거부하고, 심볼릭
+링크는 따라가지 않습니다.
 
 ### 위험 등급과 프로필 선택
 

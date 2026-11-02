@@ -25,6 +25,7 @@ import {
 import { assertReviewIterationEvent, blockingRemedy, FINDINGS_BLOCKING_NEXT, splitConfirmFindings } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
+import { AUTO_TEST_CASES, VAGUE_WORDS, vagueHits } from './oracle-schema.mjs'
 import {
   approvedSourceIds,
   AS_IS_COLUMNS,
@@ -116,33 +117,6 @@ const OUTCOME_FIELDS = [
 const RISK_LEVELS = ['Low', 'Medium', 'High']
 
 const SOURCE_KINDS = ['product-policy', 'mandatory-constraint', 'project-constraint', 'implementation-reference']
-
-const VAGUE_WORDS = [
-  '적절히',
-  '적절한',
-  '적당히',
-  '알맞게',
-  '자연스럽게',
-  '부드럽게',
-  '깔끔하게',
-  '유연하게',
-  '빠르게',
-  'appropriately',
-  'properly',
-  'gracefully',
-  'smoothly',
-]
-
-/** bva.md의 자동 추가 TC 7종. 행이든 N/A 사유든 카드 어딘가에는 나와야 한다. */
-const AUTO_TEST_CASES = [
-  { kind: '중복', tokens: ['중복', 'duplicate'] },
-  { kind: '오류', tokens: ['오류', '에러', 'error'] },
-  { kind: '재시도', tokens: ['재시도', 'retry'] },
-  { kind: '빈-데이터', tokens: ['빈 ', '0건', 'empty'] },
-  { kind: '로딩', tokens: ['로딩', 'loading'] },
-  { kind: 'out-of-order', tokens: ['out-of-order', '역전'] },
-  { kind: '취소', tokens: ['취소', '이탈', 'cancel'] },
-]
 
 const POLICY_SECTION_TITLES = ['결정된 정책', 'Decided policies']
 const SOURCE_MARKERS = ['(출처:', '(source:']
@@ -921,10 +895,9 @@ async function lintCard(options) {
       }
     }
 
-    for (const word of VAGUE_WORDS) {
-      if (then.includes(word) || never.includes(word)) {
-        issues.push(`vague-word: ${row.id}: "${word}" is not machine-checkable`)
-      }
+    // one vocabulary and one matcher with the package (oracle-schema.mjs): a word, not a substring, and code spans are names
+    for (const word of vagueHits(`${then}\n${never}`, VAGUE_WORDS.banned)) {
+      issues.push(`vague-word: ${row.id}: "${word}" is not machine-checkable`)
     }
   }
 
@@ -1078,6 +1051,7 @@ async function lintCard(options) {
           sources: formalSources,
           questionIds: new Set(lines.map((entry) => entry.match(/^###\s+(Q\d+)\b/)?.[1]).filter(Boolean)),
           readSource,
+          behaviorModel: lines.includes('## Formal Model'),
         },
       )),
     )

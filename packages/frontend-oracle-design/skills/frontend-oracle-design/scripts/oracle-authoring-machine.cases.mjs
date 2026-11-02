@@ -284,7 +284,8 @@ function authoringCommands(repo, fixture, env) {
     // every `repo:` source the oracle registers: the package's (Formal), the card's policy file (Contract)
     Lock: async () => {
       const pkg = await readFile(files.package, 'utf8').then(JSON.parse, () => null)
-      const registered = session.contract ? [{ location: CONTRACT_SOURCE }] : (pkg?.sources ?? [])
+      // a skeleton written by a step on a blank folder still holds its sources as a todo
+      const registered = session.contract ? [{ location: CONTRACT_SOURCE }] : [pkg?.sources ?? []].flat().filter((source) => !source?.todo)
       const sources = registered.map((source) => /^repo:([^#]+)/.exec(source.location ?? '')?.[1]).filter(Boolean)
       const lock = ['create', '--oracle', join(PACKAGE_DIR, 'oracle.md'), '--lock', join(PACKAGE_DIR, 'oracle.lock.json')]
       return node('oracle-lock.mjs', [...lock, ...sources.flatMap((path) => ['--source', path])])

@@ -28,13 +28,13 @@ whatever is already loaded.
    axis or candidate returns there through the controller, never silently becomes an agent decision.
    When the user named the card path, the provisional Draft written there moves to
    `provisional-draft.md` in the same folder before `project-card` writes the projected card.
-3. Write the model package from sources, starting from
-   [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
-   card. Use package-authoring and model-authoring reference routes with their dependencies.
+3. Fill the package skeleton oracle-step.mjs wrote (each undecided field a `{"todo"}` in decision order, the
+   same as [`model-package.example.json`](../model-package.example.json)) from sources, never from MODEL.bend
+   or a hand-written card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
-   Write the file once; change it only with `oracle-package.mjs patch --set|--append|--remove '<pointer>'`
-   (`'/sources/[id=S2]'` selects by a field; quote it) and read it with `get --pointer`. A script that
-   re-dumps the package costs a model turn per edit and is a defect.
+   Write each value with `oracle-package.mjs set --dir <oracle dir> '<pointer>' <value>` (JSON or plain
+   text; `'/sources/[id=S2]'` selects by a field; quote it): it refuses a value its rule breaks with the fix
+   line and names the next todo. Read with `get --pointer`. A script that re-dumps the package is a defect.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
    by repeatedly rewriting the proof.

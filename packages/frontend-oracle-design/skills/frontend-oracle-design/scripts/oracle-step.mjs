@@ -27,7 +27,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -38,8 +38,8 @@ import { nextCommandOf, nextOf } from './oracle-next.mjs'
 import { canonicalReviewPoints, deliveryBrief, requiredLabelsNotPassing, sameDigests } from './oracle-run.mjs'
 import { markdownLines, sectionLines } from './oracle-space.mjs'
 import {
-  bindingOf, briefStatus, evaluateGraph, filesDigest, GRAPH, issuesDigest, phaseLine, readStage, recordCheck, REVIEW_ROUNDS, reviewRounds,
-  SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
+  bindingOf, briefStatus, evaluateGraph, filesDigest, GRAPH, issuesDigest, lockTodos, phaseLine, readStage, recordCheck, REVIEW_ROUNDS,
+  reviewRounds, SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
 } from './oracle-stage.mjs'
 
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
@@ -412,7 +412,7 @@ async function packageSources(directory) {
   const root = directory.includes('/.ai/') ? directory.slice(0, directory.lastIndexOf('/.ai/')) : process.cwd()
   const pkg = await readJson(join(directory, 'oracle.package.json'))
   // a `repo:` location may name a section (`README.md#policy`): the source the lock snapshots is the file
-  const paths = (pkg?.sources ?? []).map((source) => /^repo:([^#]+)/.exec(source.location ?? '')?.[1]).filter(Boolean)
+  const paths = (Array.isArray(pkg?.sources) ? pkg.sources : []).map((source) => /^repo:([^#]+)/.exec(source?.location ?? '')?.[1]).filter(Boolean)
   const present = []
   for (const path of paths) if (await exists(join(root, path))) present.push(join(root, path))
   const tops = [...new Set(paths.filter((path) => !path.startsWith('.ai/')).map((path) => path.split('/')[0]))]
@@ -440,8 +440,27 @@ const plural = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`
 
 /** A path outside the working directory (a review input) printed whole. */
 const qa = (path) => sh(path)
-/** Where a review's input is written: outside the repository, one folder per oracle, review kind and input digest. */
-const inputFolder = (directory, kind, digest) => join(tmpdir(), 'oracle-review-inputs', `${basename(directory)}-${kind}-${digest.slice(0, 12)}`)
+/**
+ * The folder review inputs are written under: outside the repository, one per user, created 0700, and refused when it
+ * is a symbolic link, another user's, or open to group or others (a shared /tmp), so nobody else can swap an input.
+ */
+export async function privateInputRoot(base = tmpdir()) {
+  const uid = typeof process.getuid === 'function' ? process.getuid() : null
+  const root = join(base, `oracle-review-inputs-${uid ?? 'user'}`)
+  await mkdir(root, { recursive: true, mode: 0o700 })
+  const info = await lstat(root)
+  const shared = uid !== null && (info.uid !== uid || (info.mode & 0o077) !== 0)
+  if (info.isSymbolicLink() || !info.isDirectory() || shared) {
+    throw new Error(`${root} is not a private folder of this user (a link, someone else's, or open to others): remove it and run step again`)
+  }
+  return root
+}
+/** Where a review's input is written: in the private root, one folder per oracle, review kind and input digest. */
+async function inputFolder(directory, kind, digest) {
+  const folder = join(await privateInputRoot(), `${basename(directory)}-${kind}-${digest.slice(0, 12)}`)
+  await mkdir(folder, { recursive: true, mode: 0o700 })
+  return folder
+}
 /** Where the agent saves a review's return unchanged: in the oracle directory, named by the input digest it read. */
 export const reviewReturn = (directory, kind, digest) =>
   join(directory, 'reviews', `${kind}-${digest.slice(0, 12)}.${kind === 'reverse-impossible' ? 'json' : 'md'}`)
@@ -575,8 +594,7 @@ async function reviewClause(directory, root, record, { kind, digest, rounds }) {
     const previous = await roundOneReturn(directory, record, kind, digest)
     return `${review.name} round 2 (confirm-fixes) — continue the round-1 reviewer with only its finding IDs (${previous ? q(previous) : 'its round-1 return'}) and the repair diff, its return saved unchanged as ${saved}`
   }
-  const folder = inputFolder(directory, kind, digest)
-  await mkdir(folder, { recursive: true })
+  const folder = await inputFolder(directory, kind, digest)
   const files = (await review.write(directory, root, folder)).map(qa).join(' and ')
   return review.say(files, saved)
 }
@@ -610,11 +628,9 @@ async function translationSay(directory, root, record) {
   if (text === null) return null
   const rounds = await reviewRounds(directory, record, 'translation')
   if (rounds >= REVIEW_ROUNDS) return `the translation table changed after its ${REVIEW_ROUNDS} reviews: ask the user how to settle the mappings, never a third review`
-  const pkg = q(join(directory, 'oracle.package.json'))
-  const recordIt = `record it: oracle-package.mjs patch --package ${pkg} --set '/crossCheck/reviewedBy={"agent":"<reviewer>","inputDigest":"${sha256(text)}"}'`
+  const recordIt = `record it: oracle-package.mjs set --dir ${q(directory)} /crossCheck/reviewedBy '{"agent":"<reviewer>","inputDigest":"${sha256(text)}"}'`
   if (rounds > 0) return `the translation review round 2 (confirm-fixes) — continue the round-1 reviewer with only the mappings it disputed and the repair diff; fix what it still disputes, then ${recordIt}`
-  const folder = inputFolder(directory, 'translation', sha256(text))
-  await mkdir(folder, { recursive: true })
+  const folder = await inputFolder(directory, 'translation', sha256(text))
   await writeFile(join(folder, 'mapping-input.md'), text)
   return `dispatch the translation review — the analyst (never the model's author) with only ${qa(join(folder, 'mapping-input.md'))}; fix the mappings it disputes, then ${recordIt}`
 }
@@ -629,12 +645,26 @@ async function translationReviewed(directory) {
   return [{ kind: 'translation', digest }]
 }
 
+const TODO = 'package-todo: '
+
+/**
+ * A node that waits for undecided package fields: the next one in decision order as its `set` command (the package names
+ * them in that order), how many remain, and the node's other issues.
+ */
+function todoSay(directory, todos, rest) {
+  const set = `oracle-package.mjs set --dir ${q(directory)} <pointer> <value>`
+  const next = `decide the ${plural(todos.length, 'open package field')} in order with ${set}, which refuses a value with its rule's fix line; next: ${todos[0].slice(TODO.length)}`
+  return rest.issues.length > 0 ? `${nodeSay(directory, rest)}; and ${next}` : next
+}
+
 /**
  * A failing node as one instruction. A card issue the generated region raises is fixed in the package (step projects
  * the card again) unless the rule takes a hand-written line; one only the hand-written sections raise is an oracle.md
  * edit outside the generated markers.
  */
 function nodeSay(directory, node) {
+  const todos = node.issues.filter((issue) => issue.startsWith(TODO))
+  if (todos.length > 0) return todoSay(directory, todos, { ...node, issues: node.issues.filter((issue) => !issue.startsWith(TODO)) })
   if (node.id === 'card' && node.handWritten?.length > 0) {
     const card = q(join(directory, 'oracle.md'))
     const generated = node.issues.filter((issue) => !node.handWritten.includes(issue))
@@ -644,7 +674,7 @@ function nodeSay(directory, node) {
     return `fix ${parts.join('; and ')}`
   }
   const where = {
-    package: `the package (${q(join(directory, 'oracle.package.json'))}, one oracle-package.mjs patch)`,
+    package: `the package (${q(join(directory, 'oracle.package.json'))}, oracle-package.mjs set --dir ${q(directory)} <pointer> <value>)`,
     model: 'the package, its Bend files or sources',
     card: 'the package (step projects the card again), or where the rule takes a hand-written line in oracle.md outside the generated markers',
     confirmation: q(join(directory, 'oracle.md')),
@@ -698,18 +728,57 @@ async function lockSay(directory, { pending = [], offer = null } = {}) {
   const paths = [...new Set(contract ? await cardSources(directory, root) : [...sources, join(directory, 'oracle.package.json')])]
   const sourceFlags = paths.length > 0 ? paths.map((path) => `--source ${q(path)}`).join(' ') : '--source <approved-source>'
   const waiting = pending.length > 0 ? ` (the lock waits for: ${pending.join('; ')})` : ''
+  // Delivery closure reads these after GREEN and a locked package never changes: they are decided before the lock
+  const { nodeTodos, openTodos, todoEntries, todoIssue } = await import('./oracle-schema.mjs')
+  const raw = contract ? null : await readJson(join(directory, 'oracle.package.json'))
+  const open = new Set(raw ? openTodos(raw).map(({ pointer }) => pointer) : [])
+  // a todo whose rule does not apply (behavior with Order and Async excluded, …) is removed: the lock takes none
+  const unused = raw ? todoEntries(raw).filter(({ pointer }) => !open.has(pointer)).map(({ pointer }) => `set ${pointer} null`) : []
+  const closure = [...(raw ? nodeTodos(raw, 'closure').map((todo) => todoIssue(todo).slice(TODO.length)) : []), ...unused]
   const steps = [
     ...(offer ? [`${offer};`] : []),
     `oracle-verify.mjs card --oracle ${card} --path <files the change touches>;`,
     ...(contract ? [] : [`show the user the card and record their explicit approval in its User Confirmation${waiting};`]),
+    ...(closure.length > 0 ? [`a locked package holds no todo — decide what Delivery closure reads and remove what does not apply (oracle-package.mjs set --dir ${q(directory)}): ${closure.join('; ')};`] : []),
     `oracle-lock.mjs create --oracle ${card} --lock ${q(join(directory, 'oracle.lock.json'))} ${sourceFlags}`,
   ]
   return `every check passes; in order: ${numberedSteps(steps)}`
 }
 
 const nodeLine = ({ id, issues }) => `${id} ${issues.length === 0 ? 'ok' : plural(issues.length, 'issue')}`
-const writePackage = (directory) =>
-  `write ${q(join(directory, 'oracle.package.json'))} with $oracle-intake (sources, requirements, Space discovery), then rerun ${rerun(directory)}`
+// the oracle's id in a skeleton: the folder's name as a lowercase identifier
+const oracleIdOf = (directory) => basename(resolve(directory)).toLowerCase().replaceAll(/[^\w-]+/g, '-').replace(/^[^a-z]+/, '') || 'oracle'
+
+async function skeletonText(directory) {
+  const { packageSkeleton } = await import('./oracle-schema.mjs')
+  return `${JSON.stringify(packageSkeleton({ id: oracleIdOf(directory) }), null, 2)}\n`
+}
+
+/** Blank: no card, and no package or only the skeleton step wrote, untouched — nothing is decided yet. */
+async function blankFolder(directory) {
+  if (await exists(join(directory, 'oracle.md'))) return false
+  const text = await readFile(join(directory, 'oracle.package.json'), 'utf8').catch(() => null)
+  return text === null || text === (await skeletonText(directory))
+}
+
+/** Scaffold first: the package skeleton, and the Space discovery record's skeleton when the folder has none. */
+async function scaffold(directory) {
+  const { SPACE_DISCOVERY_FILE, spaceDiscoverySkeleton } = await import('./oracle-schema.mjs')
+  const record = join(directory, SPACE_DISCOVERY_FILE)
+  await mkdir(dirname(record), { recursive: true })
+  if (!(await exists(join(directory, 'oracle.package.json')))) await writeFile(join(directory, 'oracle.package.json'), await skeletonText(directory))
+  if (!(await exists(record))) await writeFile(record, spaceDiscoverySkeleton())
+}
+
+/** What a blank folder asks: the Space discovery record with the user first, then the package fields in order. */
+async function fillSay(directory) {
+  const { openTodos, SPACE_DISCOVERY_FILE, todoIssue } = await import('./oracle-schema.mjs')
+  const pkg = join(directory, 'oracle.package.json')
+  if (!(await exists(pkg))) return `run ${rerun(directory)}: it writes the package skeleton and the Space discovery record to fill`
+  const todos = openTodos(JSON.parse(await readFile(pkg, 'utf8')))
+  const record = q(join(directory, SPACE_DISCOVERY_FILE))
+  return `with $oracle-intake, settle the Space discovery record ${record} with the user (each question and answer verbatim, every Case space row confirmed), then decide the ${plural(todos.length, 'open package field')} of ${q(pkg)} in order with oracle-package.mjs set --dir ${q(directory)} <pointer> <value>; first: ${todoIssue(todos[0]).slice(TODO.length)}; then rerun ${rerun(directory)}`
+}
 
 /**
  * A failing node as one instruction: the reviews waiting before it, the translation review its model issues ask for,
@@ -734,8 +803,10 @@ function nextKeyOf(stop, failed, wanted) {
  * the lock. The same issues on a third edited state stop it.
  */
 export async function authoringStep(directory) {
-  if (!(await exists(join(directory, 'oracle.package.json'))) && !(await exists(join(directory, 'oracle.md'))))
-    return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: writePackage(directory) }
+  if (await blankFolder(directory)) {
+    await scaffold(directory)
+    return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: await fillSay(directory) }
+  }
   const { root } = await packageSources(directory)
   const binding = await bindingOf(directory)
   const graph = await evaluateGraph(directory, { binding, project: 'write' })
@@ -781,13 +852,15 @@ function checkSay(directory, count, pending) {
  * these files (a failing node or an answer it waits for).
  */
 export async function checkAll(directory) {
-  if (!(await exists(join(directory, 'oracle.package.json'))) && !(await exists(join(directory, 'oracle.md'))))
-    return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: writePackage(directory) }
+  if (await blankFolder(directory)) return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: await fillSay(directory) }
   const { root } = await packageSources(directory)
   const graph = await evaluateGraph(directory, { binding: await bindingOf(directory), deep: true, project: 'scratch' })
   const failing = graph.nodes.filter(({ issues }) => issues.length > 0)
   const shown = failing.map(failingLine)
   const pending = graph.nodes.flatMap((node) => node.pending ?? [])
+  // the lock refuses a package with a todo left (lockTodos); while a node fails, its own todos already say so
+  const left = failing.length > 0 || graph.profile === 'contract/v1' ? [] : await lockTodos(await readFile(join(directory, 'oracle.package.json'), 'utf8').catch(() => ''))
+  if (left.length > 0) pending.push(`a locked package holds no todo: set or remove ${left.join(', ')}`)
   if (pending.length > 0) shown.push(`lock waits for: ${numberedList(pending)}`)
   const record = await readStage(directory)
   const waiting = (await reviewStates(directory, root, record, graph.profile, null)).filter((state) => state.wanted).map(({ kind }) => kind)

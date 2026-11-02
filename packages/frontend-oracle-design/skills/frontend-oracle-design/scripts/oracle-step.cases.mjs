@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { APPROVED, FORBIDDING_ROW, PACKAGE_DIR, runNode, template, WORLD_ROW } from './oracle-authoring-machine.cases.mjs'
@@ -11,7 +11,7 @@ import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { NEXT_LINES, nextCommandOf } from './oracle-next.mjs'
 import { bindReviewDocument, workspace } from './oracle-run.cases.mjs'
 import { canonicalReviewPoints, selectedDigests } from './oracle-run.mjs'
-import { AUTO, AUTO_COMMAND, closeCall, drive, MAX_AUTO_STEPS, nextKey, planStep, readPhase, render } from './oracle-step.mjs'
+import { AUTO, AUTO_COMMAND, closeCall, drive, MAX_AUTO_STEPS, nextKey, planStep, privateInputRoot, readPhase, render } from './oracle-step.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 // oracle-step.mjs drives the commands the phase line names. These cases check that it runs only the AUTO commands of
@@ -700,7 +700,7 @@ async function translationRounds(t) {
     assert.equal(result.status, 1, result.stdout)
     return answer(result).at(-1)
   }
-  const recordIt = /record it: oracle-package\.mjs patch --package \S+ --set '\/crossCheck\/reviewedBy=\{"agent":"<reviewer>","inputDigest":"([0-9a-f]{64})"\}'/
+  const recordIt = /record it: oracle-package\.mjs set --dir \S+ \/crossCheck\/reviewedBy '\{"agent":"<reviewer>","inputDigest":"([0-9a-f]{64})"\}'/
   const first = await asked()
   assert.match(first, /dispatch the translation review — the analyst \(never the model's author\) with only \S+\/mapping-input\.md; fix the mappings it disputes, then record it: /)
   let read = recordIt.exec(first)[1]
@@ -932,7 +932,57 @@ async function refusalOnce(t) {
   assert.equal(ledger.filter((entry) => entry.type === 'run').length, 1)
 }
 
+async function scaffoldFirst(t) {
+  // a blank oracle folder: step writes the package skeleton and the S4 skeleton, records no stage and names the first set
+  const root = await mkdtemp(join(tmpdir(), 'oracle-step-scaffold-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const dir = join(root, '.ai', 'oracles', 'save-retry')
+  await mkdir(dir, { recursive: true })
+  const first = step(root, ['--dir', dir])
+  assert.equal(first.status, 0, first.stdout)
+  assert.match(answer(first).at(-1), /settle the Space discovery record \S+ with the user .* decide the \d+ open package fields of \S+ in order with oracle-package\.mjs set --dir \S+ <pointer> <value>; first: set \/sources <value> — /)
+  const bytes = await readFile(join(dir, 'oracle.package.json'))
+  const pkg = JSON.parse(bytes)
+  assert.deepEqual([pkg.id, pkg.intent.risk], ['save-retry', { todo: 'the risk the user accepted', oneOf: ['Low', 'Medium', 'High'] }])
+  const record = await readFile(join(dir, 'sources', 'space-discovery.md'), 'utf8')
+  assert.match(record, /^\| Family \| Dimension \| Choices \|\n\| --- \| --- \| --- \|\n\| Data \| todo \| todo \|$/m)
+  assert.doesNotMatch(record, /^## State Model/m)
+  assert.deepEqual((await readdir(dir)).sort(), ['oracle.package.json', 'sources'], 'a blank folder gets no stage record')
+  // the untouched skeleton is still blank: --check and a second step write nothing
+  for (const args of [['--check'], []]) {
+    const again = step(root, ['--dir', dir, ...args])
+    assert.equal(again.status, 0, again.stdout)
+    assert.deepEqual(await readFile(join(dir, 'oracle.package.json')), bytes)
+  }
+  assert.deepEqual((await readdir(dir)).sort(), ['oracle.package.json', 'sources'])
+}
+
+/** Review inputs go under a private per-user folder: a planted link or a folder open to others is refused, not written into. */
+async function privateInputs() {
+  const base = await mkdtemp(join(tmpdir(), 'oracle-private-'))
+  const planted = await mkdtemp(join(tmpdir(), 'oracle-planted-'))
+  const elsewhere = await mkdtemp(join(tmpdir(), 'oracle-elsewhere-'))
+  try {
+    const root = await privateInputRoot(base)
+    assert.equal(await privateInputRoot(base), root)
+    const info = await lstat(root)
+    assert.equal(info.isDirectory(), true)
+    if (typeof process.getuid === 'function') assert.equal(info.mode & 0o077, 0)
+    await symlink(elsewhere, join(planted, basename(root)))
+    await assert.rejects(privateInputRoot(planted), /is not a private folder of this user/)
+    assert.deepEqual(await readdir(elsewhere), [])
+    if (typeof process.getuid === 'function') {
+      await chmod(root, 0o777)
+      await assert.rejects(privateInputRoot(base), /is not a private folder of this user/)
+    }
+  } finally {
+    await Promise.all([base, planted, elsewhere].map((path) => rm(path, { recursive: true, force: true })))
+  }
+}
+
 export const stepCases = [
+  ['review inputs go under a private per-user folder; a planted link or a folder open to others is refused', privateInputs],
+  ['a blank oracle folder gets the package and Space discovery skeletons from step, and nothing else', scaffoldFirst],
   ['step runs only the AUTO entries of the shared next table; every other next and any unknown line is printed', tableAndAuto],
   ['step stops on a refusal, a line seen before, an empty plan and the step cap; FLAKINESS_GATE goes on only within the cap', loopStops],
   ['step binds a reviewer task from host receipts only when one task after the round is left; a named task wins', hostReceipts],

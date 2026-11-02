@@ -1,3 +1,88 @@
+# 0.128.0: one rule table; the package starts as a skeleton and is filled with `set`
+
+## Why
+
+Wave W2 of `.ai/plans/fod-simplify/PLAN.md` (incidents in `W2-RULES.md` §1b). Of the 24 A-class incidents in the
+eight example runs (a rule the agent met only after writing the wrong thing: a card lint, a gate, a rewind), 19 can
+end before the write: the skeleton already holds the field (10), `set` refuses the value as it is written (5), or
+both (4). The same rule also lived in several places with different verdicts: two vague-word lists (the card lint's
+banned words by substring, the adequacy lint's judgement words), a package and a card hazard check (the package
+passed any `modeled: <word>`), a package and a card Terms check, and two family judges (packageIssues and derive's
+auditFamily).
+
+## Change
+
+- `scripts/oracle-schema.mjs` (new, imports nothing) holds the rule table `RULES`: one row per package field in
+  decision order (path, stage, graph node, type and allowed values, `after`, `reads`, judge, write-time check, todo
+  text, fix line, codes), and the lists and verdicts the lints share (families, hazards, async cells, Bend keywords
+  and Base names, vague words, auto test cases, `familyVerdict`, `hazardVerdict`, `termVerdicts`, `lawSetIssues`). The
+  package node, `set`, the skeleton and derive's family audit read the table; the card lint (oracle-adequacy,
+  oracle-verify) and the model check (oracle-model) import its lists and verdicts. `packageIssues` is `judgePackage`:
+  the same issues in the same order on every fixture and 8,838 single-field mutations, except the rules below.
+- Scaffold first: on a folder with no card and no package, oracle-step.mjs writes `oracle.package.json` (every field
+  the lock path needs, in decision order, each undecided value `{"todo", "oneOf"}`) and
+  `sources/space-discovery.md` (questions and answers, and a `## Case space` with the header
+  `Family | Dimension | Choices` and the eight family rows; no State Model), records no stage and names the first
+  field. A node waits on its own todos, each printed as `package-todo: set <pointer> <value> — <what>; one of: …`
+  (package: sources … asyncCells; model: crossCheck, behavior; card: policies, contract, notApplicable, typeContract;
+  before the lock: product, faultModel). The package node also checks the S4 Case space grammar
+  (`s4-case-space-header|family|todo|row`); a version 1 package without spaceDiscovery has no S4 to check.
+  `oracle-package.mjs skeleton --id` prints the skeleton; references/model-package.example.json is that skeleton.
+- The lock refuses a package with a todo left (`STAGE_GATE: a locked package holds no todo`): Delivery closure reads
+  product and faultModel after GREEN and a locked package never changes, so they are decided (or removed for a
+  design-only run) before the lock. `--check` lists the same once every node passes, and the lock line asks to remove
+  a todo whose rule does not apply (`set <pointer> null`).
+- `oracle-package.mjs set --dir <dir> <pointer> <value>…` replaces `patch` (deleted). Each write is judged before it
+  lands: a value its row refuses, a field written before what it is decided after (requirements after sources,
+  hazards after terms, asyncCells after families, behavior after asyncCells, policies and contract, …), a todo written
+  back, or a key no row knows is refused with the row's fix line and nothing is written (`SET_REFUSED`). It writes
+  atomically (temporary file and rename under the directory lock), refuses a locked or unreadable stage and a
+  symbolic link as patch did, names a new key, and prints the todos left, the next one, what is still missing and the
+  auto test cases no contract text or sourced N/A names yet. The translation review is recorded with
+  `set /crossCheck/reviewedBy`.
+- Verdict changes, now on the package field: a hazard `modeled:` names terms[].field (or `behavior` when the package
+  has one); a contract cell has no banned word and no judgement word unless a term name holds it
+  (`package-contract-vague`, the card lint's two lists); each policy with an effect law has a witness law and every P\*
+  is cited by a law or not formalized (`package-law`); a term name is unique in its context and a confirmed term
+  cites an approved non-implementation source (`package-term-duplicate`, `package-term-source`); world.prefix,
+  behavior.prefix and term fields Bend refuses are refused (`package-bend-reserved`). Both lints match English vague
+  words at a word start and skip code spans (the card lint's banned words matched any substring). The card hazard
+  check accepts `modeled: behavior` when the card has a Formal Model. `oracle-model.mjs scaffold` refuses a keyword
+  record or field name and types a field `kind` as `RaceKind` (it wrote `type Kind`, which Bend refuses).
+- Docs: author-formal (fill the skeleton with set), space-discovery-formal step 5 (fill the S4 skeleton; no State
+  Model, the analyst writes its own), bend-cross-verification (start from the skeleton), README (set, skeleton), the
+  small-edit eval case; bundles and evals regenerated.
+
+Measured, 0.127.0 → 0.128.0:
+
+- Places a package-field rule is defined: packageIssues (one function), patch's asyncCells gate and derive's family
+  audit, with 4 rules written twice under different verdicts (vague words, hazard form, Terms, family disposition) →
+  1 table (41 field rows, 3 S4 rows); 4 variants merged.
+- A-class incidents closed of 19: 0 → 19 (skeleton 10, set 5, both 4). The other 5 belong to W3 (1) and W4 (4).
+- Package keys in the shipped example: 14 → 22 (39 todos).
+- Modules: oracle-package 2,145 → 1,495 lines, oracle-schema 1,545 (new); oracle-adequacy −22, oracle-verify −26,
+  oracle-model −10.
+- role-author bundle 209,388 → 214,585 B (cap 279,000; the example grew); role-review 61,988 B (cap 62,000); Formal
+  Delivery closure 444,132 → 444,227 B (cap 446,000); Design-only closure 232,991 B (cap 245,000).
+
+## Tests
+
+- oracle-package.test: one test per incident (`W2 #1` … `W2 #24`, 19 tests), each ending in the skeleton or in a
+  `set` refusal with its fix line; `W2 clusters` (no State Model slot, a free-form Case space blocks the package node,
+  every row decided after asyncCells is refused before it, both lints import one vague-word list); `W2 verdicts`
+  (term duplicate and source, Bend names); the table parity test (every code judgePackage emits over three packages
+  and their single-key mutations is a row code, REPORT_ORDER names each judged row once, the skeleton's keys are the
+  table's); set CLI tests (atomic write and next todo; refusals; lock, stage, link, no-op and new key) and
+  applySet/setValue.
+- oracle-step.cases: scaffoldFirst (a blank folder gets both skeletons and no stage record; `--check` and a second
+  step write nothing). oracle-model.test: scaffold types `kind` as `RaceKind` and refuses keyword names.
+  oracle-stage.test: a package whose every node passes but which still holds a faultModel todo is refused by the lock.
+  oracle-adequacy.test: `modeled: behavior` passes with a Formal Model only.
+- Changed on purpose: the patch tests became set tests (`NO_TARGET`, was `PATCH_NO_TARGET`); mandatory-verification's
+  example test (the example is the skeleton: only `package-todo` issues and under 10,000 B; was no issues and under
+  6,000 B); the translation-review record line (set, was patch); the authoring replay's Lock skips a todo `sources`;
+  the skill-contract pin on space-discovery-formal step 5 (was "Keep confirmed axes in a `## Case space` table").
+
 # 0.127.0: authoring is one graph over the files; oracle-step.mjs runs it and the lock is the only commit
 
 ## Why

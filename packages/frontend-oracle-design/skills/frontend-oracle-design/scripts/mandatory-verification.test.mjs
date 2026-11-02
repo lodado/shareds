@@ -4,6 +4,7 @@ import { readFile, stat } from 'node:fs/promises'
 import test from 'node:test'
 
 import { packageIssues } from './oracle-package.mjs'
+import { packageSkeleton } from './oracle-schema.mjs'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
@@ -233,7 +234,7 @@ test('the scope gate sorts a request: no behavior stops, value domains become ax
   assert.match(patterns, /`Empty\{\}`, `Valid\{\}`, `TooLong\{\}`, `Malformed\{\}`,\s+`Unicode\{\}`/)
 })
 
-test('the model package has a small copyable example that passes the model-stage validator', async () => {
+test('the model package example is the skeleton oracle-step.mjs writes: every rule holds, only todos are left', async () => {
   const [author, doc, raw] = await Promise.all([
     read('references/roles/author-formal.md'),
     read('references/bend-cross-verification.md'),
@@ -243,8 +244,10 @@ test('the model package has a small copyable example that passes the model-stage
   assert.match(author, /\[`model-package\.example\.json`\]\(\.\.\/model-package\.example\.json\)/)
   // the doc names the example instead of a 47KB fixture the agent can only half read
   assert.match(doc, /Do not take\s+`cat` of a fixture's/)
-  assert.deepEqual(packageIssues(JSON.parse(raw), { stage: 'model' }), [])
-  assert.ok(raw.length < 6000, 'small enough to read whole in one call')
+  const example = JSON.parse(raw)
+  assert.equal(raw, `${JSON.stringify(packageSkeleton({ id: example.id }), null, 2)}\n`, 'regenerated with oracle-package.mjs skeleton, never edited by hand')
+  assert.deepEqual(packageIssues(example, { stage: 'model' }).filter((issue) => !issue.startsWith('package-todo: set ')), [])
+  assert.ok(raw.length < 10000, 'small enough to read whole in one call')
 })
 
 test('the Bend model is the oracle the tests compute with, never the shape of the product code', async () => {

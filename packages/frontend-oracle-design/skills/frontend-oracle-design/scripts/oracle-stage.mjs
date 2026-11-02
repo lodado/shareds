@@ -248,19 +248,36 @@ function projectCard(context, out) {
   return projected.status === 0 ? null : `card-projection: ${firstOutputLine(projected.output)}`
 }
 
+/** The package fields a node waits for, as `package-todo` issues naming their set command (oracle-schema.mjs). */
+async function nodeTodoIssues(loaded, node) {
+  const { nodeTodos, todoIssue } = await import('./oracle-schema.mjs')
+  return nodeTodos(loaded.raw, node).map(todoIssue)
+}
+
 const NODE_EVALUATORS = {
-  /** 패키지 — model 단계 완결(packageIssues)과 비동기 칸. 패키지가 없으면 그것이 문제다. */
+  /**
+   * 패키지 — 규칙 표(oracle-schema.mjs)의 model 단계: 아직 정하지 않은 필드(todo)는 결정 순서의 set 명령으로, 정한 필드는 그
+   * 행의 판정으로, 비동기 칸까지. Space discovery 기록(S4)의 Case space 문법도 여기서 본다 — 값은 S4에서 패키지로 흐른다.
+   */
   async package(context) {
-    if (!(await packageBytes(context.directory))) return { issues: [`package-missing: write ${PACKAGE_FILE} with $oracle-intake (sources, requirements, Space discovery)`] }
+    if (!(await packageBytes(context.directory))) return { issues: [`package-missing: oracle-step.mjs writes the ${PACKAGE_FILE} skeleton; fill it with oracle-package.mjs set`] }
     const loaded = await loadedPackage(context)
     if (loaded.error) return { issues: [`package-unreadable: ${loaded.error}`] }
-    const { asyncCellIssues, packageIssues } = await import('./oracle-package.mjs')
-    return { issues: [...packageIssues(loaded.pkg, { stage: 'model' }), ...asyncCellIssues(loaded.pkg, { required: true })] }
+    const { packageIssues, sourcePath } = await import('./oracle-package.mjs')
+    const { isTodo, SPACE_DISCOVERY_FILE, spaceRecordIssues } = await import('./oracle-schema.mjs')
+    // the registered S4; while spaceDiscovery is still the skeleton's todo, the S4 skeleton beside it; a version 1 package has none
+    const record = loaded.pkg.spaceDiscovery
+      ? sourcePath(loaded, loaded.pkg.spaceDiscovery)
+      : isTodo(loaded.raw.spaceDiscovery) && join(context.directory, SPACE_DISCOVERY_FILE)
+    const recordText = record ? await readFile(record, 'utf8').catch(() => null) : null
+    return { issues: [...spaceRecordIssues(recordText), ...packageIssues(loaded.raw, { stage: 'model', gate: true })] }
   },
   /** 모델 — 앞 노드가 막혔으면(--check, 잠금) Bend 없이 아는 교차검증 문제만, 아니면 전체(modelCheck: 문제와 통과의 근거). */
   async model(context, { blocked }) {
     const loaded = await loadedPackage(context)
     if (loaded.error) return { issues: [] }
+    const todos = await nodeTodoIssues(loaded, 'model')
+    if (todos.length > 0) return { issues: todos }
     if (!blocked) return modelCheck(context, loaded)
     const { crossCheckReadiness } = await import('./oracle-discovery.mjs')
     return { issues: await crossCheckReadiness(loaded).catch(() => []) }
@@ -271,6 +288,9 @@ const NODE_EVALUATORS = {
    */
   async card(context, { project, blocked }) {
     const card = join(context.directory, 'oracle.md')
+    const loaded = await packageBytes(context.directory) ? await loadedPackage(context) : { error: 'no package' }
+    const todos = loaded.error ? [] : await nodeTodoIssues(loaded, 'card')
+    if (todos.length > 0) return { issues: todos }
     if (project === 'write') {
       const failed = projectCard(context, card)
       if (failed) return { issues: [failed] }
@@ -281,8 +301,7 @@ const NODE_EVALUATORS = {
     // --check: the Draft lint of the card a projection would give now, hand-written sections kept
     if (project === 'scratch') {
       const { packageIssues } = await import('./oracle-package.mjs')
-      const loaded = await loadedPackage(context)
-      if (blocked && (loaded.error || packageIssues(loaded.pkg, { stage: 'project' }).length > 0)) return { issues }
+      if (blocked && (loaded.error || packageIssues(loaded.raw, { stage: 'project' }).length > 0)) return { issues }
       return inScratch(async (scratch) => {
         const copy = join(scratch, 'oracle.md')
         if (current !== null) await writeFile(copy, current)
@@ -770,7 +789,23 @@ function lockedDigest(directory, record, { contract, bytes, present, verify }) {
 }
 
 /** 지금 바이트로 결정적 노드를 모두 돈다 — 하나라도 실패하면 거절, 도는 동안 바뀌었으면 다시. 통과하면 판정한 digest. */
+/**
+ * The todos a lock refuses: a locked package never changes, so what Delivery closure reads (product, faultModel) and
+ * every other todo is decided or removed before the lock, never found after GREEN. Unreadable bytes: the graph says so.
+ */
+export async function lockTodos(pkg) {
+  const { todoEntries } = await import('./oracle-schema.mjs')
+  try {
+    return todoEntries(JSON.parse(pkg)).map(({ pointer }) => pointer)
+  } catch {
+    return []
+  }
+}
+
 async function judgedFiles(directory, binding, { contract, pkg, card, timeoutMs }) {
+  const left = contract ? [] : await lockTodos(pkg)
+  if (left.length > 0)
+    throw new StageError('STAGE_GATE', `a locked package holds no todo: set or remove (set <pointer> null) ${left.join(', ')} — ${stepHint(directory)}`)
   const pin = contract ? null : await pinOf(directory)
   const { nodes } = await evaluateGraph(directory, { binding, deep: true, timeoutMs })
   if (nodes.some(({ issues }) => issues.length > 0))

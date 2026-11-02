@@ -2475,6 +2475,10 @@ test('scaffold writes the world record and finite field types and refuses names 
   )
   assert.throws(() => scaffoldWorld({ prefix: 'race', fields: ['a=bool'], baseText: base }), (error) => error.code === 'USAGE')
   assert.throws(() => scaffoldWorld({ prefix: 'Race', fields: ['a='], baseText: base }), (error) => error.code === 'USAGE')
+  // W2: Bend's own words — a field `kind` gets the type RaceKind (Kind is a keyword), a keyword field or record is refused
+  assert.match(scaffoldWorld({ prefix: 'Race', fields: ['kind=Fast,Slow'], baseText: base }), /type RaceKind is Data:\n[\s\S]*Race\{kind: RaceKind\}/)
+  for (const [prefix, field] of [['Race', 'type=bool'], ['Race', 'match=bool'], ['Kind', 'a=bool']])
+    assert.throws(() => scaffoldWorld({ prefix, fields: [field], baseText: base }), (error) => error.code === 'SCAFFOLD_NAME' && /Bend keyword/.test(error.message))
 })
 
 test('scaffolded world checks with the installed Bend', async (t) => {

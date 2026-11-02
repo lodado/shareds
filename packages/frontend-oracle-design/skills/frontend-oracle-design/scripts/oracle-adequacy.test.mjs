@@ -235,6 +235,11 @@ test('Adequacy lint: every hazard has a disposition, and a vague word in a row n
     ),
   )
   assert.deepEqual(await lint(CARD.replace('n/a: S1 one request per attempt', 'question: Q1')), [])
+  // W2: `modeled: behavior` names the Formal Model — a card with one may use it, without one it is no world field
+  const modeled = CARD.replace('n/a: S1 one request per attempt', 'modeled: behavior')
+  assert.ok((await lint(modeled)).some((issue) => issue.startsWith('adequacy-hazard: effect-count')))
+  const lines = modeled.split('\n')
+  assert.deepEqual(await adequacyIssues({ adequacy: parseAdequacy(lines), terms: parseTerms(lines) }, { ...lintContext(modeled), behaviorModel: true }), [])
 
   const vague = CARD.replace('"Saved" appears only after a commit', 'the save is complete only after a commit')
   assert.ok((await lint(vague)).includes('adequacy-vague-term: O3 says "complete" — define which meaning in ## Terms'))

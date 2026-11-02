@@ -2719,7 +2719,8 @@ test('the space cross-check compares the declared space with the Bend space and 
     /the findings are\s+candidates, never a verdict, and the declared table never becomes a second source of truth/,
   )
   assert.match(discovery, /\| `cross-term` +\| a world axis and a behavior axis that no joint case can run together/)
-  assert.match(caseSpace, /Keep confirmed axes in a\s+`## Case space` table/)
+  assert.match(caseSpace, /each confirmed axis a\s+`## Case space`\s+row/)
+  assert.match(caseSpace, /No State Model:\s+the\s+model\s+analyst\s+writes\s+its\s+own/)
   assert.match(tool, /export function crossCheckSpace/)
   // it runs before the lock, and every candidate goes back to the user as a question
   const controller = await read('references/roles/controller-formal.md')

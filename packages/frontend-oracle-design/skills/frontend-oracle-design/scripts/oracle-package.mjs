@@ -15,20 +15,52 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { automatonSummary, finiteAutomaton } from './oracle-automaton.mjs'
 import { sha256, stableStringify, withDirectoryLock } from './oracle-fs.mjs'
+import {
+  contractRowIssues,
+  decidedView,
+  FAMILIES,
+  familyVerdict,
+  HAZARD_IDS,
+  isTodo,
+  judgePackage,
+  nonEmpty,
+  openTodos,
+  packageSkeleton,
+  repoPathOf,
+  rowOf,
+  RULES,
+  todoIssue,
+  writeIssues,
+} from './oracle-schema.mjs'
 import { parseBendTypesStrict, typeIR } from './oracle-types.mjs'
 
-// 2: the axes were confirmed with the user (Space discovery) and every input family is decided at the model stage.
-// 1: the earlier shape — read as before.
-export const PACKAGE_VERSION = 2
-const PACKAGE_VERSIONS = [1, 2]
+// The rule table and its vocabularies live in oracle-schema.mjs; these names stay importable from here.
+export {
+  AI_OPERATORS,
+  ASSUMPTION_STATUS,
+  ASYNC_CELLS,
+  asyncCellIssues,
+  AXIS_ORIGINS,
+  DECISIONS,
+  DECLARED_OPERATORS,
+  FAMILIES,
+  familyDisposition,
+  FAULT_CLASSES,
+  GOAL_AUTHORS,
+  HAZARD_IDS,
+  HOLD_STATUS,
+  INPUT_FAMILIES,
+  LAW_KINDS,
+  LIFECYCLE_KEYS,
+  OPERATOR_IDS,
+  PACKAGE_VERSION,
+  TESTABILITY,
+  WORLD_ROLES,
+} from './oracle-schema.mjs'
+
 export const DERIVE_VERSION = 1
+const PACKAGE_FILE = 'oracle.package.json'
 export const PROJECT_VERSION = 1
-export const FAMILIES = ['Data', 'Value', 'Async', 'Order', 'Entry', 'Environment', 'Platform', 'Inherited']
-// 테스트가 몰아야 하는 입력 계열 — Inherited(이전 정책)는 interaction sweep의 몫이다.
-export const INPUT_FAMILIES = FAMILIES.filter((family) => family !== 'Inherited')
-export const WORLD_ROLES = ['controllable', 'observable', 'hidden', 'concept', 'derived']
-export const GOAL_AUTHORS = ['analyst', 'controller']
-export const LAW_KINDS = ['safety', 'effect', 'witness']
 
 // 투영된 카드가 init에서 등록해야 하는 필수 검증 스택의 라벨.
 export const STACK_LABELS = ['bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported', 'fast-check:reported']
@@ -47,64 +79,6 @@ export function stackLabelsFor(content = '') {
     ? labels.filter((label) => label !== 'type-contract:reported')
     : labels
 }
-// oracle-adequacy.mjs HAZARDS와 같은 목록이다 — 순환 import를 피하려고 이름만 둔다(테스트가 두 목록의 일치를 확인한다).
-export const HAZARD_IDS = [
-  'permission-change',
-  'concurrent-change',
-  'display-vs-commit',
-  'effect-count',
-  'identity-reference',
-  'feature-composition',
-  'carry-over',
-  'order-timing',
-]
-// Discovery 레지스트리 — 발견 연산자 카탈로그의 ID는 oracle-discovery.mjs의 OPERATORS와 같다(테스트가 일치를 확인한다).
-export const OPERATOR_IDS = [
-  'requirement-coverage',
-  'space-cross-check',
-  'observation-sufficiency',
-  'goal-implication',
-  'goal-witness',
-  'assumption-sensitivity',
-  'temporal-order',
-  'trace-extension',
-  'boundary-perturbation',
-  'order-perturbation',
-  'projection-residue',
-  'world-model-gap',
-  'mutation',
-  'metamorphic',
-  'dependency-failure',
-  'latency',
-  'environment-variation',
-  'malformed-input',
-  'concurrency',
-  'ai-explorer',
-  'cross-agent',
-]
-// 도구가 일반적으로 만들어 낼 수 없는 계열 — 모델이 그 현상을 표현하면 `modeled: <축>`, 아니면 출처가 있는 n/a.
-export const DECLARED_OPERATORS = ['dependency-failure', 'latency', 'environment-variation', 'malformed-input', 'concurrency']
-export const AI_OPERATORS = ['ai-explorer', 'cross-agent']
-export const FAULT_CLASSES = [
-  'conditional',
-  'boundary',
-  'state-transition',
-  'permission',
-  'retry',
-  'timeout',
-  'error-suppression',
-  'ordering',
-  'caching',
-  'stale-data',
-]
-export const DECISIONS = ['promoted', 'covered', 'out-of-scope', 'equivalent', 'accepted-risk', 'rejected', 'held']
-export const HOLD_STATUS = ['open', 'resolved']
-export const AXIS_ORIGINS = ['source', 'model', 'counterexample', 'incident', 'analyst', 'review']
-export const TESTABILITY = ['tested', 'monitored', 'untestable']
-export const ASSUMPTION_STATUS = ['open', 'confirmed', 'refuted']
-export const LIFECYCLE_KEYS = ['valid', 'invalid', 'transitions', 'owner', 'lifetime', 'invariant']
-const SOURCE_KINDS = ['product-policy', 'mandatory-constraint', 'project-constraint', 'implementation-reference']
-const RISKS = ['Low', 'Medium', 'High']
 const BEGIN = '<!-- oracle:generated:begin'
 const END = '<!-- oracle:generated:end -->'
 
@@ -116,128 +90,23 @@ export class PackageError extends Error {
   }
 }
 
-const nonEmpty = (value) => typeof value === 'string' && value.trim() !== '' && value.trim() !== '—'
-const repoPathOf = (location) =>
-  typeof location === 'string' && location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null
-
 /**
- * 계열 처분 — 매핑은 용어의 family로 하고, 여기는 나머지 둘이다: 행동 모델의 사건이 그 계열을 모는 경우와,
- * 원문이 허락하는 제외(사유가 S*를 인용한다). 그 밖의 문자열은 null.
- */
-export function familyDisposition(value) {
-  if (typeof value !== 'string') return null
-  if (/^modeled:\s*behavior\s*$/.test(value)) return { kind: 'behavior' }
-  const excluded = value.match(/^excluded:\s*(\S.*)$/)
-  return excluded ? { kind: 'excluded', reason: excluded[1], sources: excluded[1].match(/\bS\d+\b/g) ?? [] } : null
-}
-
-/**
- * 비동기 작업마다 모델을 쓰기 전에 처분할 칸 — 원문이 비워 두기 쉬워 Bend 전이를 쓰는 도중에야 질문이 되던 것들이다.
- * 각 칸은 원문(`source`)·승인된 프로젝트 기본 정책(`default`)·해당 없음(`n/a`) 중 하나로 승인된 S*를 인용하거나,
- * `question`으로 Open question Q* 또는 hold H*를 인용한다.
- */
-export const ASYNC_CELLS = [
-  'late-success-after-cancel',
-  'late-failure-after-success',
-  'older-response-after-newer',
-  'duplicate-completion',
-  'lost-response',
-  'retry-while-pending',
-  'unmount-before-settle',
-]
-const CELL_DECISIONS = ['source', 'default', 'n/a', 'question']
-
-/** 권위 — 승인된 원문. 구현 참고·패키지 자신·Bend 모델 파일은 결정의 근거가 되지 못한다(자기 참조다). */
-function approvedAuthority(source) {
-  if (!source || source.self || source.approval !== 'approved') return false
-  return source.kind !== 'implementation-reference' && !/\.bend$/.test(repoPathOf(source.location) ?? '')
-}
-
-function cellIssue(where, cell, { approved, questions, holds }) {
-  if (!CELL_DECISIONS.includes(cell?.decision)) return `${where}: decision must be ${CELL_DECISIONS.join(' | ')}`
-  if (cell.decision === 'question')
-    return questions.has(cell.ref) || holds.has(cell.ref) ? null : `${where}: a question cites an Open question Q* or a hold H*`
-  return approved(cell.ref) ? null : `${where}: ${cell.decision} cites an approved authoritative S* — an unapproved recommendation is not a default`
-}
-
-/**
- * `asyncCells` 검사. 있으면 모양을 늘 본다. `required`(작성 그래프의 패키지 노드)이면 Async가 공간에 있는 버전 2
- * 패키지에서 작업마다 일곱 칸이 모두 처분돼야 한다 — 모델을 쓰기 전에 열린 칸을 한 번에 묻게 하는 장치다.
- */
-export function asyncCellIssues(pkg, { required = false } = {}) {
-  const sources = new Map((pkg?.sources ?? []).map((source) => [source?.id, source]))
-  const approved = (id) => approvedAuthority(sources.get(id))
-  const questions = new Set((pkg?.intent?.openQuestions ?? []).map((question) => question?.id))
-  const holds = new Set((pkg?.holds ?? []).map((hold) => hold?.id))
-  const issues = []
-  const operations = pkg?.asyncCells
-  const asyncInSpace = (pkg?.packageVersion ?? 1) >= 2 && familyDisposition(pkg?.families?.Async)?.kind !== 'excluded'
-  if (operations === undefined) {
-    if (required && asyncInSpace)
-      issues.push('package-async-cells: Async is in the space — list asyncCells per async operation with all seven cells decided before writing the model')
-    return issues
-  }
-  if (!Array.isArray(operations) || operations.length === 0) return ['package-async-cells: asyncCells is a non-empty list of operations']
-  for (const operation of operations) {
-    const where = `asyncCells ${operation?.operation}`
-    if (!nonEmpty(operation?.operation)) issues.push('package-async-cells: each entry names its operation')
-    for (const id of ASYNC_CELLS) {
-      const issue = cellIssue(`${where} ${id}`, operation?.cells?.[id], { approved, questions, holds })
-      if (issue) issues.push(`package-async-cells: ${issue}`)
-    }
-  }
-  return issues
-}
-
-/** 객체 안의 모든 문자열 값과 그 경로. */
-function stringsOf(value, path = 'package') {
-  if (typeof value === 'string') return [[path, value]]
-  if (Array.isArray(value)) return value.flatMap((entry, index) => stringsOf(entry, `${path}[${index}]`))
-  if (value && typeof value === 'object')
-    return Object.entries(value).flatMap(([key, entry]) => stringsOf(entry, `${path}.${key}`))
-  return []
-}
-
-/** 계약 행 고정값 검사 — 모델 단계에서도 돈다(행 배정이 잘못된 고정값에서 멈추거나 두 키에 같은 ID를 주지 않게). */
-function contractRowIssues(contract) {
-  const issues = []
-  const pinned = new Set()
-  const defs = new Map()
-  for (const entry of contract ?? []) {
-    if (entry?.row !== undefined) {
-      if (typeof entry.row !== 'string' || !/^O\d+$/.test(entry.row) || pinned.has(entry.row))
-        issues.push(`package-contract-row: ${entry?.key}: row must be a unique O* ID`)
-      pinned.add(entry.row)
-    }
-    if (entry?.def) {
-      if (defs.has(entry.def))
-        issues.push(
-          `package-contract-def-duplicate: ${entry.key} and ${defs.get(entry.def)} name the same def ${
-            entry.def
-          } — one predicate is one row`,
-        )
-      defs.set(entry.def, entry.key)
-    }
-  }
-  return issues
-}
-
-/**
- * 패키지 파일 → { pkg, path, dir, root, text }. JSON이 아니면 멈춘다. root는 `repo:` 경로의 기준 — 카드의 Source Registry와
- * 같이 저장소 루트(도구를 부르는 cwd)다. 잠긴 카드가 `.ai/oracles/<id>/`로 복사돼도 같은 경로가 같은 파일을 가리킨다.
+ * 패키지 파일 → { pkg, raw, path, dir, root, text }. JSON이 아니면 멈춘다. root는 `repo:` 경로의 기준 — 카드의 Source
+ * Registry와 같이 저장소 루트(도구를 부르는 cwd)다. 잠긴 카드가 `.ai/oracles/<id>/`로 복사돼도 같은 경로가 같은 파일을
+ * 가리킨다. pkg는 아직 정하지 않은 값(todo)을 뺀 패키지 — 유도·투영이 읽는다. raw는 파일 그대로 — 검사와 set이 읽는다.
  */
 export async function loadPackage(path, { root = process.cwd() } = {}) {
   const absolute = resolve(root, path)
   const text = await readFile(absolute, 'utf8').catch((error) => {
     throw new PackageError('PACKAGE_UNREADABLE', `${path}: ${error.message}`)
   })
-  let pkg
+  let raw
   try {
-    pkg = JSON.parse(text)
+    raw = JSON.parse(text)
   } catch (error) {
     throw new PackageError('PACKAGE_INVALID', `${path}: ${error.message}`)
   }
-  return { pkg, path: absolute, dir: dirname(absolute), root: resolve(root), text }
+  return { pkg: decidedView(raw), raw, path: absolute, dir: dirname(absolute), root: resolve(root), text }
 }
 
 /** 패키지의 `repo:` 경로는 저장소 루트 기준이다 — 카드의 Source Registry에 그대로 옮겨도 같은 파일을 가리킨다. */
@@ -248,504 +117,13 @@ export function sourcePath(loaded, id) {
 }
 
 /**
- * 구조 검사 — 연결·범주·출처만 본다. 모델 작성 단계에 필요한 것(출처·목표·세계·용어)은 카드 없이 검사되고, 카드 행 ID는
- * 요구하지 않는다: 계약 술어는 모델 심볼(def 이름)로 불리고 O* ID는 투영이 붙인다(`row`로 고정할 수 있다).
- * stage: 'model'(분석·모델 작성 — 계약·투영 필드는 선택) | 'project'(카드 투영 — 전부 필요).
+ * 구조 검사 — 규칙은 oracle-schema.mjs의 표(RULES)가 한 줄씩 가진다: 연결·범주·출처만 보고, 카드 행 ID는 요구하지 않는다
+ * (계약 술어는 모델 심볼로 불리고 O* ID는 투영이 붙인다). stage: 'model'(분석·모델 작성) | 'project'(카드 투영 — 전부 필요).
+ * gate: 작성 그래프의 패키지 노드 — 비동기 칸이 비면 거절한다. 아직 정하지 않은 값(`{"todo": …}`)은 그 값을 기다리는 노드에서
+ * `package-todo`로 나오고, 그 필드를 읽는 규칙은 정해질 때까지 판정하지 않는다.
  */
-export function packageIssues(pkg, { stage = 'project' } = {}) {
-  const issues = []
-  const push = (code, message) => issues.push(`${code}: ${message}`)
-  // 패키지 문자열은 카드의 한 줄·한 칸으로 들어간다 — 줄바꿈이나 HTML 주석 표식이 있으면 생성 영역 안에 제목(예: User
-  // Confirmation)이나 영역 끝 표식을 끼워 넣을 수 있다. 생성기가 승인을 쓰는 통로가 되지 않게 전부 거부한다.
-  for (const [path, value] of stringsOf(pkg))
-    if (/[\r\n]|<!--|-->/.test(value))
-      push('package-text-unsafe', `${path} contains a line break or an HTML comment marker`)
-  if (!PACKAGE_VERSIONS.includes(pkg?.packageVersion))
-    push('package-version', `packageVersion must be ${PACKAGE_VERSION} (1 is the earlier shape without Space discovery)`)
-  const confirmedAxes = pkg?.packageVersion >= 2
-  if (!/^[a-z][\w-]*$/.test(pkg?.id ?? '')) push('package-id', 'id must be a lowercase identifier')
-
-  const sources = new Map()
-  for (const source of pkg?.sources ?? []) {
-    if (!/^S\d+$/.test(source?.id ?? '') || sources.has(source.id))
-      push('package-source-id', `"${source?.id}" must be a unique S* ID`)
-    sources.set(source?.id, source)
-    if (!SOURCE_KINDS.includes(source?.kind))
-      push('package-source-kind', `${source?.id}: kind must be ${SOURCE_KINDS.join(' | ')}`)
-    for (const field of ['jurisdiction', 'standard', 'location', 'approval'])
-      if (!nonEmpty(source?.[field])) push('package-source-field', `${source?.id}: ${field} is required`)
-    // Bend imports only plain names (letters, digits, _ and -): a dotted file name such as World.v1.bend cannot be
-    // imported, and the kernel would report a failed proof instead of naming the file.
-    const bendPath = repoPathOf(source?.location)
-    if (/\.bend$/.test(bendPath ?? '') && !bendPath.replace(/\.bend$/, '').split('/').every((segment) => /^(?:[\w-]+|\.{1,2})$/.test(segment)))
-      push('package-bend-name', `${source?.id}: ${bendPath} — Bend imports only plain names (letters, digits, _ and -) in each path segment`)
-  }
-  if (sources.size === 0) push('package-sources', 'list the source text as sources')
-  // 축은 사용자와 확정한 뒤에 세계가 된다 — 그 문답 기록이 원문 출처로 남고 lock이 덮는다.
-  const sourceText = (id) => {
-    const source = sources.get(id)
-    if (!source || source.self || source.approval !== 'approved') return false
-    return source.kind !== 'implementation-reference' && !/\.bend$/.test(repoPathOf(source.location) ?? '')
-  }
-  if (confirmedAxes && !sourceText(pkg?.spaceDiscovery))
-    push(
-      'package-space-discovery',
-      'name the approved source that records the axes and the counterexample answers the user confirmed — not this package, a model file or an implementation reference',
-    )
-  const authoritative = (id) => {
-    const source = sources.get(id)
-    return Boolean(source) && source.kind !== 'implementation-reference'
-  }
-  const cite = (where, list, { authority = false } = {}) => {
-    if (!Array.isArray(list) || list.length === 0) push('package-cite', `${where} must cite at least one S* source`)
-    for (const id of list ?? []) {
-      if (!sources.has(id)) push('package-cite-unknown', `${where}: ${id} is not a package source`)
-      else if (authority && !authoritative(id))
-        push('package-cite-authority', `${where}: ${id} is an implementation reference, not an authority`)
-    }
-  }
-
-  const intent = pkg?.intent ?? {}
-  if (!RISKS.includes(intent.risk)) push('package-intent-risk', `intent.risk must be ${RISKS.join(' | ')}`)
-  for (const field of ['actor', 'observableSuccess', 'nonGoals', 'worstRegression', 'reversibility'])
-    if (!nonEmpty(intent[field])) push('package-intent-field', `intent.${field} is required`)
-  const questions = new Set()
-  for (const question of intent.openQuestions ?? []) {
-    if (!/^Q\d+$/.test(question?.id ?? '') || questions.has(question.id))
-      push('package-question-id', `"${question?.id}" must be a unique Q* ID`)
-    questions.add(question?.id)
-    if (!nonEmpty(question?.text)) push('package-question-text', `${question?.id}: text is required`)
-    cite(`question ${question?.id}`, question?.sources)
-  }
-
-  const world = pkg?.world ?? {}
-  if (!sources.has(world.source) || !repoPathOf(sources.get(world.source)?.location)?.endsWith('.bend'))
-    push('package-world', 'world.source must name a repo:<path>.bend package source')
-  if (!/^[A-Z]\w*$/.test(world.prefix ?? '')) push('package-world', 'world.prefix must name the world record type')
-
-  const terms = new Map()
-  const fieldOwners = new Map()
-  for (const term of pkg?.terms ?? []) {
-    if (!/^T\d+$/.test(term?.id ?? '') || terms.has(term.id))
-      push('package-term-id', `"${term?.id}" must be a unique T* ID`)
-    terms.set(term?.id, term)
-    if (!WORLD_ROLES.includes(term?.role))
-      push('package-term-role', `${term?.id}: role must be ${WORLD_ROLES.join(' | ')}`)
-    const hasField = nonEmpty(term?.field)
-    if (['concept', 'derived'].includes(term?.role) === hasField)
-      push('package-term-field', `${term?.id}: a concept or derived term has no field; every other role names one world field`)
-    // derived — 다른 필드에서 계산되는 값: 세계 def를 가리키고, 제품은 그것을 상태로 저장하지 않는다
-    if ((term?.role === 'derived') !== nonEmpty(term?.def))
-      push('package-term-def', `${term?.id}: a derived term names the world def that computes it; no other role names a def`)
-    if (hasField) fieldOwners.set(term.field, [...(fieldOwners.get(term.field) ?? []), term.id])
-    const hasPath = nonEmpty(term?.path)
-    if (['controllable', 'observable'].includes(term?.role) !== hasPath)
-      push(
-        'package-term-path',
-        `${term?.id}: a controllable term says how the test sets it and an observable term the product path that reads it; hidden, concept and derived terms have none`,
-      )
-    for (const field of ['context', 'name', 'definition'])
-      if (!nonEmpty(term?.[field])) push('package-term-field', `${term?.id}: ${field} is required`)
-    if (hasField && !nonEmpty(term?.not)) push('package-term-not', `${term?.id}: name the neighbouring meaning (not)`)
-    if (!['confirmed', 'open'].includes(term?.status))
-      push('package-term-status', `${term?.id}: status must be confirmed | open`)
-    if (term?.family !== undefined && !FAMILIES.includes(term.family))
-      push('package-term-family', `${term?.id}: family must be one of ${FAMILIES.join(', ')}`)
-    if (!sources.has(term?.source))
-      push('package-cite-unknown', `term ${term?.id}: ${term?.source} is not a package source`)
-    // Ubiquitous Language — 수명주기는 선택이지만, 적으면 여섯 칸 모두 문자열이어야 한다(빠진 용어는 closure가 known
-    // unknown으로 보고한다).
-    if (term?.lifecycle !== undefined) {
-      const keys = Object.keys(term.lifecycle ?? {})
-      if (
-        typeof term.lifecycle !== 'object' ||
-        keys.some((key) => !LIFECYCLE_KEYS.includes(key)) ||
-        LIFECYCLE_KEYS.some((key) => !nonEmpty(term.lifecycle[key]))
-      )
-        push('package-term-lifecycle', `${term?.id}: lifecycle needs exactly ${LIFECYCLE_KEYS.join(', ')}`)
-    }
-  }
-  for (const [field, owners] of fieldOwners)
-    if (owners.length > 1) push('package-term-conflated', `${field}: ${owners.join(', ')} name one world field`)
-
-  const assumptions = new Set()
-  for (const assumption of pkg?.assumptions ?? []) {
-    if (!/^A\d+$/.test(assumption?.id ?? '') || assumptions.has(assumption.id))
-      push('package-assumption-id', `"${assumption?.id}" must be a unique A* ID`)
-    assumptions.add(assumption?.id)
-    if (!sources.has(assumption?.source))
-      push('package-cite-unknown', `assumption ${assumption?.id}: ${assumption?.source} is not a package source`)
-    if (!nonEmpty(assumption?.falsifier))
-      push('package-assumption-falsifier', `${assumption?.id}: falsifier is required`)
-    if (!nonEmpty(assumption?.owner)) push('package-assumption-owner', `${assumption?.id}: owner is required`)
-    else if (/^product\b/i.test(assumption.owner))
-      push('package-assumption-owner', `${assumption?.id}: a duty of the product is a goal, not an assumption`)
-    // Assumption Registry — 무엇을 근거로 믿는지, 틀리면 무엇이 깨지는지, 검사할 수 있는지, 지금 어떤 상태인지.
-    for (const field of ['evidence', 'riskIfFalse'])
-      if (!nonEmpty(assumption?.[field])) push('package-assumption-registry', `${assumption?.id}: ${field} is required`)
-    if (!TESTABILITY.includes(assumption?.testability))
-      push('package-assumption-registry', `${assumption?.id}: testability must be ${TESTABILITY.join(' | ')}`)
-    if (!ASSUMPTION_STATUS.includes(assumption?.status))
-      push('package-assumption-registry', `${assumption?.id}: status must be ${ASSUMPTION_STATUS.join(' | ')}`)
-  }
-
-  // Requirement Inventory — 원문 문장 하나가 요구사항 하나다. quote는 원문에 글자 그대로 있어야 한다(closure가 확인한다).
-  const requirements = new Set()
-  for (const requirement of pkg?.requirements ?? []) {
-    if (!/^R\d+$/.test(requirement?.id ?? '') || requirements.has(requirement.id))
-      push('package-requirement-id', `"${requirement?.id}" must be a unique R* ID`)
-    requirements.add(requirement?.id)
-    if (!nonEmpty(requirement?.quote)) push('package-requirement-quote', `${requirement?.id}: quote the source text`)
-    const source = sources.get(requirement?.source)
-    if (!source || source.kind === 'implementation-reference' || source.self || source.approval !== 'approved')
-      push('package-requirement-source', `${requirement?.id}: source must be an authoritative package source`)
-    else if (/\.bend$/.test(repoPathOf(source.location) ?? ''))
-      push('package-requirement-source', `${requirement?.id}: a requirement quotes the source text, not a model`)
-  }
-  if (requirements.size === 0)
-    push('package-requirements', 'list the source requirements as R* entries with verbatim quotes')
-  const citeRequirements = (where, list) => {
-    if (list === undefined) return
-    if (!Array.isArray(list)) push('package-requirement-ref', `${where}: requirements must be a list of R* IDs`)
-    for (const id of Array.isArray(list) ? list : [])
-      if (!requirements.has(id)) push('package-requirement-ref', `${where}: ${id} is not a requirement`)
-  }
-  for (const assumption of pkg?.assumptions ?? []) citeRequirements(`assumption ${assumption?.id}`, assumption?.requirements)
-
-  const goals = new Set()
-  for (const goal of pkg?.goals ?? []) {
-    citeRequirements(`goal ${goal?.id}`, goal?.requirements)
-    if (!/^G\d+$/.test(goal?.id ?? '') || goals.has(goal.id))
-      push('package-goal-id', `"${goal?.id}" must be a unique G* ID`)
-    goals.add(goal?.id)
-    if (!['safety', 'witness'].includes(goal?.kind))
-      push('package-goal-kind', `${goal?.id}: kind must be safety | witness`)
-    // 목표는 원문에서 온다 — 카드 행이나 행동 모델을 인용하면 모델이 자기 자신과 비교된다.
-    cite(`goal ${goal?.id}`, goal?.cites, { authority: true })
-    for (const id of goal?.cites ?? [])
-      if (/\.bend$/.test(repoPathOf(sources.get(id)?.location) ?? ''))
-        push('package-goal-source', `${goal?.id}: ${id} is a model file — a goal cites the source text, not a model`)
-    if (!GOAL_AUTHORS.includes(goal?.author))
-      push('package-goal-author', `${goal?.id}: author must be ${GOAL_AUTHORS.join(' | ')} — who read the source`)
-  }
-  if (!(pkg?.goals ?? []).some((goal) => goal?.kind === 'safety'))
-    push('package-goal-missing', 'state at least one safety goal from the source text')
-
-  const hazards = pkg?.hazards ?? {}
-  for (const id of HAZARD_IDS) {
-    const disposition = hazards[id]
-    const ok =
-      /^modeled:\s*\S/.test(disposition ?? '') ||
-      (/^n\/a:\s*S\d+\s+\S/.test(disposition ?? '') && sources.has(disposition.match(/S\d+/)[0])) ||
-      (/^question:\s*Q\d+\s*$/.test(disposition ?? '') && questions.has(disposition.match(/Q\d+/)[0]))
-    if (!ok) push('package-hazard', `${id}: modeled: <fields> | n/a: S<n> <reason> | question: Q<n>`)
-  }
-  for (const id of Object.keys(hazards))
-    if (!HAZARD_IDS.includes(id)) push('package-hazard', `${id} is not one of ${HAZARD_IDS.join(', ')}`)
-
-  for (const example of pkg?.examples ?? []) {
-    if (!/^E\d+$/.test(example?.id ?? '')) push('package-example', `"${example?.id}" must be an E* ID`)
-    if (!goals.has(example?.goal)) push('package-example', `${example?.id}: ${example?.goal} is not a goal`)
-    if (!['holds', 'violates'].includes(example?.verdict))
-      push('package-example', `${example?.id}: verdict must be holds | violates`)
-  }
-
-  const families = pkg?.families ?? {}
-  for (const family of Object.keys(families))
-    if (!FAMILIES.includes(family)) push('package-family', `${family} is not one of ${FAMILIES.join(', ')}`)
-  const familyIssue = (family) => {
-    const declared = families[family]
-    const disposition = familyDisposition(declared)
-    const tagged = (pkg?.terms ?? []).filter((term) => term?.family === family)
-    const driven = tagged.filter((term) => term.role === 'controllable')
-    const form = `map it to a controllable field (terms[].family), write "modeled: behavior" or "excluded: <reason citing the S* source text>"`
-    if (declared !== undefined && !disposition) return ['package-family', `${family}: "${declared}" — ${form}`]
-    if (disposition?.kind === 'excluded' && !disposition.sources.some(sourceText))
-      return ['package-family', `${family}: an exclusion cites the source text that allows it (an S* that is not a model file)`]
-    if (disposition?.kind === 'excluded' && driven.length > 0)
-      return ['package-family', `${family} is mapped by ${driven.map((term) => term.id).join(', ')} and also excluded — keep one`]
-    if (disposition || driven.length > 0) return null
-    if (family !== 'Inherited' && tagged.length > 0)
-      return [
-        'package-family-observation-only',
-        `${family}: ${tagged.map((term) => term.id).join(', ')} only observe — an input family needs a field the test sets; ${form}`,
-      ]
-    return family === 'Inherited' && tagged.length > 0 ? null : ['package-family', `${family}: ${form}`]
-  }
-  // every family, Inherited included: the disposition reads only families and terms, so the package node can refuse what
-  // the projection would — found at the card, its repair would rerun the model
-  if (confirmedAxes)
-    for (const family of FAMILIES) {
-      const issue = familyIssue(family)
-      if (issue) push(...issue)
-    }
-
-  // 교차검증 번역표 — 선언한 차원마다 세계 필드 하나 또는 행동 모델 def 하나, 선언 값마다 그 값이나 생성자
-  const cross = pkg?.crossCheck
-  if (cross !== undefined) {
-    if (!confirmedAxes) push('package-cross-check', 'crossCheck needs a version-2 package with a Space discovery record')
-    if (!sourceText(cross?.declared ?? pkg?.spaceDiscovery))
-      push(
-        'package-cross-check',
-        'crossCheck.declared names the approved source with the declared ## Case space — the Space discovery record by default, never a model file',
-      )
-    for (const [name, entry] of Object.entries(cross?.dimensions ?? {})) {
-      if ([entry?.world, entry?.classify].filter(nonEmpty).length !== 1)
-        push('package-cross-check', `${name}: name exactly one of world (a world field) or classify (a behavior model def)`)
-      if (!entry?.values || typeof entry.values !== 'object' || Object.keys(entry.values).length === 0)
-        push('package-cross-check', `${name}: values maps each declared value to a world value or a constructor`)
-    }
-    for (const field of ['phase', 'step'])
-      if (cross?.stateModel !== undefined && !nonEmpty(cross.stateModel?.[field]))
-        push('package-cross-check', `stateModel.${field} names a behavior model def`)
-    if (cross?.states !== undefined && !sourceText(cross.states))
-      push('package-cross-check', 'crossCheck.states names the approved source with the analyst state table, never a model file')
-    const review = cross?.reviewedBy
-    if (review !== undefined && (!nonEmpty(review?.agent) || !/^[a-f0-9]{64}$/.test(review?.inputDigest ?? '')))
-      push('package-cross-check', 'crossCheck.reviewedBy is {agent, inputDigest: sha256 of the mapping-input it read}')
-  }
-
-  issues.push(...contractRowIssues(pkg?.contract))
-  issues.push(...discoveryRegistryIssues(pkg, { sources, requirements, questions }), ...asyncCellIssues(pkg))
-  if (stage === 'model') return issues
-
-  const policies = new Set()
-  for (const policy of pkg?.policies ?? []) {
-    if (!/^P\d+$/.test(policy?.id ?? '') || policies.has(policy.id))
-      push('package-policy-id', `"${policy?.id}" must be a unique P* ID`)
-    policies.add(policy?.id)
-    if (!nonEmpty(policy?.text)) push('package-policy-text', `${policy?.id}: text is required`)
-    cite(`policy ${policy?.id}`, policy?.sources, { authority: true })
-    citeRequirements(`policy ${policy?.id}`, policy?.requirements)
-  }
-  if (policies.size === 0) push('package-policies', 'list the decided policies')
-
-  const keys = new Set()
-  const cited = new Set()
-  for (const entry of pkg?.contract ?? []) {
-    if (!/^[a-z_]\w*$/i.test(entry?.key ?? '') || keys.has(entry.key))
-      push('package-contract-key', `"${entry?.key}" must be a unique model symbol`)
-    keys.add(entry?.key)
-    const inWorld = entry?.def !== undefined && entry?.def !== null
-    if (inWorld === nonEmpty(entry?.outside))
-      push(
-        'package-contract-def',
-        `${entry?.key}: name the world def that states it, or say why it is outside the world (outside) — exactly one`,
-      )
-    if (inWorld && !/^[a-z_]\w*$/i.test(entry.def)) push('package-contract-def', `${entry?.key}: def must be a symbol`)
-    for (const policy of entry?.policies ?? []) {
-      cited.add(policy)
-      if (!policies.has(policy)) push('package-contract-policy', `${entry?.key}: ${policy} is not a policy`)
-    }
-    if ((entry?.policies ?? []).length === 0) push('package-contract-policy', `${entry?.key}: cite at least one policy`)
-    for (const field of ['given', 'when', 'then', 'never', 'sideEffects'])
-      if (!nonEmpty(entry?.[field])) push('package-contract-text', `${entry?.key}: ${field} is required`)
-    citeRequirements(`contract ${entry?.key}`, entry?.requirements)
-  }
-  if (keys.size === 0) push('package-contract', 'list the contract predicates')
-  for (const policy of policies)
-    if (!cited.has(policy)) push('package-policy-unlinked', `${policy} is cited by no contract entry`)
-
-  // 노출 타입 경계(Props·공유 API·상태 유니온·신뢰 경계 타입)가 없다는 선언 — 사유와 조사한 파일이 둘 다 있어야 한다.
-  if (pkg?.typeContract !== undefined) {
-    const { notApplicable, paths } = pkg.typeContract ?? {}
-    if (!nonEmpty(notApplicable) || !Array.isArray(paths) || paths.length === 0 || !paths.every(nonEmpty))
-      push('package-type-contract', 'typeContract needs notApplicable (why no exported Props, shared API, state union or trust-boundary type is involved) and paths (the investigated repo:<path> files)')
-  }
-
-  for (const entry of pkg?.notApplicable ?? []) {
-    if (!nonEmpty(entry?.text)) push('package-na', 'a notApplicable entry needs text')
-    cite('notApplicable', entry?.sources, { authority: true })
-    citeRequirements('notApplicable', entry?.requirements)
-  }
-
-  if (!confirmedAxes) {
-    for (const family of FAMILIES) {
-      const declared = families[family]
-      if (declared !== undefined && !familyDisposition(declared))
-        push('package-family', `${family}: a declared family disposition is "excluded: <reason with S*>" or "modeled: behavior"`)
-    }
-  }
-
-  const selfSource = [...sources.values()].find((source) => source?.self === true)
-  if (!selfSource)
-    push('package-self', 'register this package file as a source with "self": true so the lock covers it')
-
-  // 시간이 든 요청만 행동 모델(MODEL·LAWS·PROOF)을 쓴다 — Order나 Async가 매핑되면 필수, 둘 다 원문으로 제외되면 세계와
-  // 적절성 점검과 세계 대응 검사로 충분하다. 버전 1 패키지는 예전처럼 늘 필요하다.
-  const behavior = pkg?.behavior
-  const temporal =
-    !confirmedAxes ||
-    ['Order', 'Async'].some((family) => familyDisposition(families[family])?.kind !== 'excluded')
-  if (!behavior) {
-    if (temporal)
-      push(
-        'package-behavior-missing',
-        confirmedAxes
-          ? 'Order or Async is part of the space, so the behavior model is required: behavior: {model, laws, prefix, bound, ...}'
-          : 'the mandatory Formal Model needs behavior: {model, laws, prefix, bound, ...}',
-      )
-  } else {
-    for (const field of ['model', 'laws'])
-      if (!sources.has(behavior[field]) || !repoPathOf(sources.get(behavior[field])?.location)?.endsWith('.bend'))
-        push('package-behavior', `behavior.${field} must name a repo:<path>.bend package source`)
-    if (!/^[A-Z]\w*$/.test(behavior.prefix ?? ''))
-      push('package-behavior', 'behavior.prefix must name the model namespace')
-    if (!Number.isSafeInteger(behavior.bound) || behavior.bound < 1)
-      push('package-behavior', 'behavior.bound must be a positive safe integer')
-    for (const field of ['observation', 'outOfScope', 'notFormalized'])
-      if (!nonEmpty(behavior[field])) push('package-behavior', `behavior.${field} is required`)
-    if (!keys.has(behavior.conformance)) push('package-behavior', 'behavior.conformance must name a contract key')
-    for (const law of behavior.lawRows ?? []) {
-      if (!LAW_KINDS.includes(law?.kind)) push('package-law', `${law?.name}: kind must be ${LAW_KINDS.join(' | ')}`)
-      for (const id of law?.cites ?? [])
-        if (!policies.has(id) && !keys.has(id))
-          push('package-law', `${law?.name}: ${id} is neither a policy nor a contract key`)
-    }
-    if ((behavior.lawRows ?? []).length === 0) push('package-law', 'behavior.lawRows lists every law in the laws file')
-    citeRequirements('behavior', behavior.requirements)
-  }
-  return issues
-}
-
-const DISPOSITION = /^(?:n\/a:\s*(S\d+)\s+\S.*|modeled:\s*([\w.]+)\s*)$/
-
-/**
- * Discovery 레지스트리의 구조 검사 — 있으면 모든 단계에서 본다. 이 필드들은 closure(oracle-discovery.mjs)가 요구하고,
- * 카드 투영은 요구하지 않는다: 공간을 공격하는 방법(E)·결함 모델(F)·결정 기록이 여기 있다. 결정(discoveryDecisions)은
- * 사람이 출처와 함께 적는다 — 도구는 쓰지 않는다.
- */
-function discoveryRegistryIssues(pkg, { sources, requirements, questions }) {
-  const issues = []
-  const push = (code, message) => issues.push(`${code}: ${message}`)
-  const sourceOk = (id) => approvedAuthority(sources.get(id))
-  const repoFile = (where, value) => {
-    if (!nonEmpty(value) || value.startsWith('/') || value.includes('..'))
-      push('package-discovery-path', `${where} must be a repository-relative path`)
-  }
-
-  if (pkg?.spaceVersion !== undefined && !(Number.isInteger(pkg.spaceVersion) && pkg.spaceVersion >= 1))
-    push('package-space-version', 'spaceVersion must be a positive integer')
-
-  for (const [axis, origin] of Object.entries(pkg?.axisOrigins ?? {})) {
-    if (!AXIS_ORIGINS.includes(origin?.origin))
-      push('package-axis-origin', `${axis}: origin must be ${AXIS_ORIGINS.join(' | ')}`)
-    for (const field of ['ref', 'reason'])
-      if (!nonEmpty(origin?.[field])) push('package-axis-origin', `${axis}: ${field} is required`)
-  }
-
-  const faults = new Set()
-  for (const fault of pkg?.faultModel ?? []) {
-    if (!/^F\d+$/.test(fault?.id ?? '') || faults.has(fault.id))
-      push('package-fault-id', `"${fault?.id}" must be a unique F* ID`)
-    faults.add(fault?.id)
-    if (!FAULT_CLASSES.includes(fault?.class))
-      push('package-fault-class', `${fault?.id}: class must be one of ${FAULT_CLASSES.join(', ')}`)
-    repoFile(`fault ${fault?.id}: file`, fault?.file)
-    // 결함은 제품에 심는다 — 어댑터나 하네스를 바꾸면 검사가 스스로 실패해 변이를 "죽인" 것처럼 보인다
-    if (Array.isArray(pkg?.product?.files) && !pkg.product.files.includes(fault?.file))
-      push('package-fault-file', `${fault?.id}: ${fault?.file} is not one of product.files`)
-    if (typeof fault?.find !== 'string' || fault.find === '' || typeof fault?.replace !== 'string' || fault.find === fault.replace)
-      push('package-fault-edit', `${fault?.id}: find and replace are two different strings`)
-  }
-  if (pkg?.mutationThreshold !== undefined && !(typeof pkg.mutationThreshold === 'number' && pkg.mutationThreshold > 0 && pkg.mutationThreshold <= 1))
-    push('package-mutation-threshold', 'mutationThreshold is a number in (0, 1]')
-
-  const metamorphic = pkg?.metamorphic
-  if (typeof metamorphic === 'string') {
-    const match = metamorphic.match(/^n\/a:\s*(S\d+)\s+\S/)
-    if (!match || !sourceOk(match[1])) push('package-metamorphic', 'metamorphic is { source, relations } or "n/a: S<n> <reason>"')
-  } else if (metamorphic !== undefined) {
-    if (!/\.bend$/.test(repoPathOf(sources.get(metamorphic?.source)?.location) ?? ''))
-      push('package-metamorphic', 'metamorphic.source must name a repo:<path>.bend package source')
-    const ids = new Set()
-    for (const relation of metamorphic?.relations ?? []) {
-      if (!/^MR\d+$/.test(relation?.id ?? '') || ids.has(relation.id))
-        push('package-metamorphic', `"${relation?.id}" must be a unique MR* ID`)
-      ids.add(relation?.id)
-      for (const field of ['transform', 'relation'])
-        if (!/^[A-Z]\w*\.\w+$/.test(relation?.[field] ?? ''))
-          push('package-metamorphic', `${relation?.id}: ${field} must name a def as <Namespace>.<name>`)
-      for (const id of relation?.requirements ?? [])
-        if (!requirements.has(id)) push('package-requirement-ref', `metamorphic ${relation?.id}: ${id} is not a requirement`)
-    }
-    if ((metamorphic?.relations ?? []).length === 0) push('package-metamorphic', 'metamorphic.relations lists at least one relation')
-  }
-
-  const product = pkg?.product
-  if (product !== undefined) {
-    for (const field of ['adapter', 'worldAdapter']) repoFile(`product.${field}`, product?.[field])
-    if (!Array.isArray(product?.files) || product.files.length === 0) push('package-product', 'product.files lists the product modules under test')
-    for (const file of product?.files ?? []) repoFile('product.files', file)
-    if (!Number.isInteger(product?.runs) || product.runs < 1) push('package-product', 'product.runs is a positive fast-check run count')
-    if (!Number.isInteger(product?.maxLength) || product.maxLength < 2)
-      push('package-product', 'product.maxLength is the longest sampled trace')
-  }
-
-  for (const [id, disposition] of Object.entries(pkg?.operators ?? {})) {
-    if (!OPERATOR_IDS.includes(id)) push('package-operator', `${id} is not a discovery operator`)
-    const match = typeof disposition === 'string' ? disposition.match(DISPOSITION) : null
-    if (!match) push('package-operator', `${id}: "n/a: S<n> <reason>" or "modeled: <axis id>"`)
-    else if (match[1] && !sourceOk(match[1])) push('package-operator', `${id}: ${match[1]} is not an authoritative source`)
-    else if (match[2] && !DECLARED_OPERATORS.includes(id))
-      push('package-operator', `${id} runs mechanically — only ${DECLARED_OPERATORS.join(', ')} are declared as modeled`)
-  }
-  for (const [field, disposition] of Object.entries(pkg?.residue ?? {})) {
-    const match = typeof disposition === 'string' ? disposition.match(DISPOSITION) : null
-    if (!match || (match[1] && !sourceOk(match[1])))
-      push('package-residue', `${field}: "modeled: <axis id>" or "n/a: S<n> <reason>"`)
-  }
-
-  for (const run of pkg?.aiRuns ?? []) {
-    if (!AI_OPERATORS.includes(run?.operator)) push('package-ai-run', `operator must be ${AI_OPERATORS.join(' | ')}`)
-    repoFile('aiRuns.file', run?.file)
-    if (!nonEmpty(run?.agent)) push('package-ai-run', 'name the agent that produced the run')
-    if (!/^[a-f0-9]{64}$/.test(run?.inputDigest ?? ''))
-      push('package-ai-run', 'inputDigest is the sha256 of the exact input the agent received (oracle-discovery.mjs ai-input)')
-    if (!/^[a-f0-9]{64}$/.test(run?.outputDigest ?? ''))
-      push('package-ai-run', 'outputDigest is the sha256 of the output file as recorded — an edited output is not the run')
-  }
-
-  // hold — 답을 미룬 정책 질문. 질문이 막는 범위는 lock 밖에 남고, 나머지는 끝까지 간다. 열린 hold가 있으면 REVIEW_VERIFIED는 없다.
-  const holds = new Map()
-  for (const hold of pkg?.holds ?? []) {
-    const where = `hold ${hold?.id}`
-    if (!/^H\d+$/.test(hold?.id ?? '') || holds.has(hold.id)) push('package-hold', `"${hold?.id}" must be a unique H<n> ID`)
-    holds.set(hold?.id, hold)
-    if (!nonEmpty(hold?.question)) push('package-hold', `${where}: question is required`)
-    if (!Array.isArray(hold?.blocks) || hold.blocks.length === 0 || !hold.blocks.every(nonEmpty))
-      push('package-hold', `${where}: blocks names what the question keeps out of the lock (rows, terms, goals or behaviours)`)
-    if (!HOLD_STATUS.includes(hold?.status)) push('package-hold', `${where}: status must be ${HOLD_STATUS.join(' | ')}`)
-    // 풀린 hold는 사용자의 답과 승인된 출처를 남긴다 — 답을 지어 닫을 수 없다
-    if (hold?.status === 'resolved' && !(nonEmpty(hold?.answer) && sourceOk(hold?.source)))
-      push('package-hold', `${where}: a resolved hold records the answer and an approved authoritative S* source`)
-  }
-
-  const decided = new Set()
-  for (const decision of pkg?.discoveryDecisions ?? []) {
-    const where = `decision ${decision?.candidate}`
-    if (!/^C-[a-f0-9]{10}$/.test(decision?.candidate ?? '') || decided.has(decision.candidate))
-      push('package-decision', `${where}: candidate must be a unique C-<10 hex> ID from a discovery run`)
-    decided.add(decision?.candidate)
-    if (!DECISIONS.includes(decision?.decision)) push('package-decision', `${where}: decision must be ${DECISIONS.join(' | ')}`)
-    if (!nonEmpty(decision?.reason)) push('package-decision', `${where}: reason is required`)
-    // 범위 밖·위험 수용·기각은 사람의 정책 결정이다 — 승인된 출처나 Open question이 있어야 한다.
-    if (['out-of-scope', 'accepted-risk', 'promoted', 'rejected'].includes(decision?.decision)) {
-      const source = decision?.source ?? ''
-      if (!(sourceOk(source) || questions.has(source)))
-        push('package-decision', `${where}: ${decision?.decision} cites an authoritative S* or an Open question Q*`)
-    }
-    if (decision?.decision === 'held' && !holds.has(decision?.hold))
-      push('package-decision', `${where}: held names the hold (H<n>) that defers it`)
-    if (decision?.decision === 'promoted' && !nonEmpty(decision?.axis))
-      push('package-decision', `${where}: a promotion names the axis, goal, contract key or assumption it became`)
-    // 이미 덮인 후보 — 어느 행(O*·계약 키)이 덮는지 적고, 그 행이 실제로 있어야 한다.
-    if (decision?.decision === 'covered') {
-      const rows = new Set((pkg?.contract ?? []).flatMap((entry) => [entry?.key, entry?.row].filter(Boolean)))
-      if (!rows.has(decision?.by)) push('package-decision', `${where}: covered names the contract row (by: O* or key) that already rejects it`)
-    }
-  }
-  return issues
+export function packageIssues(pkg, { stage = 'project', gate = false } = {}) {
+  return judgePackage(pkg, { stage, gate })
 }
 
 /**
@@ -1142,14 +520,11 @@ function enumeratedBySpace(axes, space) {
  * 누락 감사 — 여덟 계열을 도출된 축에 잇는다. 축이 없는 계열은 패키지가 적은 excluded 사유가 있어야 한다: 모델에
  * 없다는 사실만으로 excluded를 쓰지 않는다(`family-undispositioned`는 사람의 결정이 필요한 자리다).
  */
-// 입력 계열은 테스트가 모는 축이어야 한다. 관찰 축만 매핑된 계열은 테스트가 그 조건을 만들 수 없으므로 "world로 전부
-// 열거됨"이 근거가 되지 못한다 — 몰 수 있는 축(controllable·environment·event)이나 모델 검사 순서 의무가 있어야 매핑이다.
-const drivable = (axis) => axis.role === 'controllable' || axis.role === 'environment' || axis.id.startsWith('event.')
-
+// 계열 판정은 oracle-schema.mjs의 familyVerdict 하나다 — 패키지 노드가 모델 전에, 유도가 모델 뒤에 같은 규칙으로 판정한다.
 export function familyAudit(pkg, axes, order = null) {
   const events = axes.filter((axis) => axis.id.startsWith('event.') && !axis.conditionalOn).map((axis) => axis.id)
   return FAMILIES.map((family) =>
-    auditFamily(family, pkg.families?.[family] ?? null, axes.filter((axis) => axis.family === family), {
+    familyVerdict(family, pkg.families?.[family] ?? null, axes.filter((axis) => axis.family === family), {
       events,
       ordered: family === 'Order' && (order?.total ?? 0) > 0,
     }),
@@ -1165,35 +540,6 @@ function traceSummary(space, cover, automaton) {
     ...summary,
     cover: { status, configurations, pairs, cases: cover.cases.length, ...(status === 'capped' ? { coveredDepth } : {}) },
   }
-}
-
-/** 한 계열의 처분 — 행동 모델이 모는 계열, 테스트가 모는 축으로 매핑된 계열, 원문이 제외한 계열, 처분 없음. */
-function auditFamily(family, declared, members, { events, ordered }) {
-  const mapped = members.map((axis) => axis.id)
-  const driven = members.filter(drivable).map((axis) => axis.id)
-  if (familyDisposition(declared)?.kind === 'behavior') {
-    if (events.length > 0) return { family, status: 'mapped', via: 'behavior', axes: [...driven, ...events] }
-    return {
-      family,
-      status: 'undispositioned',
-      blocked: 'family-behavior-missing',
-      message: `${family} is "modeled: behavior" but no behavior model event drives it`,
-    }
-  }
-  const observedOnly = mapped.length > 0 && family !== 'Inherited' && driven.length === 0 && !ordered
-  if (observedOnly && declared) return { family, status: 'excluded', reason: declared, axes: mapped }
-  if (observedOnly)
-    return {
-      family,
-      status: 'undispositioned',
-      axes: mapped,
-      blocked: 'family-observation-only',
-      message: `${family} maps only observed axes (${mapped.join(', ')}); add a controllable or environment axis, an event the model orders, or a sourced exclusion`,
-    }
-  if (mapped.length > 0)
-    return { family, status: 'mapped', axes: driven.length > 0 ? driven : mapped, ...(declared ? { declared } : {}) }
-  if (declared) return { family, status: 'excluded', reason: declared }
-  return { family, status: 'undispositioned' }
 }
 
 /** 파생 IR의 결정적 digest — 실행 시각·runId 없이 입력과 생성기 버전만. */
@@ -1870,15 +1216,15 @@ function pointerKey(container, token, pointer) {
     if (selector) {
       const [, field, value] = selector
       const index = container.findIndex((entry) => entry !== null && typeof entry === 'object' && Object.hasOwn(entry, field) && String(entry[field]) === value)
-      if (index < 0) throw new PackageError('PATCH_NO_TARGET', `${pointer}: no element with ${field} ${value}`)
+      if (index < 0) throw new PackageError('NO_TARGET', `${pointer}: no element with ${field} ${value}`)
       return index
     }
     if (token === '-') return container.length
-    if (!/^(?:0|[1-9]\d*)$/.test(token)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: ${token} is not an array index`)
+    if (!/^(?:0|[1-9]\d*)$/.test(token)) throw new PackageError('NO_TARGET', `${pointer}: ${token} is not an array index`)
     return Number(token)
   }
   if (container !== null && typeof container === 'object' && !selector) return token
-  throw new PackageError('PATCH_NO_TARGET', `${pointer}: cannot step into ${JSON.stringify(token)} here`)
+  throw new PackageError('NO_TARGET', `${pointer}: cannot step into ${JSON.stringify(token)} here`)
 }
 
 const present = (container, key) => (Array.isArray(container) ? key < container.length : Object.hasOwn(container, key))
@@ -1888,85 +1234,57 @@ export function pointerGet(document, pointer) {
   let node = document
   for (const token of parsePointer(pointer)) {
     const key = pointerKey(node, token, pointer)
-    if (!present(node, key)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: nothing at ${token}`)
+    if (!present(node, key)) throw new PackageError('NO_TARGET', `${pointer}: nothing at ${token}`)
     node = node[key]
   }
   return node
 }
 
-// 연산마다 부모와 마지막 키를 받는다 — 경로의 끝이 어디를 가리키는지는 pointerKey가 이미 풀었다. set은 객체에 없던 키를 만들었는지
-// 돌려준다: 마지막 키의 오타는 새 필드가 되어 조용히 무시되므로 출력에 `(new key)`로 드러낸다.
-const PATCH_OPERATIONS = {
-  set(parent, key, value, pointer) {
-    if (Array.isArray(parent) && key > parent.length) throw new PackageError('PATCH_NO_TARGET', `${pointer}: index past the end`)
-    const created = !Array.isArray(parent) && !Object.hasOwn(parent, key)
-    parent[key] = value
-    return created
-  },
-  append(parent, key, value, pointer) {
-    if (!Array.isArray(parent[key])) throw new PackageError('PATCH_NO_TARGET', `${pointer}: append needs an array`)
-    parent[key].push(value)
-    return false
-  },
-  remove(parent, key, _value, pointer) {
-    if (!present(parent, key)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: nothing to remove`)
-    if (Array.isArray(parent)) parent.splice(key, 1)
-    else delete parent[key]
-    return false
-  },
-}
-
-/** 마지막 조각의 부모까지 걷는다 — 중간 가지가 없으면 멈춘다(오타 난 경로가 새 가지를 만들지 않는다). */
+/**
+ * 마지막 조각의 부모까지 걷는다 — 중간 가지가 없으면 멈춘다(오타 난 경로가 새 가지를 만들지 않는다). 아직 정하지 않은 값(todo)을
+ * 지나면 그 자리를 다음 조각이 바라는 빈 그릇으로 바꾼다: todo였던 출처 목록에 `/sources/-`가 첫 출처를 쓴다.
+ */
 function parentOf(document, tokens, pointer) {
   let parent = document
-  for (const token of tokens.slice(0, -1)) {
+  const resolved = []
+  for (const [index, token] of tokens.slice(0, -1).entries()) {
     const key = pointerKey(parent, token, pointer)
-    if (!present(parent, key)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: nothing at ${token}`)
+    if (!present(parent, key)) throw new PackageError('NO_TARGET', `${pointer}: nothing at ${token}`)
+    if (isTodo(parent[key])) parent[key] = /^(?:-|\d+|\[.*\])$/.test(tokens[index + 1]) ? [] : {}
+    resolved.push(String(key))
     parent = parent[key]
   }
-  return parent
+  return { parent, resolved }
 }
 
-/**
- * set·append·remove를 차례로 적용한 새 문서와 새로 만든 키를 돌려준다(원본은 그대로). 중간 가지는 있어야 한다 — 오타 난 경로가 새
- * 가지를 만들지 않는다. append는 배열 끝에 넣고, set의 `-`도 같다.
- */
-export function applyPatch(document, operations) {
-  const result = structuredClone(document)
-  const created = []
-  for (const { op, pointer, value } of operations) {
-    if (!Object.hasOwn(PATCH_OPERATIONS, op)) throw new PackageError('USAGE', `unknown patch operation: ${op}`, 2)
-    const tokens = parsePointer(pointer)
-    if (tokens.length === 0) throw new PackageError('USAGE', 'a patch never replaces the whole package', 2)
-    const parent = parentOf(result, tokens, pointer)
-    if (PATCH_OPERATIONS[op](parent, pointerKey(parent, tokens.at(-1), pointer), value, pointer)) created.push(pointer)
-  }
-  return { document: result, created }
-}
-
-/** `<pointer>=<json>`의 경계 — `[id=…]` 조각 안의 `=`는 경계가 아니다. 없으면 -1. */
-function assignmentSplit(argument) {
-  let depth = 0
-  for (let index = 0; index < argument.length; index += 1) {
-    const char = argument[index]
-    if (char === '[') depth += 1
-    if (char === ']') depth -= 1
-    if (char === '=' && depth === 0) return index
-  }
-  return -1
-}
-
-/** 문자열 값도 JSON 따옴표가 있어야 한다 — 숫자·불리언·객체와 섞이지 않게 값의 종류를 명시한다. */
-function patchOperation(op, argument) {
-  if (op === 'remove') return { op, pointer: argument }
-  const split = assignmentSplit(argument)
-  if (split < 0) throw new PackageError('USAGE', `--${op} takes <pointer>=<json>: ${argument}`, 2)
-  const raw = argument.slice(split + 1)
+/** `set`의 값 — JSON이면 그 값, 아니면 글자 그대로의 문자열(`Low`, `modeled: behavior`). `null`은 그 필드를 지운다. */
+export function setValue(text) {
   try {
-    return { op, pointer: argument.slice(0, split), value: JSON.parse(raw) }
+    return JSON.parse(text)
   } catch {
-    throw new PackageError('PATCH_VALUE_INVALID', `--${op} value is not JSON (a string needs quotes, '"text"'): ${raw.slice(0, 80)}`, 2)
+    return text
   }
+}
+
+/** set 쓰기를 문서 사본에 차례로 적용한다(원본은 그대로). 마지막 조각이 `-`면 배열 끝에 넣고, 값이 null이면 지운다. */
+export function applySet(document, pairs) {
+  const result = structuredClone(document)
+  const writes = []
+  for (const { pointer, value } of pairs) {
+    const tokens = parsePointer(pointer)
+    if (tokens.length === 0) throw new PackageError('USAGE', 'set writes a field, never the whole package', 2)
+    const { parent, resolved } = parentOf(result, tokens, pointer)
+    const key = pointerKey(parent, tokens.at(-1), pointer)
+    if (Array.isArray(parent) && key > parent.length) throw new PackageError('NO_TARGET', `${pointer}: index past the end`)
+    if (value === null && !present(parent, key)) throw new PackageError('NO_TARGET', `${pointer}: nothing to remove`)
+    // a key the object did not have yet (a typo lands here too, so the output names it)
+    const created = !Array.isArray(parent) && !present(parent, key)
+    if (value === null && Array.isArray(parent)) parent.splice(key, 1)
+    else if (value === null) delete parent[key]
+    else parent[key] = value
+    writes.push({ tokens: [...resolved, String(key)], value, remove: value === null, created })
+  }
+  return { document: result, writes }
 }
 
 /** 값이 크면 모양만 — 맨 위 키와 그 종류·길이로 패키지를 둘러본다(통째로 읽지 않아도 된다). */
@@ -1985,7 +1303,7 @@ function parseOptions(args) {
       continue
     }
     const value = args[index + 1]
-    if (!['package', 'out', 'card', 'stage', 'title', 'timeout-ms'].includes(name) || value === undefined)
+    if (!['package', 'out', 'card', 'stage', 'title', 'timeout-ms', 'id'].includes(name) || value === undefined)
       throw new PackageError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     options[name] = value
     index += 1
@@ -1995,73 +1313,105 @@ function parseOptions(args) {
 
 const USAGE = `usage:
   oracle-package.mjs get --package <oracle.package.json> [--pointer '/path' | '/sources/[id=S2]']
-  oracle-package.mjs patch --package <oracle.package.json> (--set '<pointer>=<json>' | --append '<pointer>=<json>' | --remove '<pointer>')…
+  oracle-package.mjs set --dir <oracle dir> <pointer> <value> [<pointer> <value>]…  (value: JSON or plain text; null removes)
+  oracle-package.mjs skeleton --id <id> [--out <oracle.package.json>]
   oracle-package.mjs validate --package <oracle.package.json> [--stage model|project]
   oracle-package.mjs derive --package <oracle.package.json> [--out <derived.json>] [--no-bend]
   oracle-package.mjs project-card --package <oracle.package.json> --out <oracle.md> [--title <text>] [--no-bend]
   oracle-package.mjs check-card --package <oracle.package.json> --card <oracle.md> [--no-bend]`
 
-function parseGetOrPatch(command, args) {
-  const operations = []
+function parseGet(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]?.replace(/^--/, '')
-    const value = args[index + 1]
-    if (value === undefined) throw new PackageError('USAGE', USAGE, 2)
-    if (command === 'patch' && Object.hasOwn(PATCH_OPERATIONS, name)) operations.push(patchOperation(name, value))
-    else if (name === 'package' || (command === 'get' && name === 'pointer')) options[name] = value
-    else throw new PackageError('USAGE', USAGE, 2)
+    if (!['package', 'pointer'].includes(name) || args[index + 1] === undefined) throw new PackageError('USAGE', USAGE, 2)
+    options[name] = args[index + 1]
   }
   if (!options.package) throw new PackageError('USAGE', USAGE, 2)
-  if (command === 'patch' && operations.length === 0) throw new PackageError('USAGE', 'patch needs at least one --set, --append or --remove', 2)
-  return { options, operations }
+  return options
 }
 
-/** 포인터가 없으면 맨 위 키의 모양만, 있으면 그 값을 JSON으로. */
+/** 포인터가 없으면 맨 위 키의 모양만, 있으면 그 값을 JSON으로 — 파일 그대로(todo 포함). */
 function getCommand(loaded, pointer) {
-  if (pointer === undefined) return Object.entries(loaded.pkg).map(([key, value]) => `${key}: ${outline(value)}`).join('\n')
-  return JSON.stringify(pointerGet(loaded.pkg, pointer), null, 2)
+  if (pointer === undefined) return Object.entries(loaded.raw).map(([key, value]) => `${key}: ${outline(value)}`).join('\n')
+  return JSON.stringify(pointerGet(loaded.raw, pointer), null, 2)
 }
 
-/** set이 객체에 없던 키를 만들었으면 그렇다고 적는다 — 마지막 키의 오타가 새 필드로 숨지 않게. */
-function newKeyMark(op, pointer, created) {
-  if (op !== 'set' || !created.includes(pointer)) return null
-  return '(new key)'
+/** The rule row a refused issue belongs to: its field's row, or the row that owns its code. */
+function refusalRow(issue) {
+  const pointer = /^(\/[^:\s]*):/.exec(issue)?.[1]
+  return pointer ? rowOf(parsePointer(pointer)) : RULES.find((candidate) => candidate.codes?.includes(issue.split(':')[0]))
+}
+
+/** What a refused set prints: each issue, then each row's one fix line once. */
+function refusal(refused) {
+  const rows = [...new Set(refused.map(refusalRow).filter((row) => row?.fix))]
+  return ['nothing written:', ...refused.map((issue) => `  ${issue}`), ...rows.map((row) => `  fix ${row.path || 'package'}: ${row.fix}`)].join('\n')
+}
+
+function setPairs(args) {
+  if (args[0] !== '--dir' || args[1] === undefined) throw new PackageError('USAGE', USAGE, 2)
+  const rest = args.slice(2)
+  if (rest.length === 0 || rest.length % 2 !== 0) throw new PackageError('USAGE', 'set takes --dir <oracle dir> and <pointer> <value> pairs', 2)
+  const pairs = []
+  for (let index = 0; index < rest.length; index += 2) pairs.push({ pointer: rest[index], value: setValue(rest[index + 1]) })
+  return { directory: args[1], pairs }
 }
 
 /**
- * 잠긴 revision은 고치지 않는다 — stage.json이 ORACLE_READY거나 읽을 수 없으면, 또는 패키지 옆에 oracle.lock.json이 있으면 멈춘다
- * (새 revision은 늘 새 경로라 패키지 옆의 lock은 곧 잠김이다). 심볼릭 링크는 따라가지 않는다. 디렉터리 잠금 안에서 다시 읽고
- * 고쳐 써서 동시에 고친 둘 중 하나를 잃지 않는다. 내용이 같으면 쓰지 않는다. 쓴 뒤에는 패키지 노드와 같은 구조 검사를 보고만 한다.
+ * 한 필드를 쓰기 전에 판정한다(oracle-schema.mjs writeIssues): 표의 그 행이 거절하는 값, 먼저 정할 필드가 남은 쓰기, 이미 정한
+ * 다른 필드와 어긋나게 만드는 쓰기는 파일에 닿지 않고 그 행의 고칠 줄과 함께 돌아간다. 잠긴 revision은 고치지 않는다 —
+ * stage.json이 ORACLE_READY거나 읽을 수 없으면, 또는 패키지 옆에 oracle.lock.json이 있으면 멈춘다. 심볼릭 링크는 따라가지 않는다.
+ * 디렉터리 잠금 안에서 다시 읽고 임시 파일을 rename해 쓴다. 쓴 뒤에는 남은 todo 수와 결정 순서의 다음 필드를 알린다.
  */
-async function patchCommand(path, operations) {
-  const absolute = resolve(path)
-  if ((await lstat(absolute).catch(() => null))?.isSymbolicLink()) throw new PackageError('PACKAGE_LINK', `${path} is a symbolic link — patch the real file`)
-  const directory = dirname(absolute)
+async function setCommand(directory, pairs) {
+  const absolute = resolve(directory, PACKAGE_FILE)
+  const shown = relative(process.cwd(), absolute)
+  if ((await lstat(absolute).catch(() => null))?.isSymbolicLink()) throw new PackageError('PACKAGE_LINK', `${shown} is a symbolic link — set the real file`)
   const { readStage } = await import('./oracle-stage.mjs')
-  return withDirectoryLock(directory, 'package', async () => {
-    const record = await readStage(directory)
+  return withDirectoryLock(dirname(absolute), 'package', async () => {
+    const record = await readStage(dirname(absolute))
     if (record?.stage === 'ORACLE_READY') throw new PackageError('PACKAGE_LOCKED', 'this revision is locked — a change is a new revision, never an edit')
-    if (await stat(join(directory, 'oracle.lock.json')).catch(() => null))
+    if (await stat(join(dirname(absolute), 'oracle.lock.json')).catch(() => null))
       throw new PackageError('PACKAGE_LOCKED', 'oracle.lock.json sits next to this package — a locked revision changes only as a new revision')
     const loaded = await loadPackage(absolute)
-    const { document, created } = applyPatch(loaded.pkg, operations)
-    if (isDeepStrictEqual(document, loaded.pkg)) return `PACKAGE_UNCHANGED ${path} · the operations leave the package as it is`
-    const text = `${JSON.stringify(document, null, 2)}\n`
+    const { document, writes } = applySet(loaded.raw, pairs)
+    const { refused, remaining, advice } = writeIssues(loaded.raw, document, writes)
+    if (refused.length > 0) throw new PackageError('SET_REFUSED', refusal(refused))
+    if (isDeepStrictEqual(document, loaded.raw)) return `PACKAGE_UNCHANGED ${shown} · the values are already there`
     const temporary = `${absolute}.${process.pid}.tmp`
-    await writeFile(temporary, text)
+    await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`)
     await rename(temporary, absolute)
-    const written = JSON.parse(text)
-    const issues = [...packageIssues(written, { stage: 'model' }), ...asyncCellIssues(written, { required: true })]
-    const done = operations.map(({ op, pointer }) => [op, pointer, newKeyMark(op, pointer, created)].filter(Boolean).join(' '))
-    return [`PACKAGE_PATCHED ${path} · ${done.join(', ')} · package-node issues: ${issues.length}`, ...issues.slice(0, 5).map((issue) => `  ${issue}`)].join('\n')
+    const todos = openTodos(document)
+    const written = pairs.map(({ pointer }, index) => (writes[index].created ? pointer.concat(' (new key)') : pointer))
+    return [
+      `PACKAGE_SET ${shown} · ${written.join(', ')} · ${todos.length} todo(s) remain`,
+      todos.length > 0 ? `  next: ${todoIssue(todos[0]).replace(/^package-todo: /, '')}` : '  next: oracle-step.mjs runs the package node',
+      ...remaining.slice(0, 5).map((issue) => `  still open: ${issue}`),
+      ...(advice.length > 0 ? [`  auto test cases no contract text or sourced N/A names yet: ${advice.join(', ')}`] : []),
+    ].join('\n')
   })
 }
 
-async function getOrPatch(command, args) {
-  const { options, operations } = parseGetOrPatch(command, args)
-  const text = command === 'get' ? getCommand(await loadPackage(options.package), options.pointer) : await patchCommand(options.package, operations)
-  process.stdout.write(`${text}\n`)
+/** 빈 패키지 — 정할 필드를 결정 순서로 모두 todo로 둔 뼈대(oracle-step.mjs가 패키지가 없는 폴더에 쓰는 것과 같다). */
+async function skeletonCommand(args) {
+  const options = parseOptions(args)
+  if (!/^[a-z][\w-]*$/.test(options.id ?? '')) throw new PackageError('USAGE', USAGE, 2)
+  const text = `${JSON.stringify(packageSkeleton({ id: options.id }), null, 2)}\n`
+  if (options.out) await writeFile(options.out, text)
+  process.stdout.write(options.out ? `PACKAGE_SKELETON ${options.out}\n` : text)
+}
+
+const COMMANDS = {
+  get: async (args) => {
+    const options = parseGet(args)
+    process.stdout.write(`${getCommand(await loadPackage(options.package), options.pointer)}\n`)
+  },
+  set: async (args) => {
+    const { directory, pairs } = setPairs(args)
+    process.stdout.write(`${await setCommand(directory, pairs)}\n`)
+  },
+  skeleton: skeletonCommand,
 }
 
 async function binFor(options) {
@@ -2072,8 +1422,8 @@ async function binFor(options) {
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
-  if (command === 'get' || command === 'patch') {
-    await getOrPatch(command, args)
+  if (Object.hasOwn(COMMANDS, command)) {
+    await COMMANDS[command](args)
     return
   }
   if (!['validate', 'derive', 'project-card', 'check-card'].includes(command)) throw new PackageError('USAGE', USAGE, 2)
@@ -2082,7 +1432,7 @@ async function main() {
   const loaded = await loadPackage(options.package)
   const stage = options.stage ?? (command === 'derive' ? 'model' : 'project')
   if (!['model', 'project'].includes(stage)) throw new PackageError('USAGE', USAGE, 2)
-  const issues = packageIssues(loaded.pkg, { stage })
+  const issues = packageIssues(loaded.raw, { stage })
   if (command === 'validate' || issues.length > 0) {
     process.stdout.write(`${JSON.stringify({ stage, issues })}\n`)
     if (issues.length > 0) throw new PackageError('PACKAGE_INVALID', `${issues.length} issue(s)`)

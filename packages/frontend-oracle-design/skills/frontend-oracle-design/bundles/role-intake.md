@@ -1138,11 +1138,12 @@ edits or production work: the projected card is still re-presented and approved 
    the product. hidden: real, but no test reads it. derived: computed from other axes and never stored
    as product state. A hidden axis that decides correct versus bug is a SUFFICIENCY FAILURE: show the
    two worlds and hidden value, recommend promoting it to observable or adding a substitute signal.
-5. **Freeze the record.** Save confirmed axes and every question and answer verbatim as
-   .ai/oracles/<id>/sources/space-discovery.md, register it as an approved source and return its location
-   for the author to name in package spaceDiscovery; the lock covers it. Keep confirmed axes in a
-   `## Case space` table and flow states in `## State Model` when applicable. An answer that states
-   product behavior is also quoted as an R\*. No agent confirmation on the user's behalf.
+5. **Freeze the record.** Fill the skeleton at .ai/oracles/<id>/sources/space-discovery.md: every question
+   and answer verbatim, each confirmed axis a `## Case space` row (`Family | Dimension | Choices`, every
+   family, an excluded one `— | excluded: <reason>`). No State Model: the model analyst writes its own.
+   Register it as an approved source and return its location for package spaceDiscovery; the lock covers
+   it. An answer that states product behavior is also quoted as an R\*. No agent confirmation on the
+   user's behalf.
 
 Only after confirmation may the author write Terms, World, Assumptions and Goals and run adequacy.
 Once Bend files exist, oracle-discovery.mjs cross-check --package compares the source declaration with

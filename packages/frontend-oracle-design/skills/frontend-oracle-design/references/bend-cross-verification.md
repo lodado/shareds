@@ -78,8 +78,8 @@ card projection gives them `O*` IDs, and a `row` pin in the package keeps an ID 
 so evidence never moves to a different meaning. Never create empty `O*` rows, placeholder policies or a
 pending approval to get past the model stage. For retries, delays, staleness, error kinds, remounts or
 request counts, model them with [`model-patterns.md`](model-patterns.md) instead of folding them into one
-event. Start from [`model-package.example.json`](model-package.example.json),
-a complete package that passes `validate --stage model`; replace every value. Do not take `cat` of a fixture's
+event. Start from the skeleton oracle-step.mjs writes ([`model-package.example.json`](model-package.example.json)):
+each field a todo in decision order, filled with `oracle-package.mjs set`. Do not take `cat` of a fixture's
 `oracle.package.json` as a template (47KB of discovery records), and do not start from `MODEL.bend` or a
 hand-written card: a card without a package has the legacy shape and review rejects it for new work. A package whose touched code exposes no Props, shared
 API, state union or trust-boundary type may declare `typeContract: {notApplicable, paths}` — the reason

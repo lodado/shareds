@@ -14,6 +14,7 @@ import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { bendInputs, compileBend, lockScopeIssues, toPlain, verdictBeside } from './oracle-model.mjs'
 import { independenceOf, loadPackage, packageIssues, packageSpec, sourcePath } from './oracle-package.mjs'
+import { hazardVerdict, termVerdicts, VAGUE_WORDS, vagueHits } from './oracle-schema.mjs'
 import { parseBendTypes } from './oracle-types.mjs'
 
 export const ADEQUACY_VERSION = 1
@@ -34,28 +35,6 @@ export const HAZARDS = {
   'order-timing':
     'the result depends on what happens first (a toast before the commit, a late response) — a record world sees end states only',
 }
-// 판정에 쓰이면 뜻이 갈리는 단어 — 카드 행에 나오면 ## Terms가 어느 뜻인지 정해야 한다(영문은 단어 시작, 한글은 부분 일치).
-const VAGUE_WORDS = [
-  'success',
-  'complete',
-  'save',
-  'delete',
-  'cancel',
-  'same',
-  'latest',
-  'permission',
-  'change',
-  '성공',
-  '완료',
-  '저장',
-  '삭제',
-  '취소',
-  '동일',
-  '같은',
-  '최신',
-  '권한',
-  '변경',
-]
 const TERM_COLUMNS = ['Term', 'Context', 'Name', 'Category', 'Field', 'Path', 'Definition', 'Not', 'Source', 'Status']
 const ADEQUACY_FIELDS = ['World', 'Coordinates', 'Observations', 'Rows', 'Rows outside the world']
 const REFERENCE = fileURLToPath(new URL('../references/adequacy.md', import.meta.url))
@@ -203,6 +182,38 @@ function lockedBendPath(source) {
   return source.repoPath
 }
 
+/** A ## Terms row in the package's term shape — the card and the package judge terms with one rule set (termVerdicts). */
+const cardTerm = (row) => ({
+  id: row.Term,
+  context: row.Context,
+  name: row.Name,
+  role: row.Category,
+  field: isField(row) ? row.Field : undefined,
+  def: row.Category === 'derived' ? row.Field?.match(/^def: (\S+)$/)?.[1] : undefined,
+  path: row.Path,
+  definition: row.Definition,
+  not: row.Not,
+  status: row.Status,
+  source: row.Source,
+})
+
+// the card's wording of the term verdicts it judges — Context and Name are columns (terms-columns), family, lifecycle and
+// the field's Bend name are the package's
+const CARD_TERM_TEXT = {
+  id: ({ id }) => `terms-id: "${id}" must be a unique T* ID`,
+  duplicate: ({ id, name, context }) =>
+    `terms-duplicate: ${id}: "${name}" is already a term in context ${context} — the same word in another bounded context gets its own Context`,
+  role: ({ id }) => `terms-category: ${id}: Category must be ${TERM_CATEGORIES.join(' | ')}`,
+  field: ({ id }) => `terms-field: ${id}: a concept has Field —; a controllable, observable or hidden term names one world field`,
+  def: ({ id }) => `terms-field: ${id}: a derived term's Field is \`def: <world def>\``,
+  path: ({ id }) =>
+    `terms-path: ${id}: a controllable term names how the test sets it and an observable term the product path that reads it; hidden and concept terms have —`,
+  definition: ({ id }) => `terms-definition: ${id}: Definition is empty`,
+  not: ({ id }) => `terms-not: ${id}: name the neighbouring meaning the term must not be confused with`,
+  status: ({ id }) => `terms-status: ${id}: Status must be confirmed | open`,
+  'source-authority': ({ id }) => `terms-source: ${id}: a confirmed term cites one approved, non-implementation Source Registry ID`,
+}
+
 /**
  * Terms·Adequacy 구조 검사 — card lint가 부른다. 연결과 범주만 본다: 정의가 원문의 뜻과 같은지는 리뷰 소관이다.
  * context: { rows: Set<O*|D*>, rowText: Map<id, text>, sources: Map<S*, { repoPath, authoritative }>,
@@ -214,51 +225,14 @@ export async function adequacyIssues({ adequacy, terms }, context) {
   if (terms) {
     const missing = TERM_COLUMNS.filter((name) => !terms.header.includes(name))
     if (missing.length > 0) issues.push(`terms-columns: ## Terms needs the columns ${missing.join(', ')}`)
-    const ids = new Set()
-    const names = new Set()
-    const byField = new Map()
-    for (const row of termRows) {
-      const id = row.Term
-      if (!/^T\d+$/.test(id) || ids.has(id)) issues.push(`terms-id: "${id}" must be a unique T* ID`)
-      ids.add(id)
-      const name = `${(row.Context ?? '').toLowerCase()}/${(row.Name ?? '').toLowerCase()}`
-      if (names.has(name)) {
-        issues.push(
-          `terms-duplicate: ${id}: "${row.Name}" is already a term in context ${row.Context} — the same word in another bounded context gets its own Context`,
-        )
-      }
-      names.add(name)
-      if (!TERM_CATEGORIES.includes(row.Category))
-        issues.push(`terms-category: ${id}: Category must be ${TERM_CATEGORIES.join(' | ')}`)
-      if ((row.Category === 'concept') === isField(row) && row.Category !== 'derived')
-        issues.push(
-          `terms-field: ${id}: a concept has Field —; a controllable, observable or hidden term names one world field`,
-        )
-      if (row.Category === 'derived' && !/^def: \S+$/.test(row.Field ?? ''))
-        issues.push(`terms-field: ${id}: a derived term's Field is \`def: <world def>\``)
-      if (isField(row)) byField.set(row.Field, [...(byField.get(row.Field) ?? []), id])
-      // 테스트가 설정하는 방법(controllable)과 제품에서 읽는 경로(observable)를 적는다 — 좌표의 뜻과 테스트가 실제로
-      // 만드는 상황이 어긋나면 그 좌표는 검사되지 않은 채 통과한다.
-      const hasPath = Boolean(row.Path) && row.Path !== '—'
-      if (['controllable', 'observable'].includes(row.Category) !== hasPath)
-        issues.push(
-          `terms-path: ${id}: a controllable term names how the test sets it and an observable term the product path that reads it; hidden and concept terms have —`,
-        )
-      if (!row.Definition || row.Definition === '—') issues.push(`terms-definition: ${id}: Definition is empty`)
-      if (isField(row) && (!row.Not || row.Not === '—'))
-        issues.push(`terms-not: ${id}: name the neighbouring meaning the term must not be confused with`)
-      if (!['confirmed', 'open'].includes(row.Status))
-        issues.push(`terms-status: ${id}: Status must be confirmed | open`)
-      if (row.Status === 'confirmed' && !context.sources.get(row.Source)?.authoritative)
-        issues.push(`terms-source: ${id}: a confirmed term cites one approved, non-implementation Source Registry ID`)
-    }
-    for (const [field, owners] of byField) {
-      if (owners.length > 1)
-        issues.push(
-          `terms-field-conflated: ${field}: ${owners.join(
-            ', ',
-          )} name one world field — distinct meanings need distinct fields`,
-        )
+    const verdicts = termVerdicts(termRows.map(cardTerm), {
+      known: (id) => context.sources.has(id),
+      authoritative: (id) => Boolean(context.sources.get(id)?.authoritative),
+    })
+    for (const verdict of verdicts) {
+      if (verdict.rule === 'conflated')
+        issues.push(`terms-field-conflated: ${verdict.field}: ${verdict.owners.join(', ')} name one world field — distinct meanings need distinct fields`)
+      else if (CARD_TERM_TEXT[verdict.rule]) issues.push(CARD_TERM_TEXT[verdict.rule](verdict.term))
     }
   }
   if (!adequacy) return issues
@@ -328,9 +302,8 @@ export async function adequacyIssues({ adequacy, terms }, context) {
   }
   for (const [id, text] of context.rowText) {
     if (!id.startsWith('O')) continue
-    for (const word of VAGUE_WORDS) {
-      const used = /^[a-z]/.test(word) ? new RegExp(`\\b${word}`, 'i').test(text) : text.includes(word)
-      if (used && !termRows.some((row) => (row.Name ?? '').toLowerCase().includes(word)))
+    for (const word of vagueHits(text, VAGUE_WORDS.defined)) {
+      if (!termRows.some((row) => (row.Name ?? '').toLowerCase().includes(word)))
         issues.push(`adequacy-vague-term: ${id} says "${word}" — define which meaning in ## Terms`)
     }
   }
@@ -345,12 +318,17 @@ export async function adequacyIssues({ adequacy, terms }, context) {
       issues.push(`adequacy-hazard: ${row.Hazard} is not one of ${Object.keys(HAZARDS).join(', ')}`)
       continue
     }
+    // the package judges the same disposition before the card exists (oracle-schema.mjs hazardVerdict); the fields are
+    // checked against World.bend below, and `behavior` names the card's Formal Model
     const disposition = row.Disposition ?? ''
+    const verdict = hazardVerdict(disposition, {
+      sourceKnown: (id) => context.sources.has(id),
+      questionKnown: (id) => context.questionIds.has(id),
+    })
     const fieldList = disposition.match(/^modeled:\s*(\S.*)$/)?.[1]
-    const excluded = disposition.match(/^n\/a:\s*(S\d+)\s+\S/)?.[1]
-    const question = disposition.match(/^question:\s*(Q\d+)\s*$/)?.[1]
-    if (fieldList) modeled.push(...words(fieldList).map((field) => [row.Hazard, field]))
-    else if (!(context.sources.has(excluded) || context.questionIds.has(question))) {
+    if (fieldList)
+      modeled.push(...words(fieldList).filter((field) => !(context.behaviorModel && field === 'behavior')).map((field) => [row.Hazard, field]))
+    else if (verdict) {
       issues.push(
         `adequacy-hazard: ${row.Hazard}: Disposition must be modeled: <fields> | n/a: S<n> <reason> | question: Q<n> on this card`,
       )

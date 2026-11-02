@@ -11,7 +11,7 @@ import { generateFromDocument } from './oracle-frames.mjs'
 import { sha256 } from './oracle-fs.mjs'
 import { enumerateSpace, verdictOf } from './oracle-model.mjs'
 import {
-  applyPatch,
+  applySet,
   assignRows,
   ASYNC_CELLS,
   asyncCellIssues,
@@ -31,11 +31,28 @@ import {
   projectCard,
   regenerateAtRoot,
   renderGenerated,
+  setValue,
   STACK_LABELS,
   stackLabelsFor,
 } from './oracle-package.mjs'
 import { emitTrace } from './oracle-projection.mjs'
 import { withResultReceipt } from './oracle-result-receipt.mjs'
+import {
+  FAMILIES,
+  isTodo,
+  judgePackage,
+  nodeTodos,
+  PACKAGE_KEYS,
+  packageSkeleton,
+  REPORT_ORDER,
+  RULES,
+  SPACE_RULES,
+  spaceDiscoverySkeleton,
+  spaceRecordIssues,
+  VAGUE_WORDS,
+  vagueHits,
+  writeIssues,
+} from './oracle-schema.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../', import.meta.url))
@@ -1285,18 +1302,31 @@ test('[bend] card lint refuses a version-2 card while a cross-check candidate is
   assert.match(gated.stderr, /cross-check-undecided: C-[a-f0-9]{10} new-axis — longSession=expired has no counterpart/)
 })
 
-/** 패키지 하나를 임시 디렉터리에 — get·patch는 그 바이트만 바꾼다. */
-async function patchable(t) {
-  const root = await mkdtemp(join(tmpdir(), 'oracle-package-patch-'))
+/** 패키지 하나를 임시 oracle 폴더에 — get·set은 그 바이트만 바꾼다. */
+async function settable(t, pkg = PKG) {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-package-set-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const directory = join(root, '.ai', 'oracles', 'stale-search')
   await mkdir(directory, { recursive: true })
-  await cp(join(FIXTURE, 'oracle.package.json'), join(directory, 'oracle.package.json'))
-  return { root, directory, path: join(directory, 'oracle.package.json') }
+  const path = join(directory, 'oracle.package.json')
+  await writeFile(path, `${JSON.stringify(pkg, null, 2)}\n`)
+  return { root, directory, path, set: (...pairs) => node(root, 'oracle-package.mjs', ['set', '--dir', directory, ...pairs]) }
+}
+
+/** A set the package refuses: exit 1, nothing written, each issue and then the fix line of the rule it broke. */
+async function refusedSet(t, pkg, ...pairs) {
+  const { path, set } = await settable(t, pkg)
+  const bytes = await readFile(path)
+  const result = set(...pairs)
+  assert.equal(result.status, 1, result.stdout)
+  assert.match(result.stderr, /^SET_REFUSED: nothing written:\n/)
+  assert.match(result.stderr, /\n {2}fix \/\S+: \S/, 'the refusal names the fix of the rule the value broke')
+  assert.deepEqual(await readFile(path), bytes)
+  return result.stderr
 }
 
 test('get outlines the package or prints one part by pointer, finding array elements by id', async (t) => {
-  const { root, path } = await patchable(t)
+  const { root, path } = await settable(t)
   const outline = node(root, 'oracle-package.mjs', ['get', '--package', path])
   assert.equal(outline.status, 0, outline.stderr)
   assert.match(outline.stdout, /^sources: array\(6\)$/m)
@@ -1306,105 +1336,276 @@ test('get outlines the package or prints one part by pointer, finding array elem
   assert.equal(JSON.parse(source.stdout).jurisdiction, 'search response ordering')
   const missing = node(root, 'oracle-package.mjs', ['get', '--package', path, '--pointer', '/sources/[id=S99]'])
   assert.equal(missing.status, 1)
-  assert.match(missing.stderr, /^PATCH_NO_TARGET: \/sources\/\[id=S99\]: no element with id S99/)
+  assert.match(missing.stderr, /^NO_TARGET: \/sources\/\[id=S99\]: no element with id S99/)
 })
 
-test('patch applies set, append and remove in order, writes once and reports the model-stage issues', async (t) => {
-  const { root, path } = await patchable(t)
-  const before = JSON.parse(await readFile(path, 'utf8'))
-  const patched = node(root, 'oracle-package.mjs', ['patch', '--package', path,
-    '--set', '/sources/[id=S1]/standard="clarified fixture policy"',
-    '--append', '/assumptions={"id":"A9","statement":"x"}',
-    '--remove', '/aiRuns/0'])
-  assert.equal(patched.status, 0, patched.stderr)
-  assert.match(patched.stdout, /^PACKAGE_PATCHED \S+\/oracle\.package\.json · set \/sources\/\[id=S1\]\/standard, append \/assumptions, remove \/aiRuns\/0 · package-node issues: \d+/)
+test('set writes decided values in one atomic write, then names the todos left and the next one in decision order', async (t) => {
+  const { directory, path, set } = await settable(t, packageSkeleton({ id: 'stale-search' }))
+  const result = set('/intent/risk', 'Medium', '/intent/actor', 'a shopper typing a query')
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /^PACKAGE_SET \S+oracle\.package\.json · \/intent\/risk, \/intent\/actor · \d+ todo\(s\) remain\n {2}next: set \/sources <value> — /)
   const after = JSON.parse(await readFile(path, 'utf8'))
-  assert.equal(after.sources.find((source) => source.id === 'S1').standard, 'clarified fixture policy')
-  assert.deepEqual(after.assumptions, [{ id: 'A9', statement: 'x' }])
-  assert.deepEqual(after.aiRuns, before.aiRuns.slice(1))
-  assert.deepEqual({ ...after, sources: before.sources, assumptions: before.assumptions, aiRuns: before.aiRuns }, before, 'nothing else changed')
+  assert.deepEqual([after.intent.risk, after.intent.actor], ['Medium', 'a shopper typing a query'])
+  assert.ok(isTodo(after.intent.nonGoals), 'a field not written stays a todo')
+  assert.deepEqual((await readdir(directory)).filter((name) => name.endsWith('.tmp')), [])
 })
 
-test('a bad patch writes nothing: a missing branch, a value that is not JSON, or a locked revision', async (t) => {
-  const { root, directory, path } = await patchable(t)
-  const bytes = await readFile(path)
-  const patch = (...args) => node(root, 'oracle-package.mjs', ['patch', '--package', path, ...args])
-  const branch = patch('--set', '/sources/[id=S1]/standard="ok"', '--set', '/nope/deeper="x"')
-  assert.equal(branch.status, 1)
-  assert.match(branch.stderr, /^PATCH_NO_TARGET: \/nope\/deeper: nothing at nope/)
-  const unquoted = patch('--set', '/sources/[id=S1]/standard=plain text')
-  assert.equal(unquoted.status, 2)
-  assert.match(unquoted.stderr, /^PATCH_VALUE_INVALID: --set value is not JSON/)
-  assert.deepEqual(await readFile(path), bytes, 'an earlier valid operation in a refused call is not written either')
-
-  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'ORACLE_READY', packageSha256: sha256(bytes), history: [] }))
-  const locked = patch('--set', '/sources/[id=S1]/standard="ok"')
-  assert.equal(locked.status, 1)
-  assert.match(locked.stderr, /^PACKAGE_LOCKED: /)
-  assert.deepEqual(await readFile(path), bytes)
-
-  // editing before the lock is free: a 0.126 record's stage asks for no rewind (oracle-step.mjs judges the files again)
-  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'MODELED', packageSha256: sha256(bytes), history: [] }))
-  const edited = patch('--set', '/sources/[id=S1]/standard="ok"')
-  assert.equal(edited.status, 0, edited.stderr)
-  assert.doesNotMatch(edited.stdout, /rewind/)
+test('a refused set writes nothing: a value its row refuses, a field decided too early, a todo written back, a key no row knows', async (t) => {
+  const skeleton = packageSkeleton({ id: 'stale-search' })
+  assert.match(await refusedSet(t, skeleton, '/intent/risk', 'Severe'), /\n {2}fix \/intent\/risk: intent\.risk is Low \| Medium \| High/)
+  // the first pair alone would pass: a refused call writes none of its pairs
+  assert.match(await refusedSet(t, skeleton, '/intent/risk', 'Low', '/requirements', '[]'), /\/requirements: decide \/sources first/)
+  assert.match(await refusedSet(t, skeleton, '/intent/risk', '{"todo":"later"}'), /set writes a decided value — a todo is the skeleton's/)
+  const { path, set } = await settable(t, skeleton)
+  const typo = set('/intent/rsik', 'Low')
+  assert.equal(typo.status, 1)
+  assert.match(typo.stderr, /^SET_REFUSED: nothing written:\n {2}\/intent\/rsik: not a package field/)
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), skeleton)
 })
 
-test('patch refuses an unreadable stage, a lock beside the package and a linked package, and skips a no-op write', async (t) => {
-  const { root, directory, path } = await patchable(t)
+test('set refuses a locked revision, an unreadable stage and a linked package, skips a no-op write and names a new key', async (t) => {
+  const { root, directory, path, set } = await settable(t)
   const bytes = await readFile(path)
-  const patch = (...args) => node(root, 'oracle-package.mjs', ['patch', '--package', path, ...args])
-
   await writeFile(join(directory, 'stage.json'), '{"schemaVersion":1,"stage":"ORACLE_RE')
-  const torn = patch('--set', '/sources/[id=S1]/standard="ok"')
-  assert.equal(torn.status, 1)
-  assert.match(torn.stderr, /^STAGE_INVALID: /, 'an unreadable stage is never read as unlocked')
+  assert.match(set('/intent/actor', 'x').stderr, /^STAGE_INVALID: /, 'an unreadable stage is never read as unlocked')
+  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'ORACLE_READY', packageSha256: sha256(bytes), history: [] }))
+  assert.match(set('/intent/actor', 'x').stderr, /^PACKAGE_LOCKED: this revision is locked/)
   await rm(join(directory, 'stage.json'))
-
   // revisions locked before the stage machine have a lock and no stage.json
   await writeFile(join(directory, 'oracle.lock.json'), '{}')
-  const locked = patch('--set', '/sources/[id=S1]/standard="ok"')
-  assert.equal(locked.status, 1)
-  assert.match(locked.stderr, /^PACKAGE_LOCKED: oracle\.lock\.json sits next to this package/)
+  assert.match(set('/intent/actor', 'x').stderr, /^PACKAGE_LOCKED: oracle\.lock\.json sits next to this package/)
   await rm(join(directory, 'oracle.lock.json'))
-  assert.deepEqual(await readFile(path), bytes)
-
-  const same = patch('--set', `/id=${JSON.stringify(JSON.parse(bytes.toString('utf8')).id)}`)
+  const same = set('/id', 'stale-search')
   assert.equal(same.status, 0, same.stderr)
   assert.match(same.stdout, /^PACKAGE_UNCHANGED /)
-  assert.deepEqual(await readFile(path), bytes, 'a patch that changes nothing does not rewrite the bytes')
-
-  const linked = join(directory, 'linked.package.json')
-  await symlink(path, linked)
-  const viaLink = node(root, 'oracle-package.mjs', ['patch', '--package', linked, '--set', '/sources/[id=S1]/standard="ok"'])
-  assert.equal(viaLink.status, 1)
-  assert.match(viaLink.stderr, /^PACKAGE_LINK: /)
+  const linked = join(root, 'linked')
+  await mkdir(linked)
+  await symlink(path, join(linked, 'oracle.package.json'))
+  assert.match(node(root, 'oracle-package.mjs', ['set', '--dir', linked, '/intent/actor', 'x']).stderr, /^PACKAGE_LINK: /)
   assert.deepEqual(await readFile(path), bytes)
-
-  const typo = patch('--set', '/sources/[id=S1]/standrad="ok"')
-  assert.equal(typo.status, 0, typo.stderr)
-  assert.match(typo.stdout, /set \/sources\/\[id=S1\]\/standrad \(new key\)/, 'a new last key is shown, not silently accepted')
+  // editing before the lock is free: a 0.126 record's stage asks for no rewind (oracle-step.mjs judges the files again)
+  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'MODELED', packageSha256: sha256(bytes), history: [] }))
+  const edited = set('/intent/actor', 'a shopper', '/sources/[id=S1]/standrad', 'ok')
+  assert.equal(edited.status, 0, edited.stderr)
+  assert.doesNotMatch(edited.stdout, /rewind/)
+  assert.match(edited.stdout, / · \/intent\/actor, \/sources\/\[id=S1\]\/standrad \(new key\) · /, 'a new key is named, never added silently')
 })
 
-test('pointers decode escapes, select array elements by any field and refuse __proto__ and unknown operations', () => {
+test('pointers decode escapes and select by any field; a set value is JSON or plain text, null removes, - appends, a todo opens as the container asked for', () => {
   assert.deepEqual(parsePointer('/a~1b/c~0d/~01'), ['a/b', 'c~d', '~1'])
-  const document = { list: [{ key: 'k1', n: 1 }, { key: 'k2', n: 2 }], tags: [] }
+  const document = { list: [{ key: 'k1', n: 1 }, { key: 'k2', n: 2 }], tags: [], later: { todo: 'decide' } }
   assert.equal(pointerGet(document, '/list/[key=k2]/n'), 2)
   assert.equal(pointerGet(document, '/list/[n=1]/key'), 'k1', 'a number field matches its text')
-  const { document: next, created } = applyPatch(document, [
-    { op: 'set', pointer: '/tags/-', value: 'first' },
-    { op: 'append', pointer: '/tags', value: 'second' },
-    { op: 'set', pointer: '/list/[key=k1]/note', value: 'x' },
-    { op: 'remove', pointer: '/list/1' },
+  assert.deepEqual(['Low', '"Low"', '2', 'null', 'modeled: behavior'].map(setValue), ['Low', 'Low', 2, null, 'modeled: behavior'])
+  const { document: next, writes } = applySet(document, [
+    { pointer: '/tags/-', value: 'first' },
+    { pointer: '/list/[key=k1]/note', value: 'x' },
+    { pointer: '/list/1', value: null },
+    { pointer: '/later/-', value: 'S1' },
   ])
-  assert.deepEqual(next, { list: [{ key: 'k1', n: 1, note: 'x' }], tags: ['first', 'second'] })
-  assert.deepEqual(created, ['/list/[key=k1]/note'])
+  assert.deepEqual(next, { list: [{ key: 'k1', n: 1, note: 'x' }], tags: ['first'], later: ['S1'] })
+  assert.deepEqual(
+    writes.map(({ tokens, created }) => [tokens.join('/'), created]),
+    [['tags/0', false], ['list/0/note', true], ['list/1', false], ['later/0', false]],
+  )
   assert.deepEqual(document.tags, [], 'the input document is never changed')
-  assert.throws(() => applyPatch(document, [{ op: 'set', pointer: '/list/5', value: 1 }]), /index past the end/)
-  assert.throws(() => applyPatch(document, [{ op: 'append', pointer: '/list/0', value: 1 }]), /append needs an array/)
-  assert.throws(() => applyPatch(document, [{ op: 'set', pointer: '/__proto__', value: {} }]), /__proto__ is not a package key/)
-  assert.throws(() => applyPatch(document, [{ op: 'toString', pointer: '/tags', value: 1 }]), /unknown patch operation/)
+  assert.throws(() => applySet(document, [{ pointer: '/list/5', value: 1 }]), /index past the end/)
+  assert.throws(() => applySet(document, [{ pointer: '/nope/deeper', value: 1 }]), /nothing at nope/)
+  assert.throws(() => applySet(document, [{ pointer: '/tags/0', value: null }]), /nothing to remove/)
+  assert.throws(() => applySet(document, [{ pointer: '', value: 1 }]), /never the whole package/)
+  assert.throws(() => applySet(document, [{ pointer: '/__proto__', value: {} }]), /__proto__ is not a package key/)
   assert.equal(Object.prototype.polluted, undefined)
+})
+
+// W2 사건 19건 — 각 사건의 끝은 둘 중 하나다: 뼈대에 이미 있다(skeleton), 또는 set이 쓰는 순간 고칠 줄과 함께 거절한다(set).
+const SKELETON = packageSkeleton({ id: 'stale-search' })
+const S4_SKELETON = spaceDiscoverySkeleton()
+const PAGINATION = JSON.parse(await readFile(join(PACKAGE_DIR, 'test-fixtures', 'pagination', 'oracle.package.json'), 'utf8'))
+const caseSpace = (...rows) => ['## Case space', '', ...rows.map((cells) => `| ${cells.join(' | ')} |`)].join('\n')
+const pointersOf = (todos) => todos.map(({ pointer }) => pointer)
+// no term names "change", so a row that says it is vague
+const NO_CHANGE_TERM = { ...clone(PKG), terms: PKG.terms.filter((term) => term.id !== 'T10') }
+/** What writeIssues refuses for one write, without the CLI. */
+const refusedOn = (pkg, pointer, value) => {
+  const { document, writes } = applySet(pkg, [{ pointer, value }])
+  return writeIssues(pkg, document, writes).refused.join('\n')
+}
+const AUTO_CASES_LEFT = /auto test cases no contract text or sourced N\/A names yet: 중복, 재시도, 로딩, out-of-order, 취소/
+
+test("W2 #1 skeleton: the S4 record has no State Model to carry the author's reading", () => {
+  assert.doesNotMatch(S4_SKELETON, /^## State Model/m)
+  assert.match(S4_SKELETON, /The model analyst writes the flow's State Model as its own\s+source; this record has none/)
+})
+
+test('W2 #2 set: a Bend keyword as the world record name is refused when it is written', async (t) => {
+  assert.match(await refusedSet(t, PKG, '/world/prefix', 'Kind'), /\/world\/prefix: world\.prefix Kind is a Bend keyword — pick another record name\n {2}fix \/world: /)
+})
+
+test('W2 #4 skeleton: product and faultModel wait at the closure node, before the lock, with the keys closure reads', () => {
+  assert.deepEqual(pointersOf(nodeTodos(SKELETON, 'closure')), ['/product', '/faultModel'])
+  assert.match(SKELETON.product.todo, /\{adapter, worldAdapter, files, runs, maxLength\}/)
+})
+
+test('W2 #5 skeleton: the S4 Case space header and eight family rows are written; an invented column or family is refused', () => {
+  assert.deepEqual(
+    spaceRecordIssues(S4_SKELETON).map((issue) => issue.split(':')[0]),
+    FAMILIES.map(() => 's4-case-space-todo'),
+  )
+  const invented = S4_SKELETON.replace('| Family | Dimension | Choices |', '| Family | Dimension / choices | Status |').replace('| Data | todo | todo |', '| Typed | id | text |')
+  const issues = spaceRecordIssues(invented).join('\n')
+  assert.match(issues, /s4-case-space-header: the Case space header is \| Family \| Dimension \| Choices \|/)
+  assert.match(issues, /s4-case-space-family: Typed is not one of/)
+  assert.match(issues, /s4-case-space-family: Data has no row/)
+})
+
+test('W2 #6 skeleton: typeContract waits at the card node with both ways out, declared or the type-contract:reported label', () => {
+  assert.ok(pointersOf(nodeTodos(SKELETON, 'card')).includes('/typeContract'))
+  assert.match(SKELETON.typeContract.todo, /\{notApplicable: <why>, paths: \[repo:<investigated file>\]\}/)
+  assert.match(SKELETON.typeContract.todo, /run the type-contract:reported label/)
+})
+
+test('W2 #8 skeleton: each hazard is a todo with its three forms; a question placeholder must name an Open question', async (t) => {
+  assert.deepEqual(Object.keys(SKELETON.hazards), HAZARD_IDS)
+  for (const id of HAZARD_IDS) assert.deepEqual(SKELETON.hazards[id].oneOf, ['modeled: <terms[].field ...>', 'n/a: S<n> <reason>', 'question: Q<n>'])
+  const issues = judgePackage(SKELETON, { stage: 'model', gate: true })
+  assert.equal(issues.filter((issue) => issue.startsWith('package-todo: set /hazards/')).length, HAZARD_IDS.length)
+  assert.ok(!issues.some((issue) => issue.startsWith('package-hazard')), 'an undecided hazard is a todo, never a format error')
+  assert.match(await refusedSet(t, PKG, '/hazards/order-timing', 'question: Q9'), /order-timing: modeled: <fields> \| n\/a: S<n> <reason> \| question: Q<n>/)
+})
+
+test('W2 #9 skeleton: the S4 record holds only the questions and answers and the Case space', () => {
+  assert.deepEqual(S4_SKELETON.match(/^## .+$/gm), ['## Questions and answers', '## Case space'])
+})
+
+test('W2 #10 skeleton+set: asyncCells waits at the package node, before any Bend file, and an empty list is refused', async (t) => {
+  assert.ok(judgePackage(SKELETON, { stage: 'model', gate: true }).some((issue) => issue.startsWith('package-todo: set /asyncCells <value> — ')))
+  assert.match(await refusedSet(t, PKG, '/asyncCells', '[]'), /asyncCells is a non-empty list of operations\n {2}fix \/asyncCells: /)
+})
+
+test('W2 #11 skeleton+set: behavior waits at the model node unless Order and Async are excluded, and a partial block is refused', async (t) => {
+  assert.deepEqual(pointersOf(nodeTodos(SKELETON, 'model')), ['/crossCheck', '/behavior'])
+  const ordered = clone(SKELETON)
+  ordered.families.Order = 'excluded: S1 one request at a time'
+  ordered.families.Async = 'excluded: S1 synchronous'
+  assert.deepEqual(pointersOf(nodeTodos(ordered, 'model')), ['/crossCheck'])
+  assert.match(await refusedSet(t, PKG, '/behavior', '{}'), /behavior\.model must name a repo:<path>\.bend package source/)
+})
+
+test('W2 #12 set: a policy with an effect law and no witness, or a judgement word no term names, is refused when written', async (t) => {
+  const behavior = { ...PKG.behavior, lawRows: PKG.behavior.lawRows.filter((law) => law.kind !== 'witness') }
+  assert.match(await refusedSet(t, PKG, '/behavior', JSON.stringify(behavior)), /package-law: P1 has effect laws but no witness \(exs\) law/)
+  assert.match(await refusedSet(t, PKG, '/contract/0/then', 'the list keeps the same results'), /then says "same" — add a term whose name holds it/)
+})
+
+test('W2 #14 skeleton+set: asyncCells is in the first package batch, and an operation without its seven decisions is refused', async (t) => {
+  assert.ok(pointersOf(nodeTodos(SKELETON, 'package')).includes('/asyncCells'))
+  const refusal = await refusedSet(t, PKG, '/asyncCells', '[{"operation":"load","cells":{}}]')
+  assert.match(refusal, /asyncCells load late-success-after-cancel: decision must be source \| default \| n\/a \| question/)
+  assert.match(refusal, /fix \/asyncCells: each async operation decides late-success-after-cancel/)
+})
+
+test('W2 #15 skeleton: an Axis/Family/Values Case space is refused, never read with Axis as the family', () => {
+  const issues = spaceRecordIssues(caseSpace(['Axis', 'Family', 'Values', 'Role', 'Source'], ['query', 'Data', 'a, b', 'controllable', 'S1'])).join('\n')
+  assert.match(issues, /s4-case-space-header: .*not \| Axis \| Family \| Values \| Role \| Source \|/)
+  assert.match(issues, /s4-case-space-family: query is not one of/)
+})
+
+test('W2 #17 skeleton: the Space discovery role no longer tells the author to write a State Model into S4', async () => {
+  const role = await readFile(join(PACKAGE_DIR, 'skills', 'frontend-oracle-design', 'references', 'roles', 'space-discovery-formal.md'), 'utf8')
+  assert.doesNotMatch(role, /in `## State Model`/)
+  assert.match(role, /Fill\s+the\s+skeleton\s+at\s+\.ai\/oracles\/<id>\/sources\/space-discovery\.md/)
+  assert.match(role, /No\s+State\s+Model:\s+the\s+model\s+analyst\s+writes\s+its\s+own/)
+})
+
+test('W2 #18 set: a hazard modeled by a word that is no world field is refused when written', async (t) => {
+  assert.match(await refusedSet(t, PKG, '/hazards/order-timing', 'modeled: nosuch'), /order-timing: nosuch is not a world field — modeled names a terms\[\]\.field or behavior/)
+  // a concept term has no field
+  assert.match(await refusedSet(t, PKG, '/hazards/order-timing', 'modeled: latest request'), /order-timing: latest, request are not world fields/)
+})
+
+test('W2 #20 skeleton+set: behavior written before asyncCells is refused', async (t) => {
+  assert.match(await refusedSet(t, SKELETON, '/behavior', '{"model":"S2"}'), /\/behavior: decide \/asyncCells, \/policies, \/contract first/)
+})
+
+test('W2 #21 skeleton: an Axis/Role/Values Case space is refused and every family is named missing', () => {
+  const issues = spaceRecordIssues(caseSpace(['Axis', 'Role', 'Values', 'Source'], ['query', 'controllable', 'a, b', 'S1']))
+  assert.match(issues[0], /^s4-case-space-header: /)
+  for (const family of FAMILIES) assert.ok(issues.includes(`s4-case-space-family: ${family} has no row — every family is decided, an excluded one with its reason`), family)
+})
+
+test('W2 #22 skeleton: families holds all eight, Inherited too, and dropping one is named at the write', async (t) => {
+  assert.deepEqual(Object.keys(SKELETON.families), FAMILIES)
+  const { set } = await settable(t, PAGINATION)
+  const dropped = set('/families/Inherited', 'null')
+  assert.equal(dropped.status, 0, dropped.stderr)
+  assert.match(dropped.stdout, /still open: package-family: Inherited: map it to a controllable field/)
+})
+
+test('W2 #23 set: a vague word in a row is refused when written, and the auto test cases left are named at the write', async (t) => {
+  assert.match(await refusedSet(t, NO_CHANGE_TERM, '/contract/0/then', 'the list shows the change'), /\/contract\/0\/then: then says "change" — add a term whose name holds it/)
+  const { set } = await settable(t)
+  const written = set('/notApplicable', '[]')
+  assert.equal(written.status, 0, written.stderr)
+  assert.match(written.stdout, AUTO_CASES_LEFT)
+})
+
+test('W2 #24 set: my own new Given text with "change" is refused when written', async (t) => {
+  assert.match(await refusedSet(t, NO_CHANGE_TERM, '/contract/[key=latestShown]/given', 'the user makes a change'), /\/contract\/0\/given: given says "change"/)
+})
+
+test('W2 clusters: no State Model slot, the Case space grammar checked at the package node, asyncCells before what reads it, card-lint words judged on the field', async (t) => {
+  // no slot for the author's State Model (and the analyst input strips one anyway: see the State Model test above)
+  assert.doesNotMatch(S4_SKELETON, /^## State Model/m)
+  assert.ok(!JSON.stringify(SKELETON).includes('State Model'))
+  // the rules the card lint met late each have a package row, so a write meets them
+  for (const code of ['package-contract-vague', 'package-hazard', 'package-law', 'package-bend-reserved', 'package-async-cells'])
+    assert.ok(RULES.some((row) => row.codes?.includes(code)), code)
+  // the package node reads S4 beside a skeleton: a free-form table blocks it before any Bend file is written
+  const root = await mkdtemp(join(tmpdir(), 'oracle-package-node-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await mkdir(join(root, 'sources'))
+  await writeFile(join(root, 'oracle.package.json'), `${JSON.stringify(SKELETON, null, 2)}\n`)
+  await writeFile(join(root, 'sources', 'space-discovery.md'), caseSpace(['Axis', 'Role', 'Values']))
+  const { evaluateNode } = await import('./oracle-stage.mjs')
+  const { issues } = await evaluateNode({ directory: root }, 'package')
+  assert.match(issues[0], /^s4-case-space-header: /)
+  // every row decided after asyncCells waits for it: on the skeleton each such write is refused
+  for (const row of RULES.filter((candidate) => candidate.after?.includes('/asyncCells')))
+    assert.match(refusedOn(SKELETON, row.path, {}), /decide \/asyncCells/, row.id)
+  // the card lint and the package read one list of vague words
+  for (const script of ['oracle-verify.mjs', 'oracle-adequacy.mjs']) {
+    const text = await readFile(join(SCRIPTS, script), 'utf8')
+    assert.match(text, /import \{[^}]*VAGUE_WORDS[^}]*\} from '\.\/oracle-schema\.mjs'/, script)
+    assert.doesNotMatch(text, /'appropriately'|'success',/, script)
+  }
+  assert.deepEqual(vagueHits('handled improperly by `successBlocks`, then saved', [...VAGUE_WORDS.banned, ...VAGUE_WORDS.defined]), ['save'])
+})
+
+test('W2 verdicts: a term name is unique in its context and cites an approved source; Bend keywords are refused as names', () => {
+  const issuesWith = (edit, stage = 'model') => {
+    const pkg = clone(PKG)
+    edit(pkg)
+    return judgePackage(pkg, { stage }).join('\n')
+  }
+  assert.match(issuesWith((pkg) => Object.assign(pkg.terms[1], { name: pkg.terms[0].name, context: pkg.terms[0].context })), /package-term-duplicate: T2: "response arrival order" is already a term in context search/)
+  const implementation = { id: 'S9', kind: 'implementation-reference', jurisdiction: 'x', standard: 'x', location: 'repo:src/x.ts', approval: 'approved' }
+  assert.match(issuesWith((pkg) => Object.assign(pkg, { sources: [...pkg.sources, implementation], terms: [{ ...pkg.terms[0], source: 'S9' }, ...pkg.terms.slice(1)] })), /package-term-source: T1: a confirmed term cites one approved, non-implementation source/)
+  assert.match(issuesWith((pkg) => Object.assign(pkg.terms[0], { field: 'match' })), /package-bend-reserved: T1: field match is a Bend keyword/)
+  assert.match(issuesWith((pkg) => Object.assign(pkg.behavior, { prefix: 'Type' }), 'project'), /package-bend-reserved: behavior\.prefix Type is a Bend keyword/)
+})
+
+test('the rule table is the one place a package rule lives: every code a judge emits is a row code, each judged row reported once', () => {
+  const codes = new Set(['package-todo', ...[...RULES, ...SPACE_RULES].flatMap((row) => row.codes ?? [])])
+  assert.deepEqual([...REPORT_ORDER].sort(), RULES.filter((row) => row.judge).map((row) => row.id).sort())
+  assert.equal(new Set(REPORT_ORDER).size, REPORT_ORDER.length)
+  assert.deepEqual(Object.keys(SKELETON).filter((key) => !PACKAGE_KEYS.includes(key)), [])
+  const emitted = new Set()
+  for (const base of [PKG, PAGINATION, SKELETON])
+    for (const key of PACKAGE_KEYS)
+      for (const value of [undefined, 'garbage', [{}], {}])
+        for (const stage of ['model', 'project'])
+          for (const issue of judgePackage({ ...clone(base), [key]: value }, { stage })) emitted.add(issue.split(':')[0])
+  assert.deepEqual([...emitted].filter((code) => !codes.has(code)), [])
 })
 
 async function withReceiptDirectory(setting, work) {

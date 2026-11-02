@@ -410,10 +410,10 @@
     {
       "id": "fod-sem-author-small-edit",
       "manualReviewOnly": true,
-      "prompt": "During Oracle model authoring, a package pointer needs one metadata change. The author has existing oracle-package patch/get commands and small-section model checks. Decide the least wasteful repair and what evidence proves it.",
-      "expected_output": "Use the existing pointer patch and get commands, then run the relevant section-level check and record the real tool output. Do not rewrite or re-dump the whole package, regenerate the entire model, or claim the fix from prose alone; preserve the existing gate and verify the changed bytes.",
+      "prompt": "During Oracle model authoring, a package pointer needs one metadata change. The author has existing oracle-package set/get commands and small-section model checks. Decide the least wasteful repair and what evidence proves it.",
+      "expected_output": "Use the existing pointer set and get commands, then run the relevant section-level check and record the real tool output. Do not rewrite or re-dump the whole package, regenerate the entire model, or claim the fix from prose alone; preserve the existing gate and verify the changed bytes.",
       "assertions": [
-        "A semantic reviewer confirms patch/get and section-level checks are reused rather than a new wrapper or full JSON rewrite.",
+        "A semantic reviewer confirms set/get and section-level checks are reused rather than a new wrapper or full JSON rewrite.",
         "The plan distinguishes an initial file generation from a repair and requires actual command evidence.",
         "The response does not weaken lock, source, approval, or proof gates to save time."
       ]

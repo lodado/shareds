@@ -18,6 +18,7 @@ import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify, stableStringifyShared } from './oracle-fs.mjs'
 import { cellProof, lawReport, MAX_REACH_CELLS, reachPlan, reachProof } from './oracle-laws.mjs'
 import { analyzeConfigurations } from './oracle-quotient.mjs'
+import { bendNameIssue, isLawName, lawSetIssues } from './oracle-schema.mjs'
 import { bendLiteral, scanBendSource, toPlain, valuesOf } from './oracle-types.mjs'
 
 export { scanBendSource, toPlain } from './oracle-types.mjs'
@@ -1161,6 +1162,10 @@ export async function checkBendFiles({ files, bin, timeoutMs = 60_000 }) {
 
 const capitalize = (name) => `${name[0].toUpperCase()}${name.slice(1)}`
 
+// a field's type is its capitalized name — unless Bend refuses that name (`kind` → `Kind` is a keyword, `event` →
+// `Event` is Base's), then the record's prefix goes in front: `kind` in Race is `RaceKind`
+const fieldType = (prefix, name) => (bendNameIssue(capitalize(name), 'type') ? `${prefix}${capitalize(name)}` : capitalize(name))
+
 /** `bend base` 출력에서 최상위 이름(type·constructor·def 머리)을 모은다 — 같은 이름의 선언은 증명 전에 실패한다. */
 function baseNames(baseText) {
   const names = new Set()
@@ -1180,17 +1185,20 @@ const typeBlock = ({ type, values }) => [`type ${type} is Data:`, ...values.map(
  */
 export function scaffoldWorld({ prefix, fields, baseText }) {
   if (!/^[A-Z]\w*$/.test(prefix ?? '')) throw new CliError('USAGE', 'prefix must name the world record type, e.g. Race', 2)
+  if (bendNameIssue(prefix, 'type')) throw new CliError('SCAFFOLD_NAME', `prefix ${bendNameIssue(prefix, 'type')} — pick another record name`)
   if (fields.length === 0) throw new CliError('USAGE', 'scaffold needs at least one --field name=bool|A,B', 2)
   const parsed = fields.map((spec) => {
     const [name, domain = ''] = spec.split('=')
     const values = domain === 'bool' ? null : domain.split(',').filter(Boolean)
     if (!/^[a-z]\w*$/.test(name) || (values && (values.length < 2 || values.some((value) => !/^[A-Z]\w*$/.test(value)))))
       throw new CliError('USAGE', `field must be name=bool or name=Value,Value (lowerCamel name, UpperCamel values): ${spec}`, 2)
-    return { name, type: values ? capitalize(name) : 'Bool', values }
+    if (bendNameIssue(name, 'field')) throw new CliError('SCAFFOLD_NAME', `field ${bendNameIssue(name, 'field')} — rename the field`)
+    return { name, type: values ? fieldType(prefix, name) : 'Bool', values }
   })
   const declared = [prefix, ...parsed.filter(({ values }) => values).flatMap(({ type, values }) => [type, ...values])]
   const repeated = declared.filter((name, index) => declared.indexOf(name) !== index)
-  const taken = baseNames(baseText)
+  // Bend's keywords and Base's names are taken even when `bend base` could not be read
+  const taken = new Set([...baseNames(baseText), ...declared.filter((name) => bendNameIssue(name, 'type'))])
   const clashes = [...new Set([...repeated, ...declared.filter((name) => taken.has(name))])]
   if (clashes.length > 0) {
     const renamed = clashes.map((name) => prefix + name).join(', ')
@@ -1316,10 +1324,8 @@ export async function formalModelIssues(formal, context) {
 
   if (laws.length === 0) issues.push('formal-law-table: Formal Model needs a Law | Kind | Cites table')
   const names = new Set()
-  const citedPolicies = new Map()
   for (const law of laws) {
-    if (!/^[a-z_][\w.]*$/.test(law.name))
-      issues.push(`formal-law-name: ${law.name || '(empty)'} is not a Bend law name`)
+    if (!isLawName(law.name)) issues.push(`formal-law-name: ${law.name || '(empty)'} is not a Bend law name`)
     if (names.has(law.name)) issues.push(`formal-law-duplicate: ${law.name}`)
     names.add(law.name)
     if (!FORMAL_LAW_KINDS.includes(law.kind))
@@ -1330,28 +1336,12 @@ export async function formalModelIssues(formal, context) {
     for (const id of cited) {
       const known = { P: context.policies, O: context.rows, D: context.rows, I: context.invariants }[id[0]]
       if (!known.has(id)) issues.push(`formal-law-cite-unknown: ${law.name}: ${id} is not on this card`)
-      if (id.startsWith('P')) citedPolicies.set(id, [...(citedPolicies.get(id) ?? []), law.kind])
     }
   }
-  // 공허성: 안전 법칙만으로는 아무것도 하지 않는 모델·구현도 통과한다 — 요구된 효과를 법칙으로 두고, 그 효과가 init에서
-  // 실제로 일어난다는 exs 법칙을 같은 정책에 요구한다.
-  if (laws.length > 0 && !laws.some(({ kind }) => kind === 'effect')) {
-    issues.push(
-      'formal-effect-missing: only safety laws — a model that does nothing satisfies them; state the required effect as an effect law',
-    )
-  }
-  for (const [policy, kinds] of citedPolicies) {
-    if (kinds.includes('effect') && !kinds.includes('witness')) {
-      issues.push(
-        `formal-witness-missing: ${policy} has effect laws but no witness (exs) law showing the effect happens from init`,
-      )
-    }
-  }
-  const unlisted = [...context.policies].filter(
-    (id) => !citedPolicies.has(id) && !new RegExp(`\\b${id}\\b`).test(fields['Not formalized'] ?? ''),
-  )
-  for (const id of unlisted)
-    issues.push(`formal-policy-unlisted: ${id} is cited by no law and not listed under Not formalized`)
+  // the package judges its lawRows with the same rules before the card exists (oracle-schema.mjs)
+  const composed = laws.map((law) => ({ kind: law.kind, policies: law.cites.match(/\bP\d+\b/g) ?? [] }))
+  for (const [code, text] of lawSetIssues(composed, { policies: [...context.policies], notFormalized: fields['Not formalized'] }))
+    issues.push(`${code}: ${text}`)
 
   if (!modelPath || !lawsPath) return issues
   const scope = await lockScopeIssues([modelPath, lawsPath], context)
