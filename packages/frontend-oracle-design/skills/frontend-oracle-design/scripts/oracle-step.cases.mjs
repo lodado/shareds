@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
@@ -7,10 +8,13 @@ import { basename, join, relative } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { APPROVED, FORBIDDING_ROW, PACKAGE_DIR, runNode, template, WORLD_ROW } from './oracle-authoring-machine.cases.mjs'
+import { CARD_MAX_BYTES, cardOf, cardRules, CARDS, cardText, POSITIONS } from './oracle-cards.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { NEXT_LINES, nextCommandOf } from './oracle-next.mjs'
 import { bindReviewDocument, workspace } from './oracle-run.cases.mjs'
-import { canonicalReviewPoints, selectedDigests } from './oracle-run.mjs'
+import { canonicalReviewPoints, FIX_CLASSES, selectedDigests } from './oracle-run.mjs'
+import { RULES, SPACE_RULES } from './oracle-schema.mjs'
+import { GRAPH } from './oracle-stage.mjs'
 import { AUTO, AUTO_COMMAND, closeCall, drive, MAX_AUTO_STEPS, nextKey, planStep, privateInputRoot, readPhase, render } from './oracle-step.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
@@ -141,8 +145,13 @@ async function loopStops() {
   const gated = await drive({ directory: 'd', read: () => ({ line: line(1), ledger: Array.from({ length: flaky.count() }) }), plan: () => ({ calls: [call] }), run: flaky.run })
   assert.equal(flaky.count(), MAX_AUTO_STEPS)
   assert.match(gated.say, /commands ran/)
-  // the commands step ran are one line: eight runs, the phase, a refusal and the instruction stay within a dozen lines
-  assert.equal(render({ ...gated, shown: ['a', 'b', 'c'] }).split('\n').length, 6)
+  // the commands step ran are one line: eight runs, the phase, a refusal and the instruction stay within a dozen lines;
+  // the card for the position (the GREEN phase here) sits above the instruction
+  const rendered = render({ ...gated, profile: 'formal-bend/v1', shown: ['a', 'b', 'c'] })
+  assert.equal(gated.position, 'green')
+  assert.equal(rendered.replace(`${cardText('green')}\n`, '').split('\n').length, 6)
+  assert.ok(rendered.split('\n').at(-2).startsWith('END CARD green'), rendered)
+  assert.throws(() => render({ ...gated, profile: 'formal-bend/v1', position: 'nowhere' }), /no card for position nowhere/)
 }
 
 const CLEAR = {
@@ -380,9 +389,21 @@ async function blindAndMutation(t) {
 function step(cwd, args) {
   return spawnSync(process.execPath, [STEP, ...args], { cwd, encoding: 'utf8', env: CHILD_ENV, maxBuffer: 1 << 26 })
 }
-/** The answer's shape: at most a dozen lines, the instruction last and only once. */
-function answer(result) {
-  const lines = result.stdout.trimEnd().split('\n')
+/**
+ * The answer's shape: the card of its position right above the instruction, exactly as oracle-cards.mjs builds it (and
+ * the expected card when given), step's own lines at most a dozen, the instruction last and only once. Returns step's
+ * own lines.
+ */
+function answer(result, card) {
+  const all = result.stdout.trimEnd().split('\n')
+  const open = all.findIndex((text) => /^CARD \S+: /.test(text))
+  assert.notEqual(open, -1, result.stdout)
+  const id = /^CARD (\S+): /.exec(all[open])[1]
+  if (card) assert.equal(id, card, result.stdout)
+  const end = all.indexOf(`END CARD ${id}`)
+  assert.equal(end, all.length - 2, result.stdout)
+  assert.equal(all.slice(open, end + 1).join('\n'), cardText(id))
+  const lines = [...all.slice(0, open), ...all.slice(end + 1)]
   assert.ok(lines.length <= 12, result.stdout)
   assert.equal(lines.filter((text) => text.startsWith('NEXT FOR YOU: ')).length, 1, result.stdout)
   assert.ok(lines.at(-1).startsWith('NEXT FOR YOU: '), result.stdout)
@@ -451,7 +472,7 @@ async function authoringToLock(t) {
   // repository and names where each return is saved
   const first = await at.step()
   assert.equal(first.status, 0, first.stderr)
-  const lines = answer(first)
+  const lines = answer(first, 'review')
   assert.deepEqual(lines.slice(0, 2), ['ran: package ok; model ok; card ok', 'phase 3/6 Card review and lock'])
   assert.match(lines.at(-1), /^NEXT FOR YOU: dispatch \(1\) the model analyst — .*\(2\) the card review — .*; repair what they find, then rerun oracle-step\.mjs --dir \.ai\/oracles\/stale-search$/)
   const inputs = [...lines.at(-1).matchAll(/with only (\S+)/g)].map((match) => match[1])
@@ -467,7 +488,7 @@ async function authoringToLock(t) {
 
   // the returns saved: the lock comes last, after the source-aware review when its trigger applies, the touched-file
   // lint and the approval; the package's own file is one of the sources, once
-  const ready = answer(await at.step()).at(-1)
+  const ready = answer(await at.step(), 'lock').at(-1)
   assert.match(ready, OFFER)
   const order = ['(1) when card/policy-sources.md', '(2) oracle-verify.mjs card --oracle', '--path', '(3) show the user', '(4) oracle-lock.mjs create']
   const found = order.map((text) => ready.indexOf(text))
@@ -498,7 +519,7 @@ async function authoringToLock(t) {
   await writeFile(proof, `${await readFile(proof, 'utf8')}\n# edited after the lock\n`)
   assert.equal((await at.status()).current, true)
   // locked: step goes on to the Delivery run, and --check has no authoring graph left to read
-  assert.match(answer(await at.step()).at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init --dir \.ai\/oracles\/stale-search /)
+  assert.match(answer(await at.step(), 'init').at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init --dir \.ai\/oracles\/stale-search /)
   const check = await at.step('--check')
   assert.equal(check.status, 2)
   assert.match(check.stderr, /--check reads the authoring graph: this oracle is locked/)
@@ -865,7 +886,7 @@ async function contractThroughStep(t) {
   await writeFile(at.file('oracle.md'), fixture.contract.replace(/- Status: approved\n- Source: .*/, PENDING_APPROVAL))
   const first = await at.step()
   assert.equal(first.status, 1, first.stdout)
-  const lines = answer(first)
+  const lines = answer(first, 'contract-authoring')
   assert.deepEqual(lines.slice(0, 2), ['ran: confirmation 1 issue', 'phase 2/6 Model'])
   assert.match(
     lines.at(-1),
@@ -888,7 +909,7 @@ async function contractThroughStep(t) {
   assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'cold-read': 1 })
   const locked = await at.lock(next)
   assert.equal(locked.status, 0, locked.stderr)
-  assert.match(answer(await at.step()).at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init /)
+  assert.match(answer(await at.step(), 'contract-delivery').at(-1), /^NEXT FOR YOU: start the Delivery run: oracle-run\.mjs init /)
 }
 
 const SAVE_TEST = "import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { save } from './src/save.mjs'\ntest('save > pending', () => assert.ok(save > 0))\n"
@@ -901,7 +922,7 @@ async function deliveryToClose(t) {
   // the agent names no command: step runs the label's test file, named for it, and stops at the implementation
   const red = step(root, ['--dir', dir])
   assert.equal(red.status, 0, red.stderr)
-  assert.deepEqual(answer(red).slice(0, 2), ['ran: oracle-run.mjs red behavior ok', 'phase 5/6 GREEN'])
+  assert.deepEqual(answer(red, 'green').slice(0, 2), ['ran: oracle-run.mjs red behavior ok', 'phase 5/6 GREEN'])
   assert.match(answer(red).at(-1), /^NEXT FOR YOU: implement the production change/)
   assert.equal(await state(), 'VALID_RED')
 
@@ -910,7 +931,7 @@ async function deliveryToClose(t) {
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
   const green = step(root, ['--dir', dir])
   assert.equal(green.status, 0, green.stderr)
-  const greenLines = answer(green)
+  const greenLines = answer(green, 'close')
   assert.deepEqual(greenLines.slice(0, 2), ['ran: oracle-run.mjs green behavior ok; oracle-run.mjs exec behavior ok; oracle-run.mjs close CLOSE_PENDING', 'phase 6/6 Review and close'])
   assert.match(greenLines[2], /^WAITING CLOSE_PENDING: waiting for reviewer output: --findings$/)
   assert.equal(await state(), 'IMPLEMENTED_GREEN')
@@ -939,13 +960,13 @@ async function deliveryToClose(t) {
   ])
   const reviewed = step(root, ['--dir', dir, '--task-id', 'review-1'])
   assert.equal(reviewed.status, 0, reviewed.stderr)
-  assert.match(answer(reviewed).at(-1), /^NEXT FOR YOU: write \S+final-report\.md: a `Status: REVIEW_VERIFIED` line/)
+  assert.match(answer(reviewed, 'report').at(-1), /^NEXT FOR YOU: write \S+final-report\.md: a `Status: REVIEW_VERIFIED` line/)
   assert.equal(await state(), 'REVIEW_VERIFIED')
 
   await writeFile(join(dir, 'final-report.md'), `Status: REVIEW_VERIFIED\nGREEN ${run} exit 0\n`)
   const closed = step(root, ['--dir', dir])
   assert.equal(closed.status, 0, closed.stdout)
-  assert.match(answer(closed).at(-1), /^NEXT FOR YOU: done: REVIEW_VERIFIED is recorded/)
+  assert.match(answer(closed, 'done').at(-1), /^NEXT FOR YOU: done: REVIEW_VERIFIED is recorded/)
 }
 
 async function refusalOnce(t) {
@@ -954,7 +975,7 @@ async function refusalOnce(t) {
   const { root, oracleDirectory: dir } = fixture
   const result = step(root, ['--dir', dir, '--label', 'behavior', '--', 'node', '--test', join(root, 'save.test.mjs')])
   assert.equal(result.status, 1, result.stdout)
-  const lines = answer(result)
+  const lines = answer(result, 'refused')
   assert.equal(lines.filter((text) => text.startsWith('ran: ')).length, 1, result.stdout)
   assert.match(lines[0], /^ran: oracle-run\.mjs red behavior [A-Z_]+$/)
   const ledger = (await readFile(join(dir, 'runs.jsonl'), 'utf8')).split('\n').filter(Boolean).map((text) => JSON.parse(text))
@@ -1086,7 +1107,7 @@ async function scaffoldFirst(t) {
   await mkdir(dir, { recursive: true })
   const first = step(root, ['--dir', dir])
   assert.equal(first.status, 0, first.stdout)
-  assert.match(answer(first).at(-1), /settle the Space discovery record \S+ with the user .* decide the \d+ open package fields of \S+ in order with oracle-package\.mjs set --dir \S+ <pointer> <value>; first: set \/sources <value> — /)
+  assert.match(answer(first, 'intake').at(-1), /settle the Space discovery record \S+ with the user .* decide the \d+ open package fields of \S+ in order with oracle-package\.mjs set --dir \S+ <pointer> <value>; first: set \/sources <value> — /)
   const bytes = await readFile(join(dir, 'oracle.package.json'))
   const pkg = JSON.parse(bytes)
   assert.deepEqual([pkg.id, pkg.intent.risk], ['save-retry', { todo: 'the risk the user accepted', oneOf: ['Low', 'Medium', 'High'] }])
@@ -1101,6 +1122,60 @@ async function scaffoldFirst(t) {
     assert.deepEqual(await readFile(join(dir, 'oracle.package.json')), bytes)
   }
   assert.deepEqual((await readdir(dir)).sort(), ['oracle.package.json', 'sources'])
+}
+
+/**
+ * The cards: every position step can print has one per profile, each fits CARD_MAX_BYTES, every rule table row is on
+ * exactly one card, every refusal class is on the refused cards, and a Contract card quotes no Formal document.
+ */
+async function cardInventory() {
+  await positionsHaveCards()
+  cardsFitAndQuoteTheirProfile()
+  rowsOnOneCard()
+}
+
+async function positionsHaveCards() {
+  const step = await readFile(STEP, 'utf8')
+  // a position is a word step's source names (or a graph node it reports): a card for anything else is never printed
+  const tagged = new Set([...step.matchAll(/'([a-z]+)'/g)].map((match) => match[1]))
+  for (const position of ['intake', 'package', 'model', 'card', 'review', 'lock', 'decision', 'init', 'red', 'green', 'close', 'report', 'done', 'refused', 'recover'])
+    assert.ok(Object.hasOwn(POSITIONS['formal-bend/v1'], position), `formal-bend/v1 has no card for ${position}`)
+  for (const [profile, nodes] of Object.entries(GRAPH)) {
+    for (const { id, review } of nodes) if (!review) assert.ok(Object.hasOwn(POSITIONS[profile], id), `${profile} has no card for its ${id} node`)
+    for (const position of Object.keys(POSITIONS[profile])) assert.ok(tagged.has(position) || nodes.some(({ id }) => id === position), `${profile} ${position} is a position step never prints`)
+  }
+  for (const position of ['review', 'lock', 'decision', 'init', 'red', 'green', 'close', 'report', 'done', 'refused', 'recover'])
+    assert.ok(Object.hasOwn(POSITIONS['contract/v1'], position), `contract/v1 has no card for ${position}`)
+  assert.throws(() => cardOf('contract/v1', 'intake'), /no card for position intake of contract\/v1/)
+  for (const card of new Set(Object.values(POSITIONS).flatMap(Object.values))) assert.ok(Object.hasOwn(CARDS, card), card)
+}
+
+function cardsFitAndQuoteTheirProfile() {
+  // every card is built from the live documents and fits the ceiling
+  for (const id of Object.keys(CARDS)) {
+    const text = cardText(id)
+    assert.ok(Buffer.byteLength(text) <= CARD_MAX_BYTES, `card ${id} is ${Buffer.byteLength(text)} bytes`)
+    assert.match(text, new RegExp(`^CARD ${id}: [^\\n]+\\n[\\s\\S]+\\nEND CARD ${id}$`))
+    if (id.startsWith('contract-')) assert.doesNotMatch(text, /-formal\.md|mandatory-verification|bend-cross-verification|MODEL\.bend/, id)
+  }
+}
+
+function rowsOnOneCard() {
+  // each RULES and SPACE_RULES row is on exactly one card, word for word from its fix line
+  const placed = (table) => Object.keys(CARDS).flatMap((id) => cardRules(id).filter((rule) => rule.table === table).map((rule) => ({ ...rule, card: id })))
+  for (const [table, rows] of [['RULES', RULES], ['SPACE_RULES', SPACE_RULES]]) {
+    const lines = placed(table)
+    assert.deepEqual(lines.map(({ id }) => id).sort(), rows.map(({ id }) => id).sort(), `${table}: each row on exactly one card`)
+    for (const { id, card, line } of lines) {
+      assert.ok(line.endsWith(`: ${rows.find((row) => row.id === id).fix}`), `${table} ${id}`)
+      assert.ok(cardText(card).includes(line), `${card} prints ${id}`)
+    }
+  }
+  // the refusal classes' prescriptions are on the refused card of each profile
+  for (const profile of Object.keys(POSITIONS)) {
+    const text = cardText(cardOf(profile, 'refused'))
+    for (const [key, line] of Object.entries(FIX_CLASSES)) assert.ok(text.includes(`- [${key}] ${line}`), `${profile} refused card: ${key}`)
+  }
 }
 
 /** Review inputs go under a private per-user folder: a planted link or a folder open to others is refused, not written into. */
@@ -1129,6 +1204,7 @@ async function privateInputs() {
 export const stepCases = [
   ['review inputs go under a private per-user folder; a planted link or a folder open to others is refused', privateInputs],
   ['a blank oracle folder gets the package and Space discovery skeletons from step, and nothing else', scaffoldFirst],
+  ['every position step can print has a card within 4,096 bytes, and every rule table row is on exactly one card', cardInventory],
   ['step runs only the AUTO entries of the shared next table; every other next and any unknown line is printed', tableAndAuto],
   ['step stops on a refusal, a line seen before, an empty plan and the step cap; FLAKINESS_GATE goes on only within the cap', loopStops],
   ['step binds a reviewer task from host receipts only when one task after the round is left; a named task wins', hostReceipts],

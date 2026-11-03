@@ -184,10 +184,12 @@ test('all risk lanes enter the common mandatory-verification path', async () => 
   const low = graph.lanes.find(({ id }) => id === 'low-fast-path')
   assert.deepEqual(low.nodes, ['common', 'mandatory-verification'])
   assert.equal(low.exclusive, false)
-  assert.match(skill, /Read \[`common\.md`\]\(common\.md\) for every risk/)
+  // 0.130.0: every risk enters through the step call, not a Read of common; the mandatory stack stays for all of them
+  assert.match(skill, /Run `oracle-step\.mjs --dir <dir>` first/)
+  assert.match(skill, /All in-scope risks load \[`mandatory-verification\.md`\]/)
   assert.match(skill, /Bend[\s\S]*unconditionally|unconditionally[\s\S]*Bend/i)
   assert.match(skill, /type-fest[\s\S]*fast-check|fast-check[\s\S]*type-fest/i)
-  assert.match(common, /verification-common\.md/)
+  assert.doesNotMatch(common, /Read this before any other reference node/)
   assert.match(await read('references/verification-common.md'), /selected.profile|resolved profile/i)
   assert.match(skill, /mandatory-verification\.md/)
   assert.match(lane, /legacy/i)
@@ -1835,7 +1837,7 @@ test('routes the legacy low record through the common mandatory lane', async () 
   assert.match(delivery, /mandatory Bend/)
 })
 
-test('forces one entry-node read and a lane header before any other work', async () => {
+test('forces the step call first, no reference read before it, and a lane header before any other work', async () => {
   const [skill, lane, graphSource] = await Promise.all([
     read('references/controller-entry-formal.md'),
     read('references/lanes/low-fast-path.md'),
@@ -1850,8 +1852,10 @@ test('forces one entry-node read and a lane header before any other work', async
   assert.ok(entryIndex < skill.indexOf('## Mode selection'))
   assert.ok(entryIndex < skill.indexOf('Read [loading rules]'))
 
-  assert.match(skill, /After the skill loads, the first tool call is a Read of exactly one lane entry node/)
-  assert.match(skill, /any other reference load all come after it/)
+  // 0.130.0: the first call is step, whose cards carry what each position needs; the first-call Read of common is gone
+  assert.match(skill, /Run `oracle-step\.mjs --dir <dir>` first and do what its last line, `NEXT FOR YOU:`, says/)
+  assert.match(skill, /so no reference read\s+comes before it/)
+  assert.doesNotMatch(skill, /first tool call is a Read/)
   assert.match(skill, /Print the lane header as the first line of the response.*without the\s+header is a violation/s)
   assert.match(skill, /risk=<Low\|Medium\|High> lane=oracle nodes=\[/)
   assert.match(skill, /only the nodes \*\*actually Read\*\*/)
@@ -1873,7 +1877,7 @@ test('forces one entry-node read and a lane header before any other work', async
 
   // 그래프가 진입 계약을 기계 판독 가능하게 선언한다
   assert.ok(graph.entryContract, 'reference-graph.json must declare entryContract')
-  assert.match(graph.entryContract.firstToolCall, /Read exactly one lane entry node/)
+  assert.equal(Object.hasOwn(graph.entryContract, 'firstToolCall'), false)
   assert.match(graph.entryContract.responseHeader, /^risk=<Low\|Medium\|High> lane=/)
   assert.match(graph.entryContract.appliesTo, /explanation·plan-only requests/)
 })

@@ -4,7 +4,6 @@
   "description": "Conditionally loaded reference graph with two closed profiles, formal-bend/v1 and contract/v1. Every canonical node declares its supported profiles. Selection filters profile before loading and follows unconditional requires plus only the selected requiresByProfile branch. Omitted profile preserves Formal compatibility. Uncompiled conditions remain manual advisory guidance, never approval. Fresh role contexts resolve their full current-profile closure without continuation assumptions.",
   "entry": "common",
   "entryContract": {
-    "firstToolCall": "After the Skill load, Read exactly one lane entry node — common for every risk (low-fast-path is legacy-only)",
     "responseHeader": "risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]",
     "appliesTo": "both implementation requests and explanation·plan-only requests",
     "loadConditionRule": "Read when as the decision point, not the deliverable stage — load it the moment you make the decision that node owns, and the same holds when you answer only with examples·structure·plans without writing files. If applicability is ambiguous, load. Whether to skip a load is not a judgment call."

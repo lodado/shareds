@@ -4,15 +4,16 @@ Named conditional procedure links from shared roots resolve through the profile-
 For the original Formal targets at that trigger, use [Formal target index](../formal-reference-links.md).
 This adds no all-phase prerequisite and never authorizes a Contract worker to read this manual.
 
-Read after common and the applicable mandatory stack. These are shared mechanics, not a whole-run
-operator manual. Load only the current role's procedure and applicable conditional nodes.
+These are shared mechanics, not a whole-run operator manual. Load only the current role's procedure
+and applicable conditional nodes.
 
 ## Reference loading
 
 References are nodes declared in [`reference-graph.json`](../reference-graph.json), which owns load
 conditions: typed `route` rules are executable; uncompiled `when` rules remain manual. The selected
 role procedure preserves the manual conditions at the decision point where they apply.
-Before a scoped decision, model/package authoring, or protocol inspection, use the read-only router:
+The read-only router is an on-demand lookup, not a first call: run it when a scoped decision, model/package
+authoring or protocol inspection needs a node the step card or the role procedure does not name:
 
 ```sh
 node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection>

@@ -13,10 +13,8 @@ delivery mechanism for the same bytes, not a node of its own.
 
 # Common contract — authority · policy sources · feedback routing
 
-Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
-after it, read [verification-common](verification-common.md) and the resolved profile's current-stage requirements. Definitions that used to be duplicated across references are
-canonical here — each reference adds only its own stage-specific rules, and on any conflict this
-document wins.
+Definitions that used to be duplicated across references are canonical here — each reference adds only
+its own stage-specific rules, and on any conflict this document wins.
 
 ## User communication contract
 
@@ -386,15 +384,16 @@ Named conditional procedure links from shared roots resolve through the profile-
 For the original Formal targets at that trigger, use [Formal target index](../formal-reference-links.md).
 This adds no all-phase prerequisite and never authorizes a Contract worker to read this manual.
 
-Read after common and the applicable mandatory stack. These are shared mechanics, not a whole-run
-operator manual. Load only the current role's procedure and applicable conditional nodes.
+These are shared mechanics, not a whole-run operator manual. Load only the current role's procedure
+and applicable conditional nodes.
 
 ## Reference loading
 
 References are nodes declared in [`reference-graph.json`](../reference-graph.json), which owns load
 conditions: typed `route` rules are executable; uncompiled `when` rules remain manual. The selected
 role procedure preserves the manual conditions at the decision point where they apply.
-Before a scoped decision, model/package authoring, or protocol inspection, use the read-only router:
+The read-only router is an on-demand lookup, not a first call: run it when a scoped decision, model/package
+authoring or protocol inspection needs a node the step card or the role procedure does not name:
 
 ```sh
 node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection>
@@ -457,10 +456,11 @@ keep the full Draft/delta and independent reviewers' raw inputs intact.
 
 # Role reference loading and document discipline
 
-Read after common and verification-common. Prerequisites: resolved profile, role, current stage and mode.
+Prerequisites: resolved profile, role, current stage and mode.
 Unknown/bare roles return to the controller, never silently select a profile.
 
-Use the canonical read-only router at the current decision point with the already resolved profile:
+The canonical read-only router is an on-demand lookup, never a first call: when a decision needs a node
+that the step card, the role procedure or its bundle does not name, run it with the already resolved profile:
 `scripts/oracle-reference-route.mjs --profile <resolved-profile> --point scope-decision --include <role-id>`.
 Its plain output names each node, path and reason in about 3 KB; `--json` adds every manual condition
 (about 26 KB) for tooling, so a worker reads the plain output.
@@ -495,8 +495,8 @@ The controller identity and card, stage, lock, run, worker packet and review rec
 Bare roles and unknown profiles stop and request the appropriate controller. Never default a role
 to a profile, reinterpret legacy records as new authorization or override an immutable lock with a flag.
 
-Read [common](common.md), then [loading](roles/loading.md). Load only the selected profile's
-current-stage dependencies, fully, in this context. A catalog is not a whole-run prerequisite.
+Load only the selected profile's current-stage dependencies, fully, in this context, as the step card or
+the role procedure names them ([loading](roles/loading.md)). A catalog is not a whole-run prerequisite.
 Source-approved outcomes, human approval and an immutable revision precede consumer tests.
 Only the lock tool creates ORACLE_READY. Design-only never writes or executes consumer tests
 and never edits production or dependencies. Preflight shape checks grant no approval.

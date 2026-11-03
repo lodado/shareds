@@ -35,6 +35,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { forbiddenArgument, TRUSTED_ADAPTERS } from './oracle-adapters.mjs'
+import { cardOf, cardOfRule, cardText } from './oracle-cards.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { nextCommandOf, nextOf } from './oracle-next.mjs'
 import { canonicalReviewPoints, deliveryBrief, requiredLabelsNotPassing, sameDigests } from './oracle-run.mjs'
@@ -926,6 +927,23 @@ async function failedSay(directory, root, { failed, dispatch, record, recorded, 
   return [dispatch, translation, offer, nodeSay(directory, failed)].filter(Boolean).join('; and ')
 }
 
+/** A blank folder's answer: the Formal skeleton step writes waits for the intake. */
+async function blankAnswer(directory) {
+  return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, profile: 'formal-bend/v1', position: 'intake', say: await fillSay(directory) }
+}
+
+/** A failing node's position: the package shows the intake card while its next todo is one the intake decides. */
+async function nodePosition(directory, node) {
+  if (node.id !== 'package') return node.id
+  const { openTodos } = await import('./oracle-schema.mjs')
+  const pkg = await readJson(join(directory, 'oracle.package.json'))
+  if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) return 'package'
+  const next = openTodos(pkg)[0]
+  if (!next) return 'package'
+  const card = cardOfRule(next.row?.id)
+  return card === 'intake' ? 'intake' : 'package'
+}
+
 /** The phase line's next after this call: the stop, another step (a node fails or a review waits), or the lock. */
 function nextKeyOf(stop, failed, wanted) {
   if (stop) return 'stop'
@@ -941,7 +959,7 @@ function nextKeyOf(stop, failed, wanted) {
 export async function authoringStep(directory) {
   if (await blankFolder(directory)) {
     await scaffold(directory)
-    return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: await fillSay(directory) }
+    return blankAnswer(directory)
   }
   const { root } = await packageSources(directory)
   const binding = await bindingOf(directory)
@@ -956,16 +974,19 @@ export async function authoringStep(directory) {
   const next = nextKeyOf(stop, failed, wanted)
   const reviews = [...states.filter((state) => state.saved), ...(await translationReviewed(directory))]
   const recorded = await recordCheck(directory, { binding, label: graph.label, files, issues, next, reviews })
-  const outcome = { ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) } }
+  const outcome = { ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) }, profile: graph.profile }
   const shown = failed ? [`FAILED ${failed.id}: ${failed.issues[0].slice(0, 300)}`] : []
-  if (stop) return { ...outcome, refused: true, shown, say: `${STOP_NEXT}: ${numberedList(failed.issues)}` }
+  if (stop) return { ...outcome, position: 'decision', refused: true, shown, say: `${STOP_NEXT}: ${numberedList(failed.issues)}` }
   const dispatch = await dispatchSay(directory, root, record, wanted)
-  if (failed) return { ...outcome, refused: true, shown, say: `${await failedSay(directory, root, { failed, dispatch, record, recorded, states })}; then rerun ${rerun(directory)}` }
-  if (dispatch) return { ...outcome, say: `${dispatch}; repair what they find, then rerun ${rerun(directory)}` }
+  if (failed) {
+    const say = `${await failedSay(directory, root, { failed, dispatch, record, recorded, states })}; then rerun ${rerun(directory)}`
+    return { ...outcome, position: await nodePosition(directory, failed), refused: true, shown, say }
+  }
+  if (dispatch) return { ...outcome, position: 'review', say: `${dispatch}; repair what they find, then rerun ${rerun(directory)}` }
   const pending = graph.nodes.flatMap((node) => node.pending ?? [])
   // Contract recorded the approval at its confirmation node: its lock line names no review that comes before it
   const offer = graph.profile === 'contract/v1' ? null : await offerSay(directory, root, record, states)
-  return { ...outcome, say: `${repoPolicyLead(directory, root)}${await triageLead(directory, root, states)}${await lockSay(directory, { pending, offer })}` }
+  return { ...outcome, position: 'lock', say: `${repoPolicyLead(directory, root)}${await triageLead(directory, root, states)}${await lockSay(directory, { pending, offer })}` }
 }
 
 /** A failing node in `--check`: its issues, and how many only the hand-written card sections raise. */
@@ -988,7 +1009,7 @@ function checkSay(directory, count, pending) {
  * these files (a failing node or an answer it waits for).
  */
 export async function checkAll(directory) {
-  if (await blankFolder(directory)) return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, say: await fillSay(directory) }
+  if (await blankFolder(directory)) return blankAnswer(directory)
   const { root } = await packageSources(directory)
   const graph = await evaluateGraph(directory, { binding: await bindingOf(directory), deep: true, project: 'scratch' })
   const failing = graph.nodes.filter(({ issues }) => issues.length > 0)
@@ -1003,7 +1024,11 @@ export async function checkAll(directory) {
   if (waiting.length > 0) shown.push(`reviews waiting: ${waiting.join(', ')}`)
   const count = failing.reduce((total, { issues }) => total + issues.length, 0)
   const say = checkSay(directory, count, pending)
-  return { ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) }, refused: count > 0 || pending.length > 0, shown, shownLimit: shown.length, say }
+  const position = failing.length > 0 ? await nodePosition(directory, failing[0]) : 'lock'
+  return {
+    ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) }, profile: graph.profile, position,
+    refused: count > 0 || pending.length > 0, shown, shownLimit: shown.length, say,
+  }
 }
 
 /**
@@ -1035,11 +1060,20 @@ const PLANS = {
   close: closeCall,
 }
 
-/** What step does at a phase line: `calls` it runs itself, or `say`, the one instruction it prints. */
+/** The position each next of the table stops at; exec and guide stop where the phase is, an unknown line recovers. */
+const POSITION_OF_KEY = { step: 'recover', lock: 'lock', stop: 'decision', revise: 'decision', init: 'init', report: 'report', red: 'red', green: 'green', close: 'close' }
+const PHASE_POSITIONS = { 4: 'red', 5: 'green', 6: 'close' }
+/** The Delivery position of a phase line: its phase's step, or recover before Delivery. */
+const phasePosition = (phase) => PHASE_POSITIONS[/^phase (\d)\//.exec(phase.line)?.[1]] ?? 'recover'
+
+/** What step does at a phase line: `calls` it runs itself, or `say`, the one instruction it prints, and its position. */
 export async function planStep(directory, phase, given = {}) {
-  if (Object.hasOwn(PLANS, phase.key)) return { key: phase.key, ...(await PLANS[phase.key](directory, phase, given)) }
+  if (Object.hasOwn(PLANS, phase.key)) {
+    return { key: phase.key, position: POSITION_OF_KEY[phase.key] ?? phasePosition(phase), ...(await PLANS[phase.key](directory, phase, given)) }
+  }
   // a line the table does not know: show it as printed and send the agent to the command that explains it
-  return { key: phase.key, shown: [phase.line.split('\n')[0].slice(0, 300)], say: `step does not know this next step: read ${readNext(directory, phase)} and do what it names` }
+  const say = `step does not know this next step: read ${readNext(directory, phase)} and do what it names`
+  return { key: phase.key, position: 'recover', shown: [phase.line.split('\n')[0].slice(0, 300)], say }
 }
 
 /** The plan step would follow on this oracle directory now — what the model replays check against their table. */
@@ -1067,6 +1101,12 @@ function refusalAction(directory, phase, { call, head, lines, targets }) {
   return lines.find((text) => text.startsWith('next: '))?.slice(6) ?? `fix the cause above, then rerun ${rerun(directory)}`
 }
 
+/** Where a stopped close leaves the agent: the report it waits for, the reviewers it waits for, or a refusal. */
+function waitingPosition(waiting, head) {
+  if (!waiting) return 'refused'
+  return head.includes('final report is not checked yet') ? 'report' : 'close'
+}
+
 /** A refused command: its first lines and the one action that answers it. */
 function refusal(directory, phase, call, result, targets = {}) {
   const lines = (result.stderr || result.stdout || '').trim().split('\n')
@@ -1075,7 +1115,8 @@ function refusal(directory, phase, call, result, targets = {}) {
   // close waits for a reviewer or the report: that is the agent's turn, not a refusal
   const waiting = head.startsWith('CLOSE_PENDING')
   const shown = lines.filter((text) => !text.startsWith('next: ')).slice(0, 2)
-  return { refused: !waiting, shown: shown.map((text) => `${waiting ? 'WAITING' : 'REFUSED'} ${text.slice(0, 300)}`), say }
+  const position = waitingPosition(waiting, head)
+  return { refused: !waiting, position, shown: shown.map((text) => `${waiting ? 'WAITING' : 'REFUSED'} ${text.slice(0, 300)}`), say }
 }
 
 const callText = (call) => [call.script, call.args[0], call.label].filter(Boolean).join(' ')
@@ -1102,12 +1143,13 @@ async function runCalls(calls, run, ran, limit) {
 }
 
 /** A read (guide): its blockers and fix lines, and the first fix — or the read itself when it printed none. */
-function readStop(directory, call, result) {
+function readStop(directory, phase, call, result) {
   const out = (result.stdout ?? '').split('\n')
   const fixes = out.filter((text) => text.startsWith('fix '))
   const shown = [...out.filter((text) => text.startsWith('blockers:')), ...fixes].slice(0, 3)
-  if (fixes.length > 0) return { shown, say: `${fixes[0]}, then rerun ${rerun(directory)}` }
-  return { shown, say: `run ${commandText(call)} and clear what it lists, then rerun ${rerun(directory)}` }
+  const position = phasePosition(phase)
+  if (fixes.length > 0) return { shown, position, say: `${fixes[0]}, then rerun ${rerun(directory)}` }
+  return { shown, position, say: `run ${commandText(call)} and clear what it lists, then rerun ${rerun(directory)}` }
 }
 
 /** Whether the loop stops after a call, and with what: done, a read's fix lines, a refusal, or a line seen before. */
@@ -1115,17 +1157,17 @@ function stopAfter(directory, { step, phase, after, seen, call, result }) {
   const closed = /^CLOSED state:(\S+)/m.exec(result.stdout ?? '')
   if (closed) {
     const decision = closed[1] === 'NEEDS_DECISION' ? ' and the decision it needs' : ''
-    return { say: `done: ${closed[1]} is recorded and ${q(step.targets.report)} checked; tell the user the outcome${decision}` }
+    return { position: 'done', say: `done: ${closed[1]} is recorded and ${q(step.targets.report)} checked; tell the user the outcome${decision}` }
   }
   if (result.status !== 0) {
     if (grew(phase, after) && (result.stderr ?? '').startsWith('FLAKINESS_GATE')) return null
     return refusal(directory, after, call, result, step.targets)
   }
-  if (step.read) return readStop(directory, call, result)
+  if (step.read) return readStop(directory, after, call, result)
   // a recorded run the plan asked for before its own next call (the review's witness, a flaky pass) is progress on the same line
   if (!seen.has(phaseOf(after.line)) || (grew(phase, after) && (flakinessLeft(after) || step.again))) return null
   const how = phaseOf(after.line) === phaseOf(phase.line) ? 'did not move' : 'came back to a line it had'
-  return { say: `the phase ${how} after ${callText(call)}: read ${readNext(directory, after)} and do what it names` }
+  return { position: 'recover', say: `the phase ${how} after ${callText(call)}: read ${readNext(directory, after)} and do what it names` }
 }
 
 /**
@@ -1138,10 +1180,10 @@ export async function drive({ directory, read, plan, run, limit = MAX_AUTO_STEPS
   const seen = new Set([phaseOf(phase.line)])
   for (;;) {
     const step = await plan(phase)
-    if (step.say) return { ran, phase, say: step.say, shown: step.shown }
-    if (step.calls.length === 0) return { ran, phase, say: `step found nothing to run for this next step: read ${readNext(directory, phase)} and do what it names` }
+    if (step.say) return { ran, phase, position: step.position ?? phasePosition(phase), say: step.say, shown: step.shown }
+    if (step.calls.length === 0) return { ran, phase, position: 'recover', say: `step found nothing to run for this next step: read ${readNext(directory, phase)} and do what it names` }
     const last = await runCalls(step.calls, run, ran, limit)
-    if (!last) return { ran, phase, say: `${ran.length} commands ran, the most one call runs; rerun ${rerun(directory)} to go on` }
+    if (!last) return { ran, phase, position: phasePosition(phase), say: `${ran.length} commands ran, the most one call runs; rerun ${rerun(directory)} to go on` }
     const after = await read()
     const stop = stopAfter(directory, { step, phase, after, seen, ...last })
     if (stop) return { ran, phase: after, ...stop }
@@ -1178,13 +1220,21 @@ function parse(argv) {
 }
 
 /**
- * The printed answer, at most about six lines: what step ran, the phase, the shown lines (three, or every failing node
- * for `--check`), and the one instruction last.
+ * The printed answer: what step ran, the phase, the shown lines (three, or every failing node for `--check`), about six
+ * lines of step's own, then the card for the position (oracle-cards.mjs) and the one instruction last. A position or
+ * profile without a card throws, so no stop prints without one.
  */
 export function render(outcome) {
   const phase = phaseOf(outcome.phase.line).split(' · next:')[0]
   const ran = outcome.ran.length > 0 ? [`ran: ${outcome.ran.join('; ')}`] : []
-  return [...ran, phase, ...(outcome.shown ?? []).slice(0, outcome.shownLimit ?? 3), `NEXT FOR YOU: ${outcome.say}`].join('\n')
+  const card = cardText(cardOf(outcome.profile, outcome.position))
+  return [...ran, phase, ...(outcome.shown ?? []).slice(0, outcome.shownLimit ?? 3), card, `NEXT FOR YOU: ${outcome.say}`].join('\n')
+}
+
+/** The profile whose cards a locked run shows: the Delivery run's, else the stage binding's; only Contract differs. */
+async function lockedProfile(directory, phase) {
+  const profile = phase.kind === 'delivery' ? phase.state.verificationProfile : (await bindingOf(directory)).profile
+  return profile === 'contract/v1' ? 'contract/v1' : 'formal-bend/v1'
 }
 
 /** Authoring until the lock: no Delivery run yet and no locked stage record. */
@@ -1210,7 +1260,8 @@ async function main() {
         return runCall(call)
       },
     })
-  process.stdout.write(`${render(outcome)}\n`)
+  const profile = outcome.profile ?? (await lockedProfile(directory, outcome.phase))
+  process.stdout.write(`${render({ ...outcome, profile })}\n`)
   process.exitCode = outcome.refused ? 1 : 0
 }
 

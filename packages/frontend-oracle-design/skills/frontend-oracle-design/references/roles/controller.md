@@ -1,7 +1,7 @@
 # Controller stage coordination
 
 Controller-only. Input: selected profile, requested outcome, approved sources, mode and disk state.
-Read common and verification-common, then only current-stage profile requirements via loading.
+Read only the current-stage profile requirements the step card or the role procedure names.
 Invoke `$oracle-intake` before source investigation, including preliminary brief/axes/questions.
 Send the [first response](../common.md#first-response--one-message-one-confirmation): proposed axes,
 a provisional Draft and Open questions under one confirmation. Record actual human answers.

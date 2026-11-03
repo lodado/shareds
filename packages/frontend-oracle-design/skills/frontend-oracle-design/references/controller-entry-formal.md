@@ -15,11 +15,10 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
 
 ## Entry: always first
 
-1. **After the skill loads, the first tool call is a Read of exactly one lane entry node.**
-   Read [`common.md`](common.md) for every risk. The low-fast-path node is legacy-only.
-   The Skill call is activation, not this read. Repo exploration, answer drafting, any other tool call,
-   and any other reference load all come after it.
-   Required reference nodes need their full bodies: use Read without offset or limit.
+1. **Run `oracle-step.mjs --dir <dir>` first and do what its last line, `NEXT FOR YOU:`, says.** It
+   scaffolds an empty folder, and each answer carries the card for its position, so no reference read
+   comes before it. The low-fast-path node is legacy-only.
+   A reference a card names needs its full body: use Read without offset or limit.
    Keep source-code investigation reads bounded. A prefix or headings alone cannot satisfy a node.
 2. **Print the lane header as the first line of the response.** Body text without the header is a violation:
    `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]`.
@@ -117,7 +116,8 @@ Only existing scripts advance stages/ledger state. The controller owns transitio
 readback, human questions/approval, receipts, evidence freshness and truthful final reporting.
 Specialist returns are artifacts/findings, never approval, a fabricated runId or permission to bypass a gate.
 Direct invocation with missing prerequisites returns here. Fresh specialists read their own dependencies.
-After init, on resume and after each accepted transition follow `guide --dir <dir> --to <target>`.
+After init, on resume and after each accepted transition follow the fix lines of the
+`guide --dir <dir> --to <target>` step runs when the phase line names it.
 
 Use common.md's Feedback routing and Delivery's shared budgets: policy 2, harness 2, product 3, not per skill.
 Policy unresolved after init needs structured NEEDS_DECISION and a real transition/runId, even if the user

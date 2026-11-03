@@ -13,10 +13,8 @@ delivery mechanism for the same bytes, not a node of its own.
 
 # Common contract — authority · policy sources · feedback routing
 
-Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
-after it, read [verification-common](verification-common.md) and the resolved profile's current-stage requirements. Definitions that used to be duplicated across references are
-canonical here — each reference adds only its own stage-specific rules, and on any conflict this
-document wins.
+Definitions that used to be duplicated across references are canonical here — each reference adds only
+its own stage-specific rules, and on any conflict this document wins.
 
 ## User communication contract
 
@@ -361,8 +359,8 @@ The controller identity and card, stage, lock, run, worker packet and review rec
 Bare roles and unknown profiles stop and request the appropriate controller. Never default a role
 to a profile, reinterpret legacy records as new authorization or override an immutable lock with a flag.
 
-Read [common](common.md), then [loading](roles/loading.md). Load only the selected profile's
-current-stage dependencies, fully, in this context. A catalog is not a whole-run prerequisite.
+Load only the selected profile's current-stage dependencies, fully, in this context, as the step card or
+the role procedure names them ([loading](roles/loading.md)). A catalog is not a whole-run prerequisite.
 Source-approved outcomes, human approval and an immutable revision precede consumer tests.
 Only the lock tool creates ORACLE_READY. Design-only never writes or executes consumer tests
 and never edits production or dependencies. Preflight shape checks grant no approval.

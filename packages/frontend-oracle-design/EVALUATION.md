@@ -1,3 +1,74 @@
+# 0.130.0: the controller reads one page, then only the card step prints for its position
+
+## Why
+
+Wave W3 of `.ai/plans/fod-simplify/PLAN.md` (log in `W3-RESULT.md`). In the field runs the controller read 46–87 KB
+before its first command and 490–844 KB per run; every one of the 8 runs started with `oracle-reference-route`, and
+the "first tool call is Read common" rule was followed 3 times without protecting anything (PLAN D).
+
+## Change
+
+- SKILL.md is one page: the lane header, when no Oracle applies (Read common, stop `OUT_OF_SCOPE`), when the Contract
+  controller does, and for everything else `oracle-step.mjs --dir .ai/oracles/<id>` first with nothing read before
+  it. The pre-read list (common, verification-common, loading, Formal requirements, controller, reporting) is gone;
+  those documents are opened only when a card names them. Frontmatter unchanged.
+- Step cards (new scripts/oracle-cards.mjs): every answer prints, between step's own lines and `NEXT FOR YOU:`, the
+  card for its position (`CARD <id>: …` … `END CARD <id>`). A card's rules are the RULES / SPACE_RULES fix lines
+  its position's checks judge (each row on exactly one card) or the 9 FIX_CLASSES prescriptions; its text is the
+  blocks of controller-formal.md (or controller-entry-formal, reporting, reporting-formal, verification-common; the
+  Contract cards cut contract/confirmation-lock, ledger, red and green-review) cut at runtime by heading and opening
+  words. A missing block throws, so a document edit cannot leave a stale card. Positions (oracle-step.mjs): intake,
+  package, model, card, review, lock, decision, init, red, green, close, report, done, refused, recover; Contract maps
+  them to four cards. A position without a card throws in `render`.
+- Ritual rules deleted: SKILL.md's first-call Read of common and pre-read list; controller-entry-formal item 1
+  (now: run step first); reference-graph.json `entryContract.firstToolCall`; common.md's "read this before any other
+  reference node … then verification-common"; verification-common's "Read common, then loading"; controller.md's
+  "Read common and verification-common"; loading.md / loading-formal.md "Read after common …"; the router as a
+  first step in loading.md, loading-formal.md, intake-formal.md and author-formal.md (it stays an on-demand lookup;
+  author-formal steps 1–6 already link the two typed-route nodes). The symlink-stat item had no rule to delete (it
+  broke verification-common's existing no-polling rule).
+- controller-formal.md says what step now runs instead of hand-typed commands: progress messages start with the phase
+  line step printed (no `status --brief` call), step runs `guide --to`, `red` records VALID_RED, and close's
+  arguments come from the oracle directory and ledger.
+- `oracle-reference-route.mjs` keeps callers (skill-contract, profile-reference-isolation, profile-packets and its own
+  test; author-draft-formal after `project-card`) and stays as an on-demand tool; nothing deleted.
+- Not changed (out of scope): the four dispatch skills' own "First tool call … Read common" lines and the Contract
+  controller entry; controller-entry-formal item 4 "Scope gate, after common" (pinned; true for the no-Oracle stop).
+
+Measured, 0.129.0 → 0.130.0:
+
+- SKILL.md 5,537 → 4,070 B (body 4,467 → 3,000 B).
+- Cards (max 4,096 B): intake 2,827, package 2,914, model 2,622, card 1,502, review 3,313, lock 2,824, decision
+  1,099, init 1,489, red 1,563, green 1,554, close 3,866, report 3,517, done 780, refused 2,898; Contract authoring
+  1,747, delivery 2,305, review 2,019, refused 1,490. None before.
+- Static read budget, Medium Formal happy path: 88,638 B (SKILL.md and the 9 documents it named) → 32,841 B
+  (SKILL.md and the 12 cards intake … done). Reads before the first command: SKILL.md plus at least common,
+  verification-common, loading and controller-entry-formal (48,131 B) → SKILL.md only. Documents the cards still
+  name for a full read (residual, W5 measures them live): delivery/ledger 21,014, green-review 29,395,
+  confirmation-lock 11,571, delivery/red 9,749, mandatory-verification 12,169, bend-cross-verification 57,556,
+  subagent-review 38,298, retro-metrics 15,808, conditional policy-sources 16,445.
+- Role bundles: author 214,603 → 214,376, implement 122,316 → 122,239, intake 105,396 → 105,378, review 61,995 →
+  61,918 (cap 62,000). Formal closure Design-only 233,136 → 231,450, Delivery 444,752 → 443,066 (cap 446,000).
+
+Verdicts: none change. Cards are read-only text; step's instructions, exit codes and gates are the same.
+
+## Tests
+
+- New: oracle-step.cases cardInventory (every position has a card per profile, every card name is a word step
+  prints or a graph node, each card ≤4,096 B and built from the live documents, Contract cards quote no Formal
+  document, each RULES and SPACE_RULES row on exactly one card word for word, every FIX_CLASSES line on both
+  refused cards). `answer()` now checks that the card sits right above the instruction and equals `cardText`, with
+  the expected card at the scaffold (intake), the dispatch (review), the lock, init (Formal and Contract), the
+  Contract confirmation, GREEN, close, report, done and a refusal.
+- Changed on purpose: the render line-count case counts step's own lines (6) apart from the card and checks a
+  position without a card throws. skill-contract pins, each because its text was removed: "forces one entry-node
+  read" → "forces the step call first" (controller-entry-formal item 1 asserts the step-first text and the absence of
+  "first tool call is a Read"; `entryContract.firstToolCall` must be absent); "all risk lanes enter the common
+  mandatory-verification path" asserts the step entry and "All in-scope risks load mandatory-verification.md"
+  instead of "Read common.md for every risk", and common.md's read-order sentence being gone instead of its
+  verification-common link.
+- Deleted: none.
+
 # 0.129.0: step runs the Delivery ceremony, one Formal card review, and a finding blocks only when it changes a verdict
 
 ## Why

@@ -1,9 +1,10 @@
 # Role reference loading and document discipline
 
-Read after common and verification-common. Prerequisites: resolved profile, role, current stage and mode.
+Prerequisites: resolved profile, role, current stage and mode.
 Unknown/bare roles return to the controller, never silently select a profile.
 
-Use the canonical read-only router at the current decision point with the already resolved profile:
+The canonical read-only router is an on-demand lookup, never a first call: when a decision needs a node
+that the step card, the role procedure or its bundle does not name, run it with the already resolved profile:
 `scripts/oracle-reference-route.mjs --profile <resolved-profile> --point scope-decision --include <role-id>`.
 Its plain output names each node, path and reason in about 3 KB; `--json` adds every manual condition
 (about 26 KB) for tooling, so a worker reads the plain output.

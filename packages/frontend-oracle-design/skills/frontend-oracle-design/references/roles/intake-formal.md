@@ -44,8 +44,9 @@ is a verification failure, not a low-risk exemption or silent downgrade.
 
 ## Conditional scope decisions
 
-Use the scope-decision router from [loading](loading-formal.md), with inspected facts and conservative unknowns.
-The router does not replace these manual conditions or the author's corresponding decision-time reads.
+Decide each condition below from inspected facts, unknowns conservatively. The scope-decision router from
+[loading](loading-formal.md) is an on-demand lookup, never a first call, and does not replace these manual
+conditions or the author's corresponding decision-time reads.
 
 - Before new UI, redesigns or visible layout/palette/type/copy/motion/responsive/identity changes, read
   [`visual-design.md`](../visual-design.md). Record behavior-only, local or identity-shaping scope.

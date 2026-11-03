@@ -11,8 +11,8 @@ transition, target test write or production edit is authorized here. Re-read dis
 
 ## Model first, card second
 
-Read in two phases. Until `project-card` succeeds, load only the nodes steps 1–6 name and the router's
-package-authoring and model-authoring results. Load the Draft-completion nodes below after it through
+Read in two phases. Until `project-card` succeeds, load only the nodes steps 1–6 name. Load the
+Draft-completion nodes below after it through
 [`role-author-draft-formal`](author-draft-formal.md), not at entry: every model and proof turn carries
 whatever is already loaded.
 
@@ -30,8 +30,7 @@ whatever is already loaded.
    `provisional-draft.md` in the same folder before `project-card` writes the projected card.
 3. Fill the package skeleton oracle-step.mjs wrote (each undecided field a `{"todo"}` in decision order, the
    same as [`model-package.example.json`](../model-package.example.json)) from sources, never from MODEL.bend
-   or a hand-written card. Use package-authoring and model-authoring reference routes with their dependencies.
-   Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
+   or a hand-written card. Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
    Write each value with `oracle-package.mjs set --dir <oracle dir> '<pointer>' <value>` (JSON or plain
    text; `'/sources/[id=S2]'` selects by a field; quote it): it refuses a value its rule breaks with the fix
    line and names the next todo. Read with `get --pointer`. A script that re-dumps the package is a defect.

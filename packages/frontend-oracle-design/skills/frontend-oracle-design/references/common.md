@@ -1,9 +1,7 @@
 # Common contract — authority · policy sources · feedback routing
 
-Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
-after it, read [verification-common](verification-common.md) and the resolved profile's current-stage requirements. Definitions that used to be duplicated across references are
-canonical here — each reference adds only its own stage-specific rules, and on any conflict this
-document wins.
+Definitions that used to be duplicated across references are canonical here — each reference adds only
+its own stage-specific rules, and on any conflict this document wins.
 
 ## User communication contract
 

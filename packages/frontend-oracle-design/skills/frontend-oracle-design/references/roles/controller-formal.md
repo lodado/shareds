@@ -8,13 +8,13 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
 Drive the run with `oracle-step.mjs --dir <dir>` and do what its last line, `NEXT FOR YOU:`, says. Before
 the lock it checks the files as they are; after it, it runs the mechanical next command (red, green, exec,
 close, guide, report) with every argument filled. It stops for a file to write, a reviewer to dispatch, or
-the user's approval or decision.
+the user's approval or decision, and prints above that line the card for its position: the rules its
+checks judge and the part of this procedure the position needs.
 
 Six phases group the stage and Delivery states: a view, not new states, budgets or gates. Start each
-Progress message (common's table) and every answer to a progress question with the line from
-`oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
-after it (`guide` opens with the same phase): `phase N/6 <name> · next: <command>`, then the newly
-established fact. Save each review's return unchanged where step names it.
+Progress message (common's table) and every answer to a progress question with the phase line step
+printed, `phase N/6 <name>`, then the newly established fact. Save each review's return unchanged where
+step names it.
 Where the host sets effort per dispatch (Claude Code's Agent `effort`), cap execution roles (a worker
 running given commands, packet assembly, a repair spelled out by exact findings) at `high`, never above
 the session's; author, analyst, every reviewer and the blind mapper keep the session's effort and their
@@ -130,9 +130,9 @@ set. Never extend an existing lock. Confirm and lock a new revision when the sou
 
 ## 4. RED
 
-States: ORACLE_READY. Command: `oracle-run.mjs init --scan-root <scan-root> --required-label <repo-check>`,
-then `oracle-run.mjs red`. Touchpoint: none. Refusal: follow its next step and delivery/red; tests and
-harness stay free to fix until VALID_RED.
+States: ORACLE_READY. Command: `oracle-run.mjs init --scan-root <scan-root> --required-label <repo-check>`
+as step prints it, then step runs `oracle-run.mjs red`. Touchpoint: none. Refusal: follow its next step
+and delivery/red; tests and harness stay free to fix until VALID_RED.
 
 Right after entering Delivery, explicitly load and invoke the installed `$test` skill by name and read
 [`delivery/ledger.md`](../delivery/ledger.md). Immediately before writing test files, explicitly load
@@ -141,15 +141,15 @@ The test skill owns test writing/judgment. Standalone Low/card exemptions cannot
 `init` adds the stack labels the locked card implies (`LABEL_AUTO`); pin the actual target
 verification commands with `--required-label`. No label alone proves the evidence.
 
-After init or on resume, run `oracle-run.mjs guide --dir <dir>`, pick a legal target and request
-`guide --dir <dir> --to <target>`. Use the current-step guide at entry, resume, and after each transition,
-reading its missing primary references with dependencies (reviewer reads stay in the independent
-context). Guide is read-only advice, not approval, PASS or transition.
+Step runs `guide --to <target>` itself whenever the phase line names it and prints its blockers and fix
+lines: the current-step guide at entry, resume, and after each transition names the missing primary
+references to read with dependencies (reviewer reads stay in the independent context). Guide is
+read-only advice, not approval, PASS or transition.
 Transition rechecks every gate. Read accepted status after composite commands so an already accepted
 target is not recorded twice. The controller owns transition intent, not a second execution engine.
 
 Before tests/RED read [`delivery/red.md`](../delivery/red.md). TDD default: ORACLE_READY → write tests → adapter-pre-red review → run tests
-→ `oracle-run.mjs transition --to VALID_RED` → classify VALID_RED. No production writing/editing before
+→ VALID_RED (step's `red` runs them and records the transition) → classify VALID_RED. No production writing/editing before
 accepted product RED. The ORACLE_READY → IMPLEMENTED_GREEN ALREADY_SATISFIED path is zero-production
 verification and approves no production edits.
 The adapter-pre-red check runs `$oracle-review` on the locked Terms, adapter/test bytes and inspected
@@ -167,7 +167,7 @@ with shell writes.
 
 ## 5. GREEN
 
-States: VALID_RED. Command: `oracle-run.mjs green`. Touchpoint: none. Refusal: a product repair spends
+States: VALID_RED. Command: step runs `oracle-run.mjs green`. Touchpoint: none. Refusal: a product repair spends
 `product`; a test or harness change needs a `harness` spend and a new reported RED→GREEN.
 
 After VALID_RED dispatch $oracle-implement with the current lock/snapshot and scoped task.
@@ -187,7 +187,7 @@ Card-row evidence goes into evidence.json and is checked against actual run resu
 
 ## 6. Review and close
 
-States: IMPLEMENTED_GREEN and the end states. Command: `oracle-run.mjs close`. Touchpoint: NEEDS_DECISION
+States: IMPLEMENTED_GREEN and the end states. Command: step runs `oracle-run.mjs close`. Touchpoint: NEEDS_DECISION
 only. Refusal: `CLOSE_PENDING` names the dispatch and flags to add, then rerun; any other code is that
 step's own gate.
 
@@ -197,9 +197,8 @@ Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
 After GREEN use the review target's guide for High mutation kill/revert/re-GREEN and post-GREEN reruns.
 Before contextual packet collection and independent review after implementation/test verification,
 read [`subagent-review.md`](../subagent-review.md) for --context selection and snapshot binding.
-Close with `oracle-run.mjs close --dir <dir> --packet <packet> --decision
-<decision> --review-point <point> --run <runId> --evidence <evidence> --check-report <report>` (High adds
-`--mutation-run`·`--mutation-row`; a blind mapping `--blind-input`). In order, each with its own gate, it
+Step runs `oracle-run.mjs close` with every argument from the oracle directory and the ledger: packet, decision, `--review-point`, run, evidence, blind input and report (High adds
+`--mutation-run`·`--mutation-row`, which step asks for). In order, each with its own gate, close
 runs `oracle-run.mjs review-packet` (only matching criteria via `--review-point`) when the packet is
 absent, `review-receipt` for each unbound output naming this packet, the REVIEW_VERIFIED transition
 (PARTIAL_VERIFIED with an open hold) and the report check. It never writes reviewer output; the

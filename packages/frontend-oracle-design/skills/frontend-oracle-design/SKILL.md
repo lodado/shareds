@@ -7,58 +7,41 @@ allowed-tools:
 
 # Frontend Oracle Design
 
-Fixed verification profile: `formal-bend/v1`. Select before authoring and preserve it across card,
-stage, lock, run, worker packet and receipt. No downgrade or fallback to another profile.
-One canonical runtime serves both controllers and all roles.
-Settle outcome/non-goals and risky premises before expensive authoring. Before the lock run
-`oracle-step.mjs --dir <dir>` and do what NEXT FOR YOU says; each review kind gets at most 2 rounds.
-Delivery packets carry their own bounded `reviewScope`.
+Fixed verification profile: `formal-bend/v1`; no downgrade or fallback to another profile. Only its scripts
+move state, and the controller alone records each transition.
 
 ## Entry: always first
 
-After activation the first tool call is Read [common](references/common.md), before other references
-or exploration, even for explanation/design-only work. Use Read without offset or limit for required
-reference bodies, bounded source-code reads. Print `risk=<Low|Medium|High> lane=oracle nodes=[actual node IDs]`
-as the literal first line of the first response, even when it stops; payment/permission work is High.
-Include only nodes actually Read. Read [verification-common](references/verification-common.md),
-[loading](references/roles/loading.md) and the current-stage Formal requirements.
-Before any source investigation or Outcome Brief invoke [`$oracle-intake`](../oracle-intake/SKILL.md),
-including preliminary/read-only investigation. Do not defer invocation or reads to a later turn.
-If reads/invocation are unavailable, stop and return the blocker, not a substitute brief (one built from
-guessed sources). The request text is `S1`; an empty repo is `no code observation`, never a blocker.
+Print `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]` as the literal first line of the
+first response, even when it stops. Payment or permission work is High.
 
-Scope without behavioral state/order/count/permission/effect stops OUT_OF_SCOPE, not a fake contract.
-Unsupported outcome-changing scope is NEEDS_DECISION, not a skipped verification obligation.
-Formal-specific scope, mandatory stack and original entry obligations are owned by
-[Formal controller requirements](references/controller-entry-formal.md).
+- **No Oracle**: nothing modelable in state, order, count, permission or effect (only copy, tokens, layout,
+  CSS, motion timing or display). Read [common](references/common.md), then stop `OUT_OF_SCOPE` and route to
+  `$test`, `$frontend-visual-qa` or a plain edit. Ask for a missing source; never guess it.
+- **Contract**: finite test coverage explicitly asked for without a Bend proof, or a `contract/v1` run,
+  belongs to frontend-contract-design. Medium work keeps the Bend model.
+- **Oracle**, explanation and design-only work included: before any source investigation or Outcome Brief,
+  preliminary or read-only included, run `node <skill dir>/scripts/oracle-step.mjs --dir .ai/oracles/<id>`
+  and do what its last line, `NEXT FOR YOU:`, says. It scaffolds an empty folder; read nothing before it.
+  Each answer prints its position's card above that line: the rules judged there and the procedure.
+  The first card has you invoke [`$oracle-intake`](../oracle-intake/SKILL.md); never defer it.
+  If step or an invocation is unavailable, stop and return the blocker, not a substitute brief (one built from
+  guessed sources). The request text is `S1`; an empty repo is `no code observation`, never a blocker.
+
+For a reference a card names, Read without offset or limit. Keep source-code reads bounded.
 
 ## Mode selection and explicit role invocation
 
-Design-only is default. Delivery needs an explicit implementation/self-verification/review request.
-For mixed work, settle Oracle scope and session-wide activation before dispatching sibling writers;
-follow the [dispatch ordering](references/controller-entry-formal.md#dispatch-ordering) rules.
-Read [controller](references/roles/controller.md) and [Formal coordination](references/roles/controller-formal.md)
-only for the current stage, not every future phase.
+Design-only is the default; Delivery needs an explicit implementation, self-verification or review request.
+For mixed work, settle Oracle scope and session-wide activation before dispatching sibling writers
+([dispatch ordering](references/controller-entry-formal.md#dispatch-ordering)). The cards name each role as
+its phase comes: [`$oracle-author`](../oracle-author/SKILL.md), which invokes [`$bend-proof`](../bend-proof/SKILL.md);
+[`$oracle-review`](../oracle-review/SKILL.md) in independent review contexts; `$test` before target tests; and
+[`$oracle-implement`](../oracle-implement/SKILL.md) only after accepted VALID_RED. No lock before actual
+human approval (common's pre-authorized one counts). Delivery's policy 2, harness 2 and product 3 budgets are
+shared across roles. Never fabricate approval, state or runIds, bypass a refused transition or relock to pass
+a mismatch. Graph orchestration and direct visual QA stay explicit opt-ins.
 
-1. Invoke `$oracle-intake` for sources, risk/capability and proposed Space axes. The first response shows
-   axes, a provisional Draft and Open questions under one `yes` ([first response](references/common.md#first-response--one-message-one-confirmation)).
-2. Invoke [`$oracle-author`](../oracle-author/SKILL.md) after approved-source/axis prerequisites.
-   Its selected Formal procedures own specialized authoring and checks. The Formal author invokes
-   [`$bend-proof`](../bend-proof/SKILL.md) for Bend models, laws and proofs.
-3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent review contexts with permitted inputs.
-   Preserve findings, drive the falsifying nail, obtain actual human approval (common's pre-authorized one
-   counts), then lint/lock through tools.
-4. Design-only never writes/executes consumer tests or edits production/dependencies (a temporary pre-lock
-   sweep report is not a consumer test).
-5. Explicit Delivery invokes `$test` before tests and uses the current `oracle-run.mjs guide` and ledger.
-   Review the Formal adapter in `adapter-pre-red` mode before accepting RED; see [RED](references/delivery/red.md).
-   Only accepted VALID_RED permits [`$oracle-implement`](../oracle-implement/SKILL.md) production work.
-   ALREADY_SATISFIED is zero-production verification only.
-6. Record GREEN once, dispatch independent Delivery review, rerun on final snapshots and apply conditional
-   selected-profile closure. Controller alone records transitions/receipts through existing tools.
-7. Before final reporting read [reporting](references/roles/reporting.md) and
-   [Formal reporting](references/roles/reporting-formal.md). Cite actual artifacts/runIds and residual limits.
-
-Missing prerequisites return to this controller. Never fabricate approval/state/runIds, bypass rejected
-transitions or relock to pass mismatches. Delivery's shared policy 2, harness 2, product 3 budgets apply across roles.
-Graph orchestration and direct visual QA remain explicit opt-ins, not new runtime states or policy authority.
+Open these only when a card names them: [Formal controller requirements](references/controller-entry-formal.md),
+[Formal coordination](references/roles/controller-formal.md), [Formal reporting](references/roles/reporting-formal.md)
+and [verification-common](references/verification-common.md).
