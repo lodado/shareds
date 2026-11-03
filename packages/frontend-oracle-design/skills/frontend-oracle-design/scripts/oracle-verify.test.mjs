@@ -2139,9 +2139,16 @@ test('a repair claim blocks only when it names a wrong implementation every lock
     { ...claim, id: 'r-1', classification: 'PRODUCT_DEFECT', reproduction: { file: 'src/save.test.mjs', test: 'second click', code: 'assert.equal(posts, 1)' } },
     { ...rowless, id: 's-1', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'the session token is logged' },
     { ...rowless, id: 'm-1', classification: 'POLICY_GAP', severity: 'medium', finding: 'retry after logout is undecided' },
+    // a permission bypass on a row is the same global rule as a rowless one: no wrongPasses needed
+    { ...claim, id: 'c-1', classification: 'PRODUCT_DEFECT', category: 'permission', finding: 'a viewer can delete on O2' },
   ], 'kept.json', '--ir')
   assert.equal(kept.status, 0, kept.stderr)
-  assert.deepEqual(JSON.parse(kept.stdout).blocking.map(({ id }) => id), ['p-1', 'v-1', 'r-1', 's-1', 'm-1'])
+  assert.deepEqual(JSON.parse(kept.stdout).blocking.map(({ id }) => id), ['p-1', 'v-1', 'r-1', 's-1', 'm-1', 'c-1'])
+
+  // below high the security category is not the global rule: still a proposal without a witness
+  const mediumSecurity = await check([{ ...claim, severity: 'medium', category: 'security' }], 'medium-security.json', '--ir')
+  assert.equal(mediumSecurity.status, 0, mediumSecurity.stderr)
+  assert.deepEqual(JSON.parse(mediumSecurity.stdout).proposals.map(({ id }) => id), ['f-1'])
 
   // a blank wrongPasses is refused, never read as a witness
   const blank = await check([{ ...claim, wrongPasses: ' ' }], 'blank.json')

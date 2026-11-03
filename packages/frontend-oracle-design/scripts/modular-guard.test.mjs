@@ -10,6 +10,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const pluginDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const nestedScript = join(pluginDirectory, 'skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs')
@@ -99,6 +100,7 @@ async function contextFixture(t, profile = 'contract/v1') {
   }
   if (profile === 'contract/v1') {
     cli('oracle-step.mjs', '--dir', directory)
+    saveCleanReturnsSync(directory, profile)
   } else {
     // A prepared lock exercises the guard boundary, not the Formal proof: the locked record and the manifest the lock writes
     // for these bytes once the authoring graph passes (oracle-stage.mjs). The create below takes them as a re-lock, so

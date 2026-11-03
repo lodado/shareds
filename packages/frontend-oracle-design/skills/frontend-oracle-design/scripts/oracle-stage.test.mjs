@@ -6,9 +6,10 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { saveCleanReturns } from '../../../test-fixtures/saved-reviews.mjs'
 import { PACKAGE_DIR, template } from './oracle-authoring-machine.cases.mjs'
 import { sha256 } from './oracle-fs.mjs'
-import { assertReadyToLock, filesDigest, preLockProof, readStage } from './oracle-stage.mjs'
+import { assertReadyToLock, filesDigest, preLockProof, readStage, SAME_ISSUES_STOP, sameIssuesRun } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
@@ -541,6 +542,8 @@ test('the lock refuses files that change while it judges them: the card, or a Be
   for (const [name, file, text] of [['card', join(PACKAGE_DIR, 'oracle.md'), '\n'], ['laws', 'LAWS.bend', '\n# edited while the lock judged\n']]) {
     const repo = join(root, name)
     await cp(base, repo, { recursive: true })
+    // the reviewers passed this card: the lock gets past the reviews and judges the files
+    assert.equal((await saveCleanReturns(join(repo, PACKAGE_DIR), 'formal-bend/v1')).length, 2)
     const preload = join(root, `${name}.mjs`)
     await writeFile(preload, [
       "import cp from 'node:child_process'",
@@ -741,6 +744,23 @@ test('reflect counts a 0.127 step that lands earlier in the graph as rework and 
   const timing = JSON.parse(reflect(root, '--root', root, '--timing').stdout)
   const walked = timing.runs[0].authoring.rewinds.map(({ left, to, regainMs }) => [left, to, regainMs])
   assert.deepEqual(walked, [['CHECKED', 'MODELED', 600_000], ['CHECKED', 'MODELED', null]])
+})
+
+test('the same issues on a third distinct file state stop step even when another issue list of the same node comes between them (A/B/A/B)', () => {
+  const check = (files, issues, node = 'package') => ({ files, issues, node })
+  // an unbroken run counts as before, and a re-check of the same files adds no state
+  assert.equal(sameIssuesRun([check('f1', 'A'), check('f2', 'A'), check('f2', 'A')]), 2)
+  // two lists of the package that take turns: A comes back on its third file state with B between, and that stops
+  const oscillating = [check('f1', 'A'), check('f2', 'B'), check('f3', 'A'), check('f4', 'B'), check('f5', 'A')]
+  assert.equal(sameIssuesRun(oscillating.slice(0, 4)), 2)
+  assert.equal(sameIssuesRun(oscillating), SAME_ISSUES_STOP)
+  // progress starts a new count: a passing check, or another node failing, between two A states
+  assert.equal(sameIssuesRun([...oscillating, check('f6', null)]), 0)
+  assert.equal(sameIssuesRun([check('f1', 'A'), check('f2', 'A'), check('f3', null), check('f4', 'A')]), 1)
+  assert.equal(sameIssuesRun([check('f1', 'A'), check('f2', 'A'), check('f3', 'M', 'model'), check('f4', 'A')]), 1)
+  // only the recent checks count (the record keeps 20)
+  const old = [check('f1', 'A'), check('f2', 'A'), ...Array.from({ length: 19 }, (_, index) => check(`g${index}`, 'B')), check('f3', 'A')]
+  assert.equal(sameIssuesRun(old), 1)
 })
 
 test('reflect refuses a root without oracle runs and a bad bar instead of reporting zero', async (t) => {

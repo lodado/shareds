@@ -6,6 +6,7 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- actual public CLI acceptance boundary.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 // Contract default t-way: the shared hand-written card axes (Strength, Touches, E*/PATH*/EMPTY, 50-frame cap,
 // eight-family dispositions, mined dimensions) and evidence.json frame/path/sequence gates, no oracle-case tokens.
@@ -144,6 +145,7 @@ test('Contract t-way Delivery verifies evidence.json frame/sequence names in a t
     const generated = dispositioned(w.oracle, tWayCard({ dimensions }))
     ok(run('oracle-step.mjs', '--dir', w.directory))
     const lock = join(w.directory, 'oracle.lock.json')
+    saveCleanReturnsSync(w.directory, 'contract/v1')
     ok(run('oracle-lock.mjs', 'create', '--oracle', w.oracle, '--lock', lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md', '--profile', 'contract/v1'))
     writeFileSync(join(w.src, 'product.mjs'), 'export const toggle = (enabled) => !enabled\n')
     const frameNames = generated.frames.map(({ id, label }) => `toggle [${id}] ${label}`)

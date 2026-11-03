@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fullProductFixture } from '../../../test-fixtures/full-product/fixture.mjs'
+import { saveCleanReturns } from '../../../test-fixtures/saved-reviews.mjs'
 import { PACKAGE_DIR, template } from './oracle-authoring-machine.cases.mjs'
 import { verifyLock } from './oracle-lock.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
@@ -28,6 +29,8 @@ async function contractFixture(t) {
   const result = spawnSync(process.execPath, [stepScript, '--dir', directory], { cwd: directory, encoding: 'utf8' })
   assert.equal(result.status, 0, result.stdout)
   assert.equal(JSON.parse(await readFile(stage, 'utf8')).verificationProfile, 'contract/v1')
+  // the cold-read passed this card: the lock waits for nothing else
+  assert.equal((await saveCleanReturns(directory, 'contract/v1')).length, 1)
   return { directory, oracle, lock, stage, card }
 }
 
@@ -78,6 +81,7 @@ test('public create rejects a Formal card swapped between the judgment and the s
   const { base, card } = await template(root)
   const oracle = join(base, PACKAGE_DIR, 'oracle.md')
   const lock = join(base, PACKAGE_DIR, 'oracle.lock.json')
+  assert.equal((await saveCleanReturns(join(base, PACKAGE_DIR), 'formal-bend/v1')).length, 2)
   const swapped = `${card}\n`
   const preload = join(root, 'swap.mjs')
   // realpath(oracle.md) is the first read of the card after the graph judged it: the bytes snapshotted are not those

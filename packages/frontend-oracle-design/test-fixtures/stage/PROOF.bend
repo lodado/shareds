@@ -19,6 +19,9 @@ def Laws.no_stop_on_second():
 def Laws.no_third_round():
   {==}
 
+def Laws.no_lock_after_unread_repair():
+  {==}
+
 def Laws.same_input_one_round():
   {==}
 

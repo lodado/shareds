@@ -21,7 +21,7 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
    A reference a card names needs its full body: use Read without offset or limit.
    Keep source-code investigation reads bounded. A prefix or headings alone cannot satisfy a node.
 2. **Print the lane header as the first line of the response.** Body text without the header is a violation:
-   `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]`.
+   `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read so far, [] before any]`.
    It is the literal first line of the first response even when that response stops (OUT_OF_SCOPE,
    NEEDS_DECISION, a blocker). Risk is common's classification: payment or permission work is High.
    List only the nodes **actually Read**, never planned reads or a bundle name.

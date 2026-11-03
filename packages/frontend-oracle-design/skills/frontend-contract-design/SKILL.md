@@ -13,7 +13,7 @@ budgets serve both controllers and all roles. Runtime tool paths are under `fron
 
 ## Entry: always first
 
-First tool call after activation is Read [common](../frontend-oracle-design/references/common.md), before
+Read [common](../frontend-oracle-design/references/common.md) before
 exploration or other references, even for explanation/design-only work. Use Read without offset or limit
 for required bodies, source-code reads stay bounded. Print `risk=<Low|Medium|High> lane=oracle nodes=[actual node IDs]`
 first, listing only actually Read nodes. Read [verification-common](../frontend-oracle-design/references/verification-common.md),
@@ -37,7 +37,8 @@ Read [controller](../frontend-oracle-design/references/roles/controller.md) only
    companion policy package.
 3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent mode-bounded contexts. Preserve raw
    findings and drive the falsifying nail before presenting full Draft/semantic delta and questions.
-4. Obtain actual human approval before CHECKED whole-card hash. Unresolved dispositions block lock.
+4. Record actual human approval in the card's User Confirmation before the lock, which hashes those same
+   bytes. Unresolved dispositions block lock.
    Follow selected-profile stage gates on identical approved bytes, only lock tool writes ORACLE_READY.
 5. Design-only never writes/executes consumer tests or edits production/dependencies.
 6. Explicit Delivery invokes `$test` before tests and follows existing `oracle-run.mjs guide` and ledger.

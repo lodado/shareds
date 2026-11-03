@@ -339,10 +339,12 @@ every repair can keep expanding the modeled world rather than verify the agreed 
    a decision to narrow that row's scope instead of repairing it a third time.
 6. After round 2, unresolved blockers stop at `NEEDS_DECISION`. Delegating choices does not waive
    mandatory constraints or authorize locking an unjudgeable contract. There is no round 3: step never
-   asks for one, and no approval or delegation opens one.
+   asks for one, and no approval or delegation opens one. Step stops, and the lock refuses, when round 2's
+   return still holds a line opening `BLOCKING` (JSON: a `blocking` array) or its input changed after it.
 
 Runtime dispatch: run `oracle-step.mjs --dir <dir>` and do what NEXT FOR YOU says. It checks the files as
-they are, so editing is free and nothing rewinds; the lock judges every node again. It writes each review's
+they are, so editing is free and nothing rewinds; the lock judges every node again and refuses a review
+kind with no return saved for its current input. It writes each review's
 input outside the repository and names where its return is saved; keep procedural metadata out of blind
 inputs. A role's first pass is `full`; a later one is `confirm-fixes`. Step names the source-aware review
 with its trigger until its first return is saved; then it counts rounds like the others. `--check` lists

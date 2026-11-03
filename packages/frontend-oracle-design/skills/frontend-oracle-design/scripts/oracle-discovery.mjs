@@ -787,7 +787,10 @@ export async function mappingInput({ loaded }) {
   ].join('\n')
 }
 
-/** 번역표는 해석이다 — 모델을 쓰지 않은 분석 에이전트가 현재 매핑 입력(digest)을 검토한 기록이 있어야 한다. */
+/**
+ * 번역표는 해석이다 — 모델을 쓰지 않은 분석 에이전트가 현재 매핑 입력(digest)을 검토한 기록이 있어야 한다. 두 번의 리뷰 뒤에는
+ * 사용자가 정한 기록(`agent: "user"`, 그 결정의 출처, 같은 digest)이 같은 자리를 채운다 — 리뷰 라운드로 세지 않는다.
+ */
 async function mappingReviewIssues(loaded) {
   const review = loaded.pkg.crossCheck?.reviewedBy
   if (!review?.agent || !review?.inputDigest)

@@ -273,8 +273,9 @@ no line to quote; cite the row or run instead and the check does not apply. Each
 
 A `PRODUCT_DEFECT`, `EVIDENCE_GAP` or `HARNESS_DEFECT` blocks only when it changes a test verdict: it records
 `wrongPasses`, the wrong implementation every locked test passes, or a `reproduction`. Without either the verifier
-records it as an improvement proposal with that reason, never a blocker. `POLICY_GAP`, `ENVIRONMENT_DEFECT` and a
-rowless critical/high finding block as before.
+records it as an improvement proposal with that reason, never a blocker. `POLICY_GAP`, `ENVIRONMENT_DEFECT`, a
+rowless critical/high finding, and a critical/high finding with `category` `security|permission|data-loss` on any
+row block as before.
 
 Below High, a `PRODUCT_DEFECT` that cites `path#La-Lb` may also record `reproduction: { file, test, code }`
 so round 2 can close without a confirmation dispatch. The controller appends `code` byte for byte to
@@ -289,7 +290,8 @@ you write it.
 In a `confirm-fixes` round a finding blocks only with a `confirm` claim the packet backs:
 `{ "class": "previous", "finding": "<round-1 ID>" }`, `{ "class": "regression", "path", "line" }` on a
 line `reviewScope.repairDiff` adds, or `{ "class": "security", "category" }`
-(`security|permission|data-loss`, severity critical/high). Any other finding is an improvement proposal.
+(`security|permission|data-loss`, severity critical/high). A backed claim blocks without `wrongPasses`: round 2 is
+the only place a repair regression is caught. Any other finding is an improvement proposal.
 
 `changeabilityReview` judges the five axes exactly once each as `PASS | FINDING | N/A`. Every
 judgment needs path·line or packet field evidence. `FINDING` cites a real ID from the `findings`

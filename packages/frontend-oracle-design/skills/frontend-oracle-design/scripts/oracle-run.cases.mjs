@@ -3274,6 +3274,14 @@ test('O11: derived budgets — harness allows its second binding and refuses a t
   // restoring a bound state costs nothing: the second binding's bytes refresh no further, GREEN may rest on them
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper 2\n")
   assert.equal(JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).remainingBudgets.harness.spent, 2)
+  // the packet judges a re-bind the way the transition does (one ledger test): a binding counted before shows no
+  // BUDGET_EXHAUSTED, a new one does
+  const refresh = () => JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).nextActions.find((action) => action.to === 'VALID_RED')
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper 1\n")
+  assert.ok(!refresh().blockers.includes('BUDGET_EXHAUSTED'), JSON.stringify(refresh()))
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper 3\n")
+  assert.ok(refresh().blockers.includes('BUDGET_EXHAUSTED'), JSON.stringify(refresh()))
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper 2\n")
 
   // policy: a resume after a decision is one spend — the second is allowed, the third refused
   for (const round of [1, 2, 3]) {
@@ -4686,6 +4694,8 @@ test('a round-2 class is backed only by the packet: round-1 claim ids, new-side 
 const roundTwoFinding = (id, confirm, extra = {}) => ({ id, row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT',
   finding: `round-2 finding ${id}`, evidence: 'seen in the repair diff', fix: 'adjust it', wrongPasses: 'the repaired product passes every row',
   ...(confirm ? { confirm } : {}), ...extra })
+// a round-2 finding that names no wrong implementation
+const withoutWrongPasses = (finding) => Object.fromEntries(Object.entries(finding).filter(([key]) => key !== 'wrongPasses'))
 
 test('round 2 blocks only a backed previous, regression or security finding; every other finding is a recorded improvement proposal', async (t) => {
   const lap = await roundTwo(t)
@@ -4694,6 +4704,9 @@ test('round 2 blocks only a backed previous, regression or security finding; eve
     ['previous', roundTwoFinding('P1', { class: 'previous', finding: 'F1' })],
     ['regression', roundTwoFinding('R1', { class: 'regression', path: 'src/repair.mjs', line: 2 })],
     ['security', roundTwoFinding('S1', { class: 'security', category: 'permission' }, { severity: 'high' })],
+    // a backed class is judged before the wrongPasses filter: round 2 is the only place a repair regression is caught
+    ['regression without wrongPasses', withoutWrongPasses(roundTwoFinding('R2', { class: 'regression', path: 'src/repair.mjs', line: 2 }))],
+    ['security without wrongPasses', withoutWrongPasses(roundTwoFinding('S2', { class: 'security', category: 'permission' }, { severity: 'high' }))],
   ]
   for (const [label, finding] of backed) {
     const before = await readFile(join(lap.dir, 'runs.jsonl'))

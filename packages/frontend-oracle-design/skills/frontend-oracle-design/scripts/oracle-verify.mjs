@@ -22,7 +22,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
-import { assertReviewIterationEvent, blockingRemedy, changesVerdict, FINDINGS_BLOCKING_NEXT, splitConfirmFindings } from './oracle-iterations.mjs'
+import { assertReviewIterationEvent, blockingRemedy, FINDINGS_BLOCKING_NEXT, splitConfirmFindings, witnessedFindings } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import { AUTO_TEST_CASES, VAGUE_WORDS, vagueHits } from './oracle-schema.mjs'
@@ -2515,15 +2515,16 @@ async function findingsResult(options) {
   }
 
   // a repair-class claim blocks only when it changes a test verdict: a wrong implementation every locked test passes
-  // (wrongPasses) or a PRODUCT_DEFECT reproduction. POLICY_GAP and ENVIRONMENT_DEFECT stop the run and a rowless
-  // critical/high finding is the global safety rule; every other claim is an improvement proposal, recorded and not
-  // fixed, the same way round 2 demotes an unbacked claim
-  const unwitnessed = blocking.filter((finding) => !changesVerdict(finding)).map((finding) => ({ ...finding, demoted: NO_WRONG_PASS }))
-  blocking = blocking.filter(changesVerdict)
+  // (wrongPasses) or a PRODUCT_DEFECT reproduction. POLICY_GAP and ENVIRONMENT_DEFECT stop the run and a critical/high
+  // security·permission·data-loss or rowless finding is the global safety rule; in round 2 a packet-backed confirm class
+  // is judged first, so a backed regression or security claim blocks without wrongPasses. Every other claim is an
+  // improvement proposal, recorded and not fixed, the same way round 2 demotes an unbacked claim
+  const packet = options.packet ? await readJson(options.packet, 'REVIEW_PACKET_INVALID').catch(() => null) : null
+  const witnessed = witnessedFindings(blocking, packet?.reviewScope)
+  const unwitnessed = witnessed.unwitnessed.map((finding) => ({ ...finding, demoted: NO_WRONG_PASS }))
 
   // round 2 (confirm-fixes): only a backed previous·regression·security claim keeps blocking, the rest are proposals
-  const packet = options.packet ? await readJson(options.packet, 'REVIEW_PACKET_INVALID').catch(() => null) : null
-  const split = splitConfirmFindings(blocking, packet?.reviewScope)
+  const split = splitConfirmFindings(witnessed.blocking, packet?.reviewScope)
   blocking = split.blocking
   const proposals = proposalList(unwitnessed, split.proposals)
   const proposalCount = proposals ? ` proposals:${proposals.length}` : ''

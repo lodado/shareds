@@ -67,7 +67,7 @@ import {
 import { assertProfileReviewReferences, snapshotContext } from './oracle-review-context.mjs'
 import { approvedSourceIds, auditFullProduct, markdownLines, sectionLines, tWaySummary } from './oracle-space.mjs'
 import { phaseLine } from './oracle-stage.mjs'
-import { harnessIdentity, ledgerSpend, reviewHoldBlocker } from './oracle-transition-guards.mjs'
+import { bindingCounted, harnessIdentity, ledgerSpend, reviewHoldBlocker } from './oracle-transition-guards.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
 
@@ -3945,11 +3945,9 @@ function applyLedgerSpend(state, ledger) {
  * nothing, and so does one made from ORACLE_READY (the first VALID_RED, or one after a resume).
  */
 function assertHarnessBudget(state, ledger, identity) {
-  if (state.state !== 'VALID_RED') return
-  const { bindings, free } = ledgerSpend(ledger)
-  if (free.has(identity) || bindings.has(identity)) return
+  if (state.state !== 'VALID_RED' || bindingCounted(ledger, identity)) return
   const { limit } = state.budgets.harness
-  const spent = Math.max(state.budgets.harness.spent ?? 0, bindings.size)
+  const spent = Math.max(state.budgets.harness.spent ?? 0, ledgerSpend(ledger).bindings.size)
   if (spent >= limit) {
     throw new CliError(
       'BUDGET_EXHAUSTED',
@@ -4846,7 +4844,7 @@ function isReviewTransition(to) {
  * 보인다: VALID_RED 전 production 변경, VALID_RED 뒤 바뀐 테스트 바이트(harness 예산이 남았으면 새 RED, 다 썼으면 소진). 판정은
  * 그대로 transition 몫이다 — 증거 매핑 변경처럼 인수에 달린 거부는 여기서 보이지 않는다.
  */
-function guardBlockers(to, state, current, rebindsNothing) {
+function guardBlockers(to, state, current, { rebindsNothing, rebindCounted }) {
   if (to !== 'VALID_RED' && to !== 'IMPLEMENTED_GREEN') return []
   if (state.state === 'ORACLE_READY') {
     return productionChanges(changedPaths(state.snapshot, current), state.harnessPaths).length > 0 ? ['PRODUCTION_TOUCHED_BEFORE_RED'] : []
@@ -4855,9 +4853,10 @@ function guardBlockers(to, state, current, rebindsNothing) {
   // a refresh onto the binding VALID_RED already holds is refused (TRANSITION_NOT_ALLOWED) — it would bind nothing new
   if (to === 'VALID_RED' && rebindsNothing) return ['TRANSITION_NOT_ALLOWED']
   if (sameDigests(testDigests(current), state.testBindings.tests)) return []
-  // 바뀐 테스트는 새 RED가 묶는다(EVIDENCE_STALE이 단계를 RED로 돌린다) — 묶을 지출이 없으면 그 RED도 거부된다(BUDGET_EXHAUSTED)
+  // 바뀐 테스트는 새 RED가 묶는다(EVIDENCE_STALE이 단계를 RED로 돌린다) — 묶을 지출이 없으면 그 RED도 거부된다(BUDGET_EXHAUSTED).
+  // 이미 센 묶음으로 되돌아가는 것은 공짜다: assertHarnessBudget과 같은 원장 판정(bindingCounted)
   const harness = state.budgets.harness
-  if (harness.spent >= harness.limit) return ['BUDGET_EXHAUSTED']
+  if (harness.spent >= harness.limit && !rebindCounted) return ['BUDGET_EXHAUSTED']
   return to === 'IMPLEMENTED_GREEN' ? ['EVIDENCE_STALE'] : []
 }
 
@@ -4895,7 +4894,7 @@ function requiredLabelsMisgraded(state, runEntries, stale) {
   })
 }
 
-function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping, current, rebindsNothing }) {
+function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping, current, rebindsNothing, rebindCounted }) {
   const requires = protocolRequiredFlags(deliveryProtocol, to, deliveryFacts(state, blindMapping ?? null))
   const packetBlockers = []
   let candidateRuns = []
@@ -4935,7 +4934,7 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
     ) {
       packetBlockers.push('EVIDENCE_MISSING_ROWS')
     }
-    packetBlockers.push(...guardBlockers(to, state, current, rebindsNothing))
+    packetBlockers.push(...guardBlockers(to, state, current, { rebindsNothing, rebindCounted }))
     if (to === 'IMPLEMENTED_GREEN') {
       // 연속 통과 게이트: 같은 명령의 신선한 연속 통과가 부족하면 지금 인용해도 FLAKINESS_GATE다.
       const required = REQUIRED_CONSECUTIVE_PASSES[state.risk] ?? 1
@@ -4980,7 +4979,7 @@ function blindMappingReport(to, blindMapping) {
   return { blindMapping }
 }
 
-function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds, current, rebindsNothing }) {
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds, current, rebindsNothing, rebindCounted }) {
   const dir = portablePath(process.cwd(), directory)
   return nextTargets(deliveryProtocol, state.state).map((to) => {
     const { requires, packetBlockers, candidateRuns } = transitionPacket(to, {
@@ -4992,6 +4991,7 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       blindMapping,
       current,
       rebindsNothing,
+      rebindCounted,
     })
     // 열린 hold가 있으면 완전한 REVIEW_VERIFIED는 막히고 PARTIAL_VERIFIED가 그 자리다 — transition이 같은 규칙을 강제한다
     const holdBlocker = reviewHoldBlocker(to, holds.length)
@@ -5306,10 +5306,12 @@ async function collectStatus(directory, state, ledger) {
   if (needsEvidence && evidence.missingRows?.length > 0) blockers.push('EVIDENCE_MISSING_ROWS')
   // the refresh packet mirrors the VALID_RED refusal of a binding it already holds; an unreadable map is a change
   let rebindsNothing = false
+  let rebindCounted = false
   if (state.state === 'VALID_RED' && state.testBindings) {
     const mapping = await testEvidenceDigest(evidencePathFor(directory, state)).catch(() => null)
     const now = harnessIdentity(currentSnapshot.harnessSha256, testDigests(current), mapping)
     rebindsNothing = now === harnessIdentity(state.harnessAtValidRed, state.testBindings.tests, state.testBindings.evidenceSha256)
+    rebindCounted = bindingCounted(ledger, now)
   }
 
   return {
@@ -5342,6 +5344,7 @@ async function collectStatus(directory, state, ledger) {
       holds: await openHolds(directory),
       current,
       rebindsNothing,
+      rebindCounted,
     }),
   }
 }

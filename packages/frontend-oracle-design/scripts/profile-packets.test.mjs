@@ -12,6 +12,7 @@ import { loadGraph } from '../skills/frontend-oracle-design/scripts/generate-ref
 import { routeReferences } from '../skills/frontend-oracle-design/scripts/oracle-reference-route.mjs'
 import { parseWorkerSubmission } from '../skills/frontend-oracle-design/scripts/oracle-worker.mjs'
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const scripts = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
 const loader = `data:text/javascript,${encodeURIComponent("export async function resolve(s,c,n){if(/oracle-(package|model|adequacy|discovery)\\.mjs$|ensure-bend\\.mjs$/.test(s))throw Error('FORMAL_IMPORT_DENIED:'+s);return n(s,c)}")}`
@@ -53,6 +54,7 @@ test('Contract public guidance worker and review artifacts bind identity and sel
     writeFileSync(testPath, `import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport {pending,trace} from './save.mjs'\ntest('save > pending',()=>{assert.equal(pending,true);for(const events of ${JSON.stringify(fixture.records.map(({ scenario }) => scenario.when))})assert.deepEqual(trace(events),events)})\n${cases}`)
     writeFileSync(oracle, `${fixture.render()}\n## Verification Profile\n\n- Profile: contract/v1\n`)
     ok(run('oracle-step.mjs', '--dir', directory))
+    saveCleanReturnsSync(directory, 'contract/v1')
     ok(run('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock))
     ok(run('oracle-run.mjs', 'init', '--dir', directory, '--lock', lock, '--scan-root', scanRoot,
       ...['save.test.mjs', 'save.d.mts', 'positive.mts', 'negative.mts', 'property.mjs', 'witness.test.mjs'].flatMap((path) => ['--harness-path', path]),

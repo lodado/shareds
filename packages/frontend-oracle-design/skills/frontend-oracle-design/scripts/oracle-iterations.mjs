@@ -67,15 +67,23 @@ const SECURITY_CATEGORIES = ['security', 'permission', 'data-loss']
 // the classes a review repairs; POLICY_GAP and ENVIRONMENT_DEFECT stop the run instead
 const REPAIR_CLASSES = ['PRODUCT_DEFECT', 'EVIDENCE_GAP', 'HARNESS_DEFECT']
 
+/** A critical/high finding whose `category` (or `confirm.category`) is security, permission or data-loss: the global rule. */
+export function securityBlocker(finding) {
+  const category = finding?.category ?? finding?.confirm?.category
+  return SECURITY_CATEGORIES.includes(category) && ['critical', 'high'].includes(finding.severity)
+}
+
 /**
  * Whether a claim changes a test verdict, the only ground a review finding blocks on: a stop class (POLICY_GAP,
  * ENVIRONMENT_DEFECT), a repair claim naming the wrong implementation every locked test passes (`wrongPasses`, either
- * copy of a cited pair) or a PRODUCT_DEFECT reproduction, or a rowless critical/high finding (the global security,
- * permission and data-loss rule). Any other claim is an improvement proposal.
+ * copy of a cited pair) or a PRODUCT_DEFECT reproduction, or a critical/high finding under the global security,
+ * permission and data-loss rule (a security category on any row, or no row at all). Any other claim is an improvement
+ * proposal.
  */
 export function changesVerdict(finding) {
   if (!REPAIR_CLASSES.includes(finding?.classification)) return true
   if (finding.wrongPasses || finding.alsoReportedAs?.wrongPasses || finding.reproduction) return true
+  if (securityBlocker(finding)) return true
   return (finding.row ?? '-') === '-' && ['critical', 'high'].includes(finding.severity)
 }
 
@@ -179,6 +187,18 @@ function regressionClass(claim, scope) {
 }
 
 /** In a confirm-fixes round only a backed class keeps blocking; every other blocking finding becomes an improvement proposal. */
+/**
+ * Splits findings by whether they block. In a confirm-fixes round the packet-backed class decides first: a backed
+ * `previous`, `regression` or `security` claim blocks without `wrongPasses` (round 2 is the only place a repair
+ * regression is caught). Any other finding blocks only when it changes a test verdict; the rest are `unwitnessed`.
+ */
+export function witnessedFindings(findings, scope) {
+  const confirm = scope?.mode === 'confirm-fixes'
+  const backed = (finding) => confirm && confirmClass(finding, scope).class !== 'proposal'
+  const blocks = (finding) => backed(finding) || changesVerdict(finding)
+  return { blocking: findings.filter(blocks), unwitnessed: findings.filter((finding) => !blocks(finding)) }
+}
+
 export function splitConfirmFindings(blocking, scope) {
   if (scope?.mode !== 'confirm-fixes') return { blocking, proposals: null }
   const kept = []

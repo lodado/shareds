@@ -10,6 +10,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { resolveExecutable } from '../skills/frontend-oracle-design/scripts/resolve-executable.mjs'
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const core = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
 const fixture = new URL('../test-fixtures/contract-v1/', import.meta.url)
@@ -76,6 +77,7 @@ function workspace(t, { formal = false } = {}) {
   copyFileSync(new URL('policy.md', fixture), join(root, registered))
   const author = () => {
     ok(cli('step', '--dir', directory))
+    saveCleanReturnsSync(directory, 'contract/v1')
     ok(cli('lock', 'create', '--oracle', oracle, '--lock', lock, '--source', registered, '--profile', 'contract/v1'))
     // the record keeps the positions the step saw and the lock, not a walk through every stage
     assert.deepEqual(json(join(directory, 'stage.json')).history.map((entry) => entry.stage), ['DRAFTED', 'ORACLE_READY'])
@@ -137,6 +139,7 @@ test('approval and Design-only authoring write no product tests, tampered card a
   assert.equal(existsSync(w.ledger), false)
   writeFileSync(w.oracle, card)
   ok(w.cli('step', '--dir', w.directory))
+  saveCleanReturnsSync(w.directory, 'contract/v1')
   ok(w.cli('lock', 'create', '--oracle', w.oracle, '--lock', w.lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md'))
   // Design-only is the approved authoring endpoint, not a invented CLI switch.
   assert.equal(existsSync(w.state), false)
@@ -370,6 +373,7 @@ test('explicit Formal real pinned Bend package projection and initialization pre
   const harness = join(formalTests, 'search.oracle.test.mjs')
   const harnessBytes = readFileSync(harness)
   const witnesses = prepareFormalWitnesses(w, packagePath, formalTests)
+  saveCleanReturnsSync(w.directory, 'formal-bend/v1')
   ok(w.cli('lock', 'create', '--oracle', w.oracle, '--lock', w.lock, '--profile', 'formal-bend/v1', ...['README.md', 'MODEL.bend', 'LAWS.bend', 'World.bend', 'Metamorphic.bend', packagePath].flatMap((path) => ['--source', path])))
   const init = (...labels) => w.cli('run', 'init', '--dir', w.directory, '--lock', w.lock, '--scan-root', w.source, ...['__test__/formal/search.oracle.test.mjs', ...witnesses.paths.map((path) => relative(w.source, path))].flatMap((path) => ['--harness-path', path]), ...labels.flatMap((label) => ['--required-label', label]))
   // the projected card implies the stack labels: init adds the ones not typed, so the agent types only its repository check

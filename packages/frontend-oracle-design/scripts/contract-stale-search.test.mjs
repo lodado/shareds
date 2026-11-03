@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { generateFromDocument } from '../skills/frontend-oracle-design/scripts/oracle-frames.mjs'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const scripts = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
 const fixtureSource = new URL('../test-fixtures/stale-search/', import.meta.url)
@@ -134,6 +135,7 @@ test('actual stale-search Contract RED restores exact reducer then bounded GREEN
   try {
     ok(run('oracle-verify.mjs','card','--oracle',oracle,'--case-space'))
     ok(run('oracle-step.mjs','--dir',directory))
+    saveCleanReturnsSync(directory, 'contract/v1')
     ok(run('oracle-lock.mjs','create','--oracle',oracle,'--lock',lock))
     ok(run('oracle-run.mjs','init','--dir',directory,'--lock',lock,'--scan-root',src,...frozen.flatMap(path=>['--harness-path',path]),...['contract-cases:reported','type-contract:reported','fast-check:reported'].flatMap(label=>['--required-label',label])))
     const lockedPaths=[oracle,lock,f.mapPath,join(directory,'policy.md')]

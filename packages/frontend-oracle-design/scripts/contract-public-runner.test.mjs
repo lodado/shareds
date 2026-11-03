@@ -7,6 +7,7 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- focused public CLI integration test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const core = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
 const fixture = new URL('../test-fixtures/contract-v1/', import.meta.url)
@@ -80,6 +81,7 @@ test('actual Contract toggle public RED and two reported Medium passes preserve 
     assert.equal(generated.frames.length, 2)
     console.log(`FRAME_OUTPUT ${JSON.stringify(generated)}`)
     ok(cli('step', '--dir', directory))
+    saveCleanReturnsSync(directory, 'contract/v1')
     ok(cli('lock', 'create', '--oracle', oracle, '--lock', lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md', '--profile', 'contract/v1'))
     const locked = readFileSync(lock)
     // the Contract card implies contract-cases, but a derived label is not a repository check: with nothing typed, init refuses

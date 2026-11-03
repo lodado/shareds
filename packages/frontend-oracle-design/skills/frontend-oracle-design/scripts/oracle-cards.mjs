@@ -92,6 +92,7 @@ export const CARDS = Object.freeze({
     ],
   },
   // a Contract run reads only Contract and shared documents
+  'contract-intake': { text: [{ path: 'references/contract/authoring.md', starts: ['Input: resolved profile', 'Sweep new'] }] },
   'contract-authoring': { text: [{ path: 'references/contract/confirmation-lock.md' }] },
   'contract-delivery': { text: [{ path: 'references/contract/ledger.md' }, { path: 'references/contract/red.md' }] },
   'contract-review': { text: [{ path: 'references/contract/green-review.md' }] },
@@ -109,7 +110,7 @@ export const POSITIONS = Object.freeze({
     init: 'init', red: 'red', green: 'green', close: 'close', report: 'report', done: 'done', refused: 'refused', recover: 'refused',
   }),
   'contract/v1': Object.freeze({
-    confirmation: 'contract-authoring', card: 'contract-authoring', review: 'contract-authoring', lock: 'contract-authoring',
+    intake: 'contract-intake', confirmation: 'contract-authoring', card: 'contract-authoring', review: 'contract-authoring', lock: 'contract-authoring',
     decision: 'contract-authoring', init: 'contract-delivery', red: 'contract-delivery', green: 'contract-review',
     close: 'contract-review', report: 'contract-review', done: 'contract-review', refused: 'contract-refused', recover: 'contract-refused',
   }),

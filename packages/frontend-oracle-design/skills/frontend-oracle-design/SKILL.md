@@ -12,7 +12,7 @@ move state, and the controller alone records each transition.
 
 ## Entry: always first
 
-Print `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]` as the literal first line of the
+Print `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read so far, [] before any]` as the literal first line of the
 first response, even when it stops. Payment or permission work is High.
 
 - **No Oracle**: nothing modelable in state, order, count, permission or effect (only copy, tokens, layout,

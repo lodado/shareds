@@ -2442,7 +2442,8 @@ source alone (registered as its own source, `crossCheck.states`) while the autho
 and the same analyst — continued, never a fresh agent and never the author — then checks the translation table from `oracle-discovery.mjs
 mapping-input` — the declared tables, the model's types and classifiers, never `step` — and is recorded as
 `crossCheck.reviewedBy: {agent, inputDigest}`. The gate fails `cross-check-unreviewed` without a review of the
-current input. Run the analyst on the newest model the host can dispatch, from another family when one is as recent (for example the newest `ocx-gpt-*` agent under Claude), and name the exact model in `agent`; where no delegation exists, `agent: controller`
+current input. A table still disputed after its 2 rounds goes to the user: `{agent: "user", source, inputDigest}`
+names where they settled it, clears the check and is no review round. Run the analyst on the newest model the host can dispatch, from another family when one is as recent (for example the newest `ocx-gpt-*` agent under Claude), and name the exact model in `agent`; where no delegation exists, `agent: controller`
 records that the two readings are one.
 
 ## Axis Breaker — classifying what was found

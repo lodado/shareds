@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const scripts = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
 const loader = `data:text/javascript,${encodeURIComponent("export async function resolve(s,c,n){if(/oracle-(package|model|adequacy|discovery)\\.mjs$|ensure-bend\\.mjs$/.test(s))throw Error('FORMAL_IMPORT_DENIED:'+s);return n(s,c)}")}`
@@ -31,6 +32,7 @@ function fixture() {
   writeFileSync(oracle, `${data.render()}\n## Verification Profile\n\n- Profile: contract/v1\n`)
   ok(run('oracle-step.mjs', '--dir', directory))
   const lock = join(directory, 'oracle.lock.json')
+  saveCleanReturnsSync(directory, 'contract/v1')
   ok(run('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock))
   writeFileSync(join(src, 'product.mjs'), 'export const result = (x) => x\nexport const trace = events => [...events].reverse()\n')
   return { root, storage, directory, src, data, oracle, lock }

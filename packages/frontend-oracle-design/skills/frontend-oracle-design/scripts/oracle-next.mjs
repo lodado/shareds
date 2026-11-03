@@ -15,7 +15,7 @@ export const NEXT_LINES = Object.freeze({
   report: /· next: oracle-run\.mjs close --dir \S+ --check-report /,
   step: /· next: oracle-step\.mjs --dir \S+(?: ·|$)/,
   lock: /· next: oracle-lock\.mjs create /,
-  stop: /· next: NEEDS_DECISION: the same issues came back/,
+  stop: /· next: NEEDS_DECISION: (?:the same issues came back|a review ran its 2 rounds)/,
   init: /· next: oracle-run\.mjs init /,
   revise: /· next: NEEDS_DECISION: the user rewrites the sources/,
 })

@@ -421,7 +421,7 @@ const NO_ROUNDS = { 'model-analyst': 0, translation: 0, 'card-review': 0, 'cold-
 const OFFER = /when card\/policy-sources\.md's trigger applies, a source-aware review — .*; save its return unchanged as (\S+);/
 /** A second round of a review kind: it continues the first reviewer, whose return it names, with the repair diff. */
 const confirmFixes = (kind, name = kind) =>
-  `${name} round 2 \\(confirm-fixes\\) — continue the round-1 reviewer with only its finding IDs \\(\\.ai/oracles/stale-search/reviews/${kind}-[0-9a-f]{12}\\.(?:md|json)\\) and the repair diff, its return saved unchanged as \\S+`
+  `${name} round 2 \\(confirm-fixes\\) — continue the round-1 reviewer with only its finding IDs \\(\\.ai/oracles/stale-search/reviews/${kind}-[0-9a-f]{12}\\.(?:md|json)\\) and the repair diff, each finding still blocking on a line opening BLOCKING \\(JSON: a "blocking" array of its IDs\\), its return saved unchanged as \\S+`
 const PENDING_APPROVAL = '- Status: pending\n- Source: none yet'
 
 /** The template in a folder of this test, and receipts of this test only. */
@@ -589,11 +589,12 @@ async function bClassIncidents(t) {
   assert.deepEqual(['stage', 'iterations', 'rewinds', 'rewindAllowance'].filter((field) => field in kept), [])
 }
 
-/** The issues a refused lock names: the node lines of STAGE_GATE, or the card lint's indented lines. */
+/** The issues a refused lock names: the node or review lines of STAGE_GATE, or the card lint's indented lines. */
 function lockIssues(stderr) {
-  const head = 'STAGE_GATE: the lock judged the current files: '
-  const at = stderr.indexOf(head)
-  if (at !== -1) return stderr.slice(at + head.length, stderr.indexOf(' — run oracle-step.mjs', at)).split(' · ')
+  for (const head of ['STAGE_GATE: the lock judged the current files: ', 'STAGE_GATE: the lock waits for the reviews: ']) {
+    const at = stderr.indexOf(head)
+    if (at !== -1) return stderr.slice(at + head.length, stderr.indexOf(' — run oracle-step.mjs', at)).split(' · ')
+  }
   return stderr.split('\n').filter((line) => line.startsWith('  ')).map((line) => line.trim())
 }
 
@@ -617,6 +618,8 @@ async function checkParity(t) {
   }
   const states = {
     clean: async () => {},
+    // every node passes and no reviewer has answered: the lock waits for the reviews, and --check says so
+    'no reviews': async (at) => rm(join(at.dir, 'reviews'), { recursive: true }),
     'stale projection': (at) => world(at, `${fixture.world}# edited\n`),
     'broken model': (at) => world(at, fixture.world.replace(WORLD_ROW, FORBIDDING_ROW)),
     'hand-written sweep': (at) => writeFile(at.file('oracle.md'), withHandWritten(fixture.card, SWEEP)),
@@ -631,6 +634,8 @@ async function checkParity(t) {
   const lockArgs = ['create', '--oracle', join(PACKAGE_DIR, 'oracle.md'), '--lock', join(PACKAGE_DIR, 'oracle.lock.json'), ...LOCK_SOURCES(fixture.package).flatMap((path) => ['--source', path])]
   const results = await Promise.all(Object.entries(states).map(async ([name, change], index) => {
     const at = await authoringRepo(fixture, `state-${index}`)
+    // the reviews step asks for on the clean files, answered: the lock takes the clean state only with them
+    await at.save((await at.step()).stdout)
     await change(at)
     const before = await snapshot(at.dir)
     const check = await at.step('--check')
@@ -676,8 +681,10 @@ async function stopOnThird(t) {
 async function noThirdRound(t) {
   if (!(await installedBend(t))) return
   // a review kind runs at most two rounds, the second confirming the first one's fixes: the source-aware review is named
-  // with its condition until its first return is saved, then counted like the card reviews; after returns saved for two
-  // card versions, a third version goes to the lock without asking for any of them again, and the lock takes it
+  // with its condition until its first return is saved, then counted like the card reviews; a round-2 return that still
+  // holds a blocker stops step and the lock; after returns saved for two card versions, a third version asks for none of
+  // them again and is not locked unreviewed: step stops at the user's decision and the lock refuses it, a third saved
+  // return too
   const fixture = await authoringFixture(t, 'rounds')
   const at = await authoringRepo(fixture)
   const note = (n) => writeFile(at.file('oracle.md'), withHandWritten(fixture.card, `<!-- edit ${n} -->`))
@@ -693,21 +700,38 @@ async function noThirdRound(t) {
   const kinds = [['card-review', 'the card review'], ['source-aware']].map((kind, index) => `\\(${index + 1}\\) ${confirmFixes(...kind)}`)
   assert.match(answer(second).at(-1), new RegExp(`^NEXT FOR YOU: dispatch ${kinds.join(' ')}; repair what they find`))
   await at.save(second.stdout)
+  // the round-2 card review still holds a blocker: no lock, the user decides
+  const cardReturn = join(at.repo, [...second.stdout.matchAll(RETURN)].map((match) => match[1]).find((path) => path.endsWith('.json')))
+  await writeFile(cardReturn, '{"candidates": [], "blocking": ["F1"]}\n')
+  const blocked = await at.step()
+  assert.equal(blocked.status, 1, blocked.stdout)
+  assert.match(answer(blocked).at(-1), /^NEXT FOR YOU: NEEDS_DECISION: a review ran its 2 rounds unsettled: stop and report its findings to the user, never a third round: 1\) card-review round 2 still holds blocking findings /)
+  assert.equal(nextCommandOf(await at.brief()), 'stop')
+  assert.match((await at.lock(opened)).stderr, /^STAGE_GATE: the lock waits for the reviews: card-review round 2 still holds blocking findings /)
+  await writeFile(cardReturn, savedText(cardReturn))
   assert.match(answer(await at.step()).at(-1), /every check passes; in order: \(1\) oracle-verify\.mjs card /)
   await note(2)
-  const third = answer(await at.step()).at(-1)
-  assert.match(third, /every check passes; in order: \(1\) oracle-verify\.mjs card /)
-  assert.ok(!/dispatch|source-aware/.test(third), third)
+  const third = await at.step()
+  assert.equal(third.status, 1, third.stdout)
+  const stopped = answer(third).at(-1)
+  assert.match(stopped, /^NEXT FOR YOU: NEEDS_DECISION: a review ran its 2 rounds unsettled: .*: 1\) card-review ran its 2 rounds and its input changed since: no reviewer read the repair; 2\) source-aware ran its 2 rounds and its input changed since/)
+  assert.ok(!/dispatch|oracle-lock/.test(stopped), stopped)
   assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'card-review': 2, 'source-aware': 2 })
-  assert.equal(nextCommandOf(await at.brief()), 'lock')
-  const locked = await at.lock(third)
-  assert.equal(locked.status, 0, locked.stderr)
+  assert.equal(nextCommandOf(await at.brief()), 'stop')
+  const refused = await at.lock(opened)
+  assert.equal(refused.status, 1, refused.stdout)
+  assert.match(refused.stderr, /^STAGE_GATE: the lock waits for the reviews: card-review ran its 2 rounds and its input changed since/)
+  // a third return saved anyway is not a round: it is reported and still stops
+  await writeFile(join(at.dir, 'reviews', 'card-review-aaaaaaaaaaaa.json'), savedText('x.json'))
+  assert.match(answer(await at.step()).at(-1), /1\) card-review has 3 saved returns: there is no round 3/)
+  assert.equal((await at.lock(opened)).status, 1)
 }
 
 async function legacyCardRounds(t) {
   if (!(await installedBend(t))) return
   // a Formal run from before the card review was one reviewer saved its card returns as reverse-impossible: each is a
-  // card-review round for its card version, the second round continues that return, and two leave no third to ask for
+  // card-review round for its card version, the second round continues that return, and two leave no third to ask for:
+  // a card changed after them stops at the user's decision
   const fixture = await authoringFixture(t, 'legacy-rounds')
   const at = await authoringRepo(fixture)
   const legacy = (path) => path.replace(/\/card-review-([0-9a-f]{12})\.json$/, '/reverse-impossible-$1.json')
@@ -721,9 +745,10 @@ async function legacyCardRounds(t) {
   const second = await at.step()
   assert.match(answer(second).at(-1), new RegExp(`^NEXT FOR YOU: dispatch ${confirmFixes('reverse-impossible', 'the card review')}; `))
   await saveLegacy(second.stdout)
+  assert.match(answer(await at.step()).at(-1), /every check passes; in order: /)
   await note(2)
   const third = answer(await at.step()).at(-1)
-  assert.match(third, /every check passes; in order: /)
+  assert.match(third, /^NEXT FOR YOU: NEEDS_DECISION: a review ran its 2 rounds unsettled: .*1\) card-review ran its 2 rounds and its input changed since/)
   assert.ok(!/the card review/.test(third), third)
   assert.deepEqual((await at.status()).reviews, { ...NO_ROUNDS, 'model-analyst': 1, 'card-review': 2 })
 }
@@ -773,7 +798,20 @@ async function translationRounds(t) {
   const third = await asked()
   assert.match(third, /the translation table changed after its 2 reviews: ask the user how to settle the mappings, never a third review/)
   assert.ok(!/translation review|mapping-input\.md/.test(third), third)
-  assert.equal(JSON.parse((await runNode(root, 'oracle-stage.mjs', ['status', '--dir', join('.ai', 'oracles', 'pagination')], env)).stdout).reviews.translation, 2)
+  const rounds = async () => JSON.parse((await runNode(root, 'oracle-stage.mjs', ['status', '--dir', join('.ai', 'oracles', 'pagination')], env)).stdout).reviews.translation
+  assert.equal(await rounds(), 2)
+  // the user's settlement is the exit: recorded with its source and the digest, it clears the check and is no round
+  const settled = /record their decision \(not a review round\): oracle-package\.mjs set --dir \S+ \/crossCheck\/reviewedBy '\{"agent":"user","source":"<where the user settled it>","inputDigest":"([0-9a-f]{64})"\}'/.exec(third)
+  assert.ok(settled, third)
+  pkg.crossCheck.reviewedBy = { agent: 'user', inputDigest: settled[1] }
+  await writePackage()
+  assert.match(await asked(), /names the source of the user's decision/)
+  pkg.crossCheck.reviewedBy = { agent: 'user', source: 'S1: the user kept the mappings as they are', inputDigest: settled[1] }
+  await writePackage()
+  const after = await runNode(root, 'oracle-step.mjs', ['--dir', join('.ai', 'oracles', 'pagination')], env)
+  assert.ok(!after.stdout.includes('cross-check-unreviewed'), after.stdout)
+  assert.ok(!/translation/.test(after.stdout.trim().split('\n').at(-1)), after.stdout)
+  assert.equal(await rounds(), 2)
 }
 
 async function proofEditsStop(t) {
@@ -1122,6 +1160,15 @@ async function scaffoldFirst(t) {
     assert.deepEqual(await readFile(join(dir, 'oracle.package.json')), bytes)
   }
   assert.deepEqual((await readdir(dir)).sort(), ['oracle.package.json', 'sources'])
+  // a blank folder bound to Contract gets no Formal file: its card comes first, with step and --check alike
+  const contract = join(root, '.ai', 'oracles', 'save-retry-contract')
+  await mkdir(contract, { recursive: true })
+  for (const args of [[], ['--check']]) {
+    const blank = step(root, ['--dir', contract, '--profile', 'contract/v1', ...args])
+    assert.equal(blank.status, 0, blank.stdout)
+    assert.match(answer(blank, 'contract-intake').at(-1), /write the Contract card \S+oracle\.md with its Verification Profile contract\/v1 — no package, model or Space discovery record; then rerun oracle-step\.mjs --dir /)
+    assert.deepEqual(await readdir(contract), [], 'a Contract blank folder gets no package or Space discovery skeleton')
+  }
 }
 
 /**
@@ -1144,9 +1191,11 @@ async function positionsHaveCards() {
     for (const { id, review } of nodes) if (!review) assert.ok(Object.hasOwn(POSITIONS[profile], id), `${profile} has no card for its ${id} node`)
     for (const position of Object.keys(POSITIONS[profile])) assert.ok(tagged.has(position) || nodes.some(({ id }) => id === position), `${profile} ${position} is a position step never prints`)
   }
-  for (const position of ['review', 'lock', 'decision', 'init', 'red', 'green', 'close', 'report', 'done', 'refused', 'recover'])
+  for (const position of ['intake', 'review', 'lock', 'decision', 'init', 'red', 'green', 'close', 'report', 'done', 'refused', 'recover'])
     assert.ok(Object.hasOwn(POSITIONS['contract/v1'], position), `contract/v1 has no card for ${position}`)
-  assert.throws(() => cardOf('contract/v1', 'intake'), /no card for position intake of contract\/v1/)
+  // a blank Contract folder has its own card, never the Formal intake's package and Space discovery rows
+  assert.equal(cardOf('contract/v1', 'intake'), 'contract-intake')
+  assert.throws(() => cardOf('contract/v1', 'package'), /no card for position package of contract\/v1/)
   for (const card of new Set(Object.values(POSITIONS).flatMap(Object.values))) assert.ok(Object.hasOwn(CARDS, card), card)
 }
 
@@ -1203,7 +1252,7 @@ async function privateInputs() {
 
 export const stepCases = [
   ['review inputs go under a private per-user folder; a planted link or a folder open to others is refused', privateInputs],
-  ['a blank oracle folder gets the package and Space discovery skeletons from step, and nothing else', scaffoldFirst],
+  ['a blank oracle folder gets the package and Space discovery skeletons from step, and nothing else; a Contract one gets none', scaffoldFirst],
   ['every position step can print has a card within 4,096 bytes, and every rule table row is on exactly one card', cardInventory],
   ['step runs only the AUTO entries of the shared next table; every other next and any unknown line is printed', tableAndAuto],
   ['step stops on a refusal, a line seen before, an empty plan and the step cap; FLAKINESS_GATE goes on only within the cap', loopStops],

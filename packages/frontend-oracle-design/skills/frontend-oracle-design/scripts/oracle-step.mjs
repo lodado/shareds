@@ -42,7 +42,7 @@ import { canonicalReviewPoints, deliveryBrief, requiredLabelsNotPassing, sameDig
 import { markdownLines, sectionLines } from './oracle-space.mjs'
 import {
   bindingOf, briefStatus, evaluateGraph, filesDigest, GRAPH, issuesDigest, lockTodos, phaseLine, readStage, recordCheck, REVIEW_ROUNDS,
-  reviewRounds, roundKinds, SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
+  REVIEW_STOP_NEXT, reviewRounds, roundKinds, SAME_ISSUES_STOP, sameIssuesRun, STOP_NEXT,
 } from './oracle-stage.mjs'
 
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
@@ -192,7 +192,7 @@ async function sourceOf(directory, phase, label, given) {
 function commandIssue(directory, label, source) {
   if (label.endsWith(':exit')) return null
   const shown = source.command.map((word) => (word === process.execPath ? 'node' : word)).join(' ')
-  const again = `rerun ${rerun(directory)} --label ${label} -- <node --test <test files> | npx vitest run <test files>>`
+  const again = `rerun ${rerun(directory)} --label ${sh(label)} -- <node --test <test files> | npx vitest run <test files>>`
   if (!source.adapter) return { say: `${label} is graded on a reported run and \`${shown}\` reports no test results to the oracle: ${again}` }
   if (forbiddenArgument(TRUSTED_ADAPTERS[source.adapter], source.command)) return { say: `\`${shown}\` passes reporter, destination or leniency arguments the ${source.adapter} adapter owns: drop them and ${again}` }
   return null
@@ -270,7 +270,7 @@ async function preRedReviewMissing(directory, phase) {
 }
 
 function preRedReview(directory, phase, given) {
-  const again = given.command ? ` --label ${given.label} -- ${given.command.map(sh).join(' ')}` : ''
+  const again = given.command ? ` --label ${sh(given.label)} -- ${given.command.map(sh).join(' ')}` : ''
   return [
     'before the first RED, dispatch $oracle-review in adapter-pre-red mode in a fresh context with the locked Terms and observations,',
     'the adapter, the generated and hand-written tests and the product paths they call (run oracle-projection.mjs verify-generated --file <generated test> on each generated file first);',
@@ -680,9 +680,32 @@ const REVIEW_KINDS = {
   },
 }
 
+/** Whether a saved return names a finding it still holds blocking: a line opening `BLOCKING`, or a JSON `blocking` array. */
+async function holdsBlockers(file) {
+  const text = await readFile(file, 'utf8').catch(() => '')
+  if (!file.endsWith('.json')) return /^[ \t]*(?:[-*][ \t]+)?BLOCKING\b/m.test(text)
+  try {
+    const blocking = JSON.parse(text)?.blocking
+    return Array.isArray(blocking) && blocking.length > 0
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Why a review ends its rounds at the user's decision: a return saved past REVIEW_ROUNDS, an input changed after the
+ * last round (a repair no reviewer read), or a last-round return that still holds a blocker. null while it is open.
+ */
+async function roundsStop(kind, { saved, file, rounds }) {
+  if (rounds > REVIEW_ROUNDS) return `${kind} has ${rounds} saved returns: there is no round ${REVIEW_ROUNDS + 1}, the rounds after ${REVIEW_ROUNDS} are not counted`
+  if (rounds < REVIEW_ROUNDS) return null
+  if (!saved) return `${kind} ran its ${REVIEW_ROUNDS} rounds and its input changed since: no reviewer read the repair`
+  return (await holdsBlockers(file)) ? `${kind} round ${REVIEW_ROUNDS} still holds blocking findings (${q(file)})` : null
+}
+
 /**
  * One review node now: its input digest, the rounds it ran (saved returns, recorded or on disk), whether step asks for
- * it, and whether it is a conditional review step only names (no return saved for it yet).
+ * it, whether it is a conditional review step only names (no return saved for it yet), and why its rounds stop.
  */
 async function reviewState(directory, root, record, kind) {
   const digest = await REVIEW_KINDS[kind].digest(directory, root)
@@ -691,7 +714,35 @@ async function reviewState(directory, root, record, kind) {
   const saved = file !== null
   const rounds = await reviewRounds(directory, record, kind)
   const offered = Boolean(REVIEW_KINDS[kind].conditional) && rounds === 0
-  return { kind, digest, saved, file, rounds, offered, wanted: !offered && !saved && rounds < REVIEW_ROUNDS }
+  const stop = offered ? null : await roundsStop(kind, { saved, file, rounds })
+  return { kind, digest, saved, file, rounds, offered, stop, wanted: !offered && !saved && rounds < REVIEW_ROUNDS }
+}
+
+/**
+ * What the lock refuses on the reviews (oracle-stage.mjs judgedFiles): each review kind of the profile, and a
+ * conditional one once a return opened it, needs a return saved for its current input, with no stop on its rounds.
+ */
+export async function reviewGate(directory, profile) {
+  return (await gateStates(directory, profile)).flatMap(({ id, state }) => {
+    if (!state) return [`${id}: its input cannot be built`]
+    if (state.stop) return [state.stop]
+    return state.offered || state.saved ? [] : [`${id}: no return saved for its current input (${q(reviewReturn(directory, id, state.digest))})`]
+  })
+}
+
+/** Where the returns the lock waits for go: each review kind of the profile still open with none for its current input. */
+export async function missingReturns(directory, profile) {
+  return (await gateStates(directory, profile))
+    .filter(({ state }) => state && !state.stop && !state.offered && !state.saved)
+    .map(({ id, state }) => reviewReturn(directory, id, state.digest))
+}
+
+async function gateStates(directory, profile) {
+  const { root } = await packageSources(directory)
+  const record = await readStage(directory)
+  const states = []
+  for (const { id } of GRAPH[profile].filter(({ review }) => review)) states.push({ id, state: await reviewState(directory, root, record, id) })
+  return states
 }
 
 /** The review nodes that come before `failed` in the graph (all of them when every node passes). */
@@ -729,7 +780,7 @@ async function reviewClause(directory, root, record, { kind, digest, rounds }) {
   const saved = q(reviewReturn(directory, kind, digest))
   if (rounds > 0) {
     const previous = await roundOneReturn(directory, record, kind, digest)
-    return `${review.name} round 2 (confirm-fixes) — continue the round-1 reviewer with only its finding IDs (${previous ? q(previous) : 'its round-1 return'}) and the repair diff, its return saved unchanged as ${saved}`
+    return `${review.name} round 2 (confirm-fixes) — continue the round-1 reviewer with only its finding IDs (${previous ? q(previous) : 'its round-1 return'}) and the repair diff, each finding still blocking on a line opening BLOCKING (JSON: a "blocking" array of its IDs), its return saved unchanged as ${saved}`
   }
   const folder = await inputFolder(directory, kind, digest)
   const files = (await review.write(directory, root, folder)).map(qa).join(' and ')
@@ -756,7 +807,8 @@ async function offerSay(directory, root, record, states) {
 /**
  * The translation review: round 1 reads the mapping input written outside the repository, a reviewer who did not write
  * the model; round 2 confirms round 1's fixes. Its verdict is recorded in the package by hand with the digest the
- * reviewer read. After REVIEW_ROUNDS reviews the table is the user's to settle.
+ * reviewer read. After REVIEW_ROUNDS reviews the table is the user's to settle, recorded as `agent: "user"` with the
+ * source of their decision: that record clears the check and is no review round.
  */
 async function translationSay(directory, root, record) {
   const { loadPackage } = await import('./oracle-package.mjs')
@@ -764,7 +816,7 @@ async function translationSay(directory, root, record) {
   const text = await mappingInput({ loaded: await loadPackage(join(directory, 'oracle.package.json'), { root }) }).catch(() => null)
   if (text === null) return null
   const rounds = await reviewRounds(directory, record, 'translation')
-  if (rounds >= REVIEW_ROUNDS) return `the translation table changed after its ${REVIEW_ROUNDS} reviews: ask the user how to settle the mappings, never a third review`
+  if (rounds >= REVIEW_ROUNDS) return `the translation table changed after its ${REVIEW_ROUNDS} reviews: ask the user how to settle the mappings, never a third review; record their decision (not a review round): oracle-package.mjs set --dir ${q(directory)} /crossCheck/reviewedBy '{"agent":"user","source":"<where the user settled it>","inputDigest":"${sha256(text)}"}'`
   const recordIt = `record it: oracle-package.mjs set --dir ${q(directory)} /crossCheck/reviewedBy '{"agent":"<reviewer>","inputDigest":"${sha256(text)}"}'`
   if (rounds > 0) return `the translation review round 2 (confirm-fixes) — continue the round-1 reviewer with only the mappings it disputed and the repair diff; fix what it still disputes, then ${recordIt}`
   const folder = await inputFolder(directory, 'translation', sha256(text))
@@ -774,11 +826,12 @@ async function translationSay(directory, root, record) {
 
 /**
  * The translation review the package records: a round for the digest the reviewer read. A mapping fixed after a dispute
- * leaves that record stale, and it is still the round that ran.
+ * leaves that record stale, and it is still the round that ran. The user's own settlement (`agent: "user"`) is no round.
  */
 async function translationReviewed(directory) {
-  const digest = (await readJson(join(directory, 'oracle.package.json')))?.crossCheck?.reviewedBy?.inputDigest
-  if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) return []
+  const review = (await readJson(join(directory, 'oracle.package.json')))?.crossCheck?.reviewedBy
+  const digest = review?.inputDigest
+  if (review?.agent === 'user' || typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) return []
   return [{ kind: 'translation', digest }]
 }
 
@@ -932,6 +985,17 @@ async function blankAnswer(directory) {
   return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, profile: 'formal-bend/v1', position: 'intake', say: await fillSay(directory) }
 }
 
+/** A blank folder bound to Contract (`--profile contract/v1` or its stage record) gets no Formal file: the card is first. */
+async function contractBlank(directory, profile) {
+  return (await bindingOf(directory, profile)).profile === 'contract/v1'
+}
+
+function contractBlankAnswer(directory) {
+  const card = q(join(directory, 'oracle.md'))
+  const say = `with $oracle-intake (the source identities, risk and the finite axes the user confirms) and then $oracle-author, write the Contract card ${card} with its Verification Profile contract/v1 — no package, model or Space discovery record; then rerun ${rerun(directory)}`
+  return { ran: [], phase: { line: phaseLine(null, rerun(directory)) }, profile: 'contract/v1', position: 'intake', say }
+}
+
 /** A failing node's position: the package shows the intake card while its next todo is one the intake decides. */
 async function nodePosition(directory, node) {
   if (node.id !== 'package') return node.id
@@ -944,9 +1008,10 @@ async function nodePosition(directory, node) {
   return card === 'intake' ? 'intake' : 'package'
 }
 
-/** The phase line's next after this call: the stop, another step (a node fails or a review waits), or the lock. */
-function nextKeyOf(stop, failed, wanted) {
+/** The phase line's next after this call: a stop, another step (a node fails or a review waits), or the lock. */
+function nextKeyOf(stop, stuck, failed, wanted) {
   if (stop) return 'stop'
+  if (stuck.length > 0) return 'review-stop'
   if (failed || wanted.length > 0) return 'step'
   return 'lock'
 }
@@ -956,8 +1021,9 @@ function nextKeyOf(stop, failed, wanted) {
  * the reviews waiting before the first failing node with that node's issues, or the reviews after the last node, or
  * the lock. The same issues on a third edited state stop it.
  */
-export async function authoringStep(directory) {
+export async function authoringStep(directory, { profile } = {}) {
   if (await blankFolder(directory)) {
+    if (await contractBlank(directory, profile)) return contractBlankAnswer(directory)
     await scaffold(directory)
     return blankAnswer(directory)
   }
@@ -970,13 +1036,16 @@ export async function authoringStep(directory) {
   const wanted = states.filter((state) => state.wanted)
   const files = await filesDigest(directory)
   const issues = issuesDigest(graph.nodes)
-  const stop = issues !== null && sameIssuesRun([...(record?.checks ?? []), { files, issues }]) >= SAME_ISSUES_STOP
-  const next = nextKeyOf(stop, failed, wanted)
+  const stop = issues !== null && sameIssuesRun([...(record?.checks ?? []), { files, issues, node: failed?.id ?? null }]) >= SAME_ISSUES_STOP
+  // a review whose rounds ended unsettled stops before any other instruction: the lock refuses it too
+  const stuck = states.map((state) => state.stop).filter(Boolean)
+  const next = nextKeyOf(stop, stuck, failed, wanted)
   const reviews = [...states.filter((state) => state.saved), ...(await translationReviewed(directory))]
-  const recorded = await recordCheck(directory, { binding, label: graph.label, files, issues, next, reviews })
+  const recorded = await recordCheck(directory, { binding, label: graph.label, files, issues, node: failed?.id ?? null, next, reviews })
   const outcome = { ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) }, profile: graph.profile }
   const shown = failed ? [`FAILED ${failed.id}: ${failed.issues[0].slice(0, 300)}`] : []
   if (stop) return { ...outcome, position: 'decision', refused: true, shown, say: `${STOP_NEXT}: ${numberedList(failed.issues)}` }
+  if (stuck.length > 0) return { ...outcome, position: 'decision', refused: true, shown, say: `${REVIEW_STOP_NEXT}: ${numberedList(stuck)}` }
   const dispatch = await dispatchSay(directory, root, record, wanted)
   if (failed) {
     const say = `${await failedSay(directory, root, { failed, dispatch, record, recorded, states })}; then rerun ${rerun(directory)}`
@@ -995,10 +1064,11 @@ function failingLine({ id, issues, handWritten = [] }) {
   return [`${id}: ${numberedList(issues)}`, ...own].join(' ')
 }
 
-/** `--check`'s instruction: the failing issues in one pass, the user's answers the lock waits for, or step. */
-function checkSay(directory, count, pending) {
+/** `--check`'s instruction: the failing issues in one pass, the user's answers or the reviews the lock waits for, or step. */
+function checkSay(directory, count, pending, reviews = []) {
   if (count > 0) return `fix all ${count} in one pass, then run ${rerun(directory)}`
   if (pending.length > 0) return `no node fails; the lock waits for the user: show them the card, record their answer in its User Confirmation, then run ${rerun(directory)}`
+  if (reviews.length > 0) return `no node fails; the lock waits for the reviews listed: run ${rerun(directory)} and do what it says`
   return `no node fails: run ${rerun(directory)}`
 }
 
@@ -1008,8 +1078,8 @@ function checkSay(directory, count, pending) {
  * oracle directory (a passing model check may fill the receipt cache), and fails exactly when the lock would refuse
  * these files (a failing node or an answer it waits for).
  */
-export async function checkAll(directory) {
-  if (await blankFolder(directory)) return blankAnswer(directory)
+export async function checkAll(directory, { profile } = {}) {
+  if (await blankFolder(directory)) return (await contractBlank(directory, profile)) ? contractBlankAnswer(directory) : blankAnswer(directory)
   const { root } = await packageSources(directory)
   const graph = await evaluateGraph(directory, { binding: await bindingOf(directory), deep: true, project: 'scratch' })
   const failing = graph.nodes.filter(({ issues }) => issues.length > 0)
@@ -1022,12 +1092,15 @@ export async function checkAll(directory) {
   const record = await readStage(directory)
   const waiting = (await reviewStates(directory, root, record, graph.profile, null)).filter((state) => state.wanted).map(({ kind }) => kind)
   if (waiting.length > 0) shown.push(`reviews waiting: ${waiting.join(', ')}`)
+  // the lock refuses a review with no return for its current input, or whose rounds stopped (reviewGate)
+  const reviews = await reviewGate(directory, graph.profile)
+  if (reviews.length > 0) shown.push(`lock waits for the reviews: ${numberedList(reviews)}`)
   const count = failing.reduce((total, { issues }) => total + issues.length, 0)
-  const say = checkSay(directory, count, pending)
+  const say = checkSay(directory, count, pending, reviews)
   const position = failing.length > 0 ? await nodePosition(directory, failing[0]) : 'lock'
   return {
     ran: graph.nodes.map(nodeLine), phase: { line: phaseLine(graph.label, rerun(directory)) }, profile: graph.profile, position,
-    refused: count > 0 || pending.length > 0, shown, shownLimit: shown.length, say,
+    refused: count > 0 || pending.length > 0 || reviews.length > 0, shown, shownLimit: shown.length, say,
   }
 }
 
@@ -1198,9 +1271,9 @@ export function runCall(call) {
 
 const FLAGS = {
   '--dir': 'dir', '--label': 'label', '--findings': 'findings', '--intersect': 'intersect',
-  '--task-id': 'taskId', '--intersect-task-id': 'intersectTaskId', '--blind-task-id': 'blindTaskId',
+  '--task-id': 'taskId', '--intersect-task-id': 'intersectTaskId', '--blind-task-id': 'blindTaskId', '--profile': 'profile',
 }
-const USAGE = 'usage: oracle-step.mjs --dir <oracle dir> [--check] [--label <label> -- <test command>] [--findings <file>] [--intersect <file>] [--task-id <id>] [--intersect-task-id <id>] [--blind-task-id <id>]'
+const USAGE = 'usage: oracle-step.mjs --dir <oracle dir> [--profile <profile>] [--check] [--label <label> -- <test command>] [--findings <file>] [--intersect <file>] [--task-id <id>] [--intersect-task-id <id>] [--blind-task-id <id>]'
 
 function parse(argv) {
   const split = argv.indexOf('--')
@@ -1249,7 +1322,7 @@ async function main() {
   const before = await authoring(directory)
   if (given.check && !before) throw new Error('--check reads the authoring graph: this oracle is locked')
   const outcome = before
-    ? await (given.check ? checkAll(directory) : authoringStep(directory))
+    ? await (given.check ? checkAll(directory, given) : authoringStep(directory, given))
     : await drive({
       directory,
       read: () => readPhase(directory),

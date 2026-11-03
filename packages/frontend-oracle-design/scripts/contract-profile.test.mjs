@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { stableStringify } from '../skills/frontend-oracle-design/scripts/oracle-fs.mjs'
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
+import { saveCleanReturnsSync } from '../test-fixtures/saved-reviews.mjs'
 
 const moduleUrl = new URL('../skills/frontend-oracle-design/scripts/oracle-profile.mjs', import.meta.url)
 const verifier = new URL('../skills/frontend-oracle-design/scripts/oracle-verify.mjs', import.meta.url)
@@ -48,6 +49,7 @@ test('Contract public step and lock bind approved whole card without a package',
     const checked = JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8'))
     assert.equal(checked.checks.at(-1).label, 'DRAFTED')
     assert.equal(checked.verificationProfile, 'contract/v1')
+    saveCleanReturnsSync(directory, 'contract/v1')
     result = create('--profile', 'contract/v1')
     assert.equal(result.status, 0, result.stderr)
     const lockedBytes = readFileSync(manifest)
@@ -213,6 +215,7 @@ test('Contract public init derives type-contract unless an approved investigated
       writeFileSync(oracle, card)
       const stepped = run('oracle-step.mjs', '--dir', directory)
       assert.equal(stepped.status, 0, `${mode}: ${stepped.stdout}${stepped.stderr}`)
+      saveCleanReturnsSync(directory, 'contract/v1')
       const locked = run('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock)
       assert.equal(locked.status, 0, `${mode}: ${locked.stderr}`)
       const lockBytes = readFileSync(lock)

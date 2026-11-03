@@ -689,6 +689,8 @@ function crossCheckIssues(pkg, ctx) {
   const review = cross?.reviewedBy
   if (review !== undefined && (!nonEmpty(review?.agent) || !/^[a-f0-9]{64}$/.test(review?.inputDigest ?? '')))
     issues.push('package-cross-check: crossCheck.reviewedBy is {agent, inputDigest: sha256 of the mapping-input it read}')
+  else if (review?.agent === 'user' && !nonEmpty(review?.source))
+    issues.push('package-cross-check: a user-settled crossCheck.reviewedBy {agent: "user"} names the source of the user\'s decision')
   return issues
 }
 

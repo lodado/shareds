@@ -9,7 +9,7 @@ allowed-tools:
 
 ## Entry prerequisites
 
-First tool call after activation is Read [common](../frontend-oracle-design/references/common.md).
+Read [common](../frontend-oracle-design/references/common.md).
 Print `risk=<Low|Medium|High> lane=oracle nodes=[actual node IDs]` first, only actually Read nodes.
 Required reference bodies use Read without offset or limit. Read
 [verification-common](../frontend-oracle-design/references/verification-common.md) and

@@ -77,8 +77,9 @@ the run directory and the open findings. The Delivery test worker is continued t
 States: DRAFTED. Command: `oracle-lock.mjs create`. Touchpoint: card approval, none under common's
 pre-authorized approval. Refusal: `oracle-lock.mjs create` judges every node again on the current package,
 Bend files, registered sources and card, refuses when one fails or a file changes while it judges, and only
-the scripts write stage.json. The lock still runs card lint itself, so a hand-written
-record skips no check; repair a refusal in the author context.
+the scripts write stage.json. It also refuses a review kind with no return saved for its current input.
+The lock still runs card lint itself, so a hand-written record skips no check; repair a refusal in the author
+context.
 
 1. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
    with card bytes alone first: one card review reads the one input folder step writes outside the run

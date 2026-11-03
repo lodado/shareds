@@ -4,7 +4,8 @@
 // Formal은 패키지(model 단계 완결), 모델(파생·교차검증·적정성·증명·법칙, 같은 입력의 통과는 영수증), 카드(생성 영역 재생성
 // 비교와 lock의 Draft lint), Contract는 승인(User Confirmation과 엄격한 Space)과 카드 lint. 판정은 새로 하지 않고 기존 검사를
 // 부른다. 위치 이름(DISCOVERING~DRAFTED)은 처음 실패하는 노드에서 나오고, 리뷰 노드는 oracle-step.mjs가 그 사이에 끼운다.
-// 잠금(oracle-lock.mjs create)이 유일한 확정이다: 기록한 단계를 믿지 않고 지금 바이트로 결정적 노드를 모두 다시 돈다.
+// 잠금(oracle-lock.mjs create)이 유일한 확정이다: 기록한 단계를 믿지 않고 지금 바이트로 결정적 노드를 모두 다시 돌고, 리뷰마다
+// 지금 입력에 저장된 반환과 멈추지 않은 라운드를 요구한다.
 // stage.json은 잠금 기록(ORACLE_READY와 잠근 바이트의 digest), 프로필(hook이 읽는다), oracle-step.mjs가 남기는 최근 검사
 // (반복 감지)와 리뷰 라운드만 든다. 0.126 기록의 단계·라운드·되감기는 읽지만 위치에 쓰지 않는다. 직접 쓰기는 hook이 막는다.
 
@@ -50,7 +51,7 @@ export function phaseLine(state, next) {
 
 /**
  * 그래프 — 프로필마다 순서대로. 결정적 노드는 실패할 때의 위치 이름(label)을 갖고, 리뷰 노드(review)는 독립 리뷰어의
- * 반환을 기다린다(잠금은 리뷰를 확인하지 않는다). 리뷰는 입력 digest마다 한 라운드다. 조건부 리뷰(conditional: source-aware)는
+ * 반환을 기다린다(잠금은 지금 입력에 저장된 반환을 요구한다). 리뷰는 입력 digest마다 한 라운드다. 조건부 리뷰(conditional: source-aware)는
  * card/policy-sources.md의 계기가 정하므로 저장된 첫 반환이 연다 — 그 전에는 oracle-step.mjs가 조건과 함께 이름만 댄다.
  */
 export const GRAPH = Object.freeze({
@@ -78,7 +79,8 @@ const LEGACY_KINDS = { 'card-review': ['reverse-impossible'] }
 export const roundKinds = (kind) => [kind, ...(LEGACY_KINDS[kind] ?? [])]
 // 리뷰 종류마다 라운드 상한 — 라운드는 새 입력 digest에 대해 저장된 반환 하나다(같은 digest는 라운드를 더하지 않는다)
 export const REVIEW_ROUNDS = 2
-// 같은 실패 목록이 고친 파일 상태 세 개에서 연달아 나오면 oracle-step.mjs가 멈추고 사용자에게 넘긴다(새 상한이 아니라 감지)
+// 같은 실패 목록이 최근 검사 안의 서로 다른 파일 상태 세 개에서 나오면(연달아든 A/B/A/B로 오가든) oracle-step.mjs가 멈추고
+// 사용자에게 넘긴다(새 상한이 아니라 감지)
 export const SAME_ISSUES_STOP = 3
 // 반복 감지에 쓰는 최근 검사 수
 const CHECK_LIMIT = 20
@@ -811,9 +813,14 @@ async function judgedFiles(directory, binding, { contract, pkg, card, timeoutMs 
   if (left.length > 0)
     throw new StageError('STAGE_GATE', `a locked package holds no todo: set or remove (set <pointer> null) ${left.join(', ')} — ${stepHint(directory)}`)
   const pin = contract ? null : await pinOf(directory)
+  // 리뷰도 잠금의 조건이다: 프로필의 리뷰 종류마다 지금 입력에 저장된 반환, 라운드가 멈추지 않았을 것(oracle-step.mjs reviewGate).
+  // 노드를 돌기 전에 읽어 잠글 바이트로 판정하고, 도는 동안 바뀐 파일은 아래 STAGE_STALE이 잡는다
+  const { reviewGate } = await import('./oracle-step.mjs')
+  const reviews = await reviewGate(directory, graphProfile(binding))
   const { nodes } = await evaluateGraph(directory, { binding, deep: true, timeoutMs })
   if (nodes.some(({ issues }) => issues.length > 0))
     throw new StageError('STAGE_GATE', `the lock judged the current files: ${nodeIssuesText(nodes)} — ${stepHint(directory)}`)
+  if (reviews.length > 0) throw new StageError('STAGE_GATE', `the lock waits for the reviews: ${reviews.join(' · ')} — ${stepHint(directory)}`)
   const [pkgAfter, cardAfter] = await Promise.all([packageBytes(directory), cardBytes(directory)])
   const pinAfter = contract ? null : await pinOf(directory)
   if (sha256(pkgAfter ?? '') !== sha256(pkg ?? '') || sha256(cardAfter ?? '') !== sha256(card ?? '') || pinAfter !== pin)
@@ -884,13 +891,17 @@ export function issuesDigest(nodes) {
   return failed.length > 0 ? sha256(stableStringify(failed)) : null
 }
 
-/** 최근 검사 끝에서 같은 실패 목록이 연달아 나온 서로 다른 파일 상태 수 — SAME_ISSUES_STOP이면 멈출 때다. */
+/**
+ * 마지막 검사의 실패 목록이 나온 서로 다른 파일 상태 수 — 최근 검사(CHECK_LIMIT) 중 같은 노드가 실패하는 마지막 구간에서 센다.
+ * 그 노드의 두 목록을 오가는 A/B/A/B도 멈추고, 모두 통과하거나 다른 노드가 실패한 검사(진전)에서 새로 센다.
+ * SAME_ISSUES_STOP이면 멈출 때다.
+ */
 export function sameIssuesRun(checks = []) {
   const last = checks.at(-1)
   if (!last?.issues) return 0
-  const files = new Set()
-  for (let index = checks.length - 1; index >= 0 && checks[index].issues === last.issues; index -= 1) files.add(checks[index].files)
-  return files.size
+  const recent = checks.slice(-CHECK_LIMIT)
+  const from = recent.findLastIndex((check) => !check.issues || check.node !== last.node) + 1
+  return new Set(recent.slice(from).filter((check) => check.issues === last.issues).map((check) => check.files)).size
 }
 
 /**
@@ -911,7 +922,7 @@ export async function reviewRounds(directory, record, kind) {
  * (파일 상태, 실패 목록)이 바뀌면 검사에 한 줄(같으면 마지막 줄의 다음 걸음만 고친다), 저장된 리뷰 반환은 (종류, digest)마다
  * 한 줄. 잠근 기록은 건드리지 않는다.
  */
-export async function recordCheck(directory, { binding, label, files, issues, next, reviews = [] }) {
+export async function recordCheck(directory, { binding, label, files, issues, node = null, next, reviews = [] }) {
   return withDirectoryLock(directory, 'stage', async () => {
     const found = await readStage(directory)
     if (found?.stage === 'ORACLE_READY') return found
@@ -922,7 +933,7 @@ export async function recordCheck(directory, { binding, label, files, issues, ne
     const checks = record.checks ?? []
     const last = checks.at(-1)
     const same = last?.files === files && last?.issues === issues
-    record.checks = [...(same ? checks.slice(0, -1) : checks), { files, issues, label, next, at: same ? last.at : at }].slice(-CHECK_LIMIT)
+    record.checks = [...(same ? checks.slice(0, -1) : checks), { files, issues, node, label, next, at: same ? last.at : at }].slice(-CHECK_LIMIT)
     for (const review of reviews) {
       const known = record.reviews ?? []
       if (!known.some((entry) => entry.kind === review.kind && entry.digest === review.digest)) record.reviews = [...known, { kind: review.kind, digest: review.digest, at }]
@@ -936,11 +947,14 @@ export async function recordCheck(directory, { binding, label, files, issues, ne
 
 /** 같은 실패가 세 번 고친 뒤에도 돌아왔을 때의 다음 걸음 — 사용자의 결정이다. */
 export const STOP_NEXT = 'NEEDS_DECISION: the same issues came back after three edits: stop and report them to the user'
+/** 리뷰 라운드가 끝났는데 결론이 나지 않았을 때(2라운드 뒤 입력 변경, 2라운드 반환의 막는 지적, 세 번째 반환) — 사용자의 결정이다. */
+export const REVIEW_STOP_NEXT = 'NEEDS_DECISION: a review ran its 2 rounds unsettled: stop and report its findings to the user, never a third round'
 
-/** 검사가 남긴 다음 걸음(step·lock·stop)의 명령. */
+/** 검사가 남긴 다음 걸음(step·lock·stop·review-stop)의 명령. */
 function nextCommand(key, dir) {
   if (key === 'lock') return `oracle-lock.mjs create --oracle ${dir}/oracle.md --lock ${dir}/oracle.lock.json --source <approved-source>`
   if (key === 'stop') return STOP_NEXT
+  if (key === 'review-stop') return REVIEW_STOP_NEXT
   return `oracle-step.mjs --dir ${dir}`
 }
 

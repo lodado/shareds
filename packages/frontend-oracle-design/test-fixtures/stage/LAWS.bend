@@ -49,9 +49,13 @@ law stop_on_third:
 law no_stop_on_second:
   {M.Graph.stops(M.Graph.run_all([M.Start{M.Formal{}}, M.Edit{M.BendFiles{}, M.Breaks{}}, M.Step{}, M.Edit{M.BendFiles{}, M.Keeps{}}, M.Step{}], M.Graph.init())) == False{} : Bool}
 
-# After two card review rounds a changed card asks for no third: the next is the lock
+# After two card review rounds a changed card asks for no third and is not locked unreviewed: the next is the stop
 law no_third_round:
-  {M.Graph.hint_is(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}], M.Graph.init()), 1n) == True{} : Bool}
+  {M.Graph.hint_is(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}], M.Graph.init()), 2n) == True{} : Bool}
+
+# ... and the lock refuses it
+law no_lock_after_unread_repair:
+  {M.Graph.ok(M.Graph.decide(M.Graph.run_all([M.Start{M.Formal{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}, M.Save{}, M.Edit{M.CardText{}, M.Keeps{}}, M.Step{}], M.Graph.init()), M.Lock{})) == False{} : Bool}
 
 # A return saved again for the same input is the same round
 law same_input_one_round:

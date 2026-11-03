@@ -52,7 +52,7 @@ test('[bend] the authoring graph laws are proven by the kernel: cells, witnesses
   assert.equal(reached.status, 'proven', reach.stdout.slice(0, 2000))
   assert.deepEqual(
     { domain: reached.domain, reachable: reached.reachable, diameter: reached.diameter },
-    { domain: { states: 4204, events: 18, cells: 75672 }, reachable: 730, diameter: 15 },
+    { domain: { states: 4204, events: 18, cells: 75672 }, reachable: 728, diameter: 15 },
   )
 })
 

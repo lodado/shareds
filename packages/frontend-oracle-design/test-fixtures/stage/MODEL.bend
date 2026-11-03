@@ -4,7 +4,8 @@ import Base
 # recordCheck, briefStatus) and of the lock that judges it (`oracle-lock.mjs create`). No record says where the
 # authoring is: each step evaluates the deterministic nodes in the profile's order on the files as they are, up to
 # the first failing one, and records one check (the files digest, the issue list, the label and the next). Editing
-# is free; the lock is the only commit and judges every deterministic node on the bytes it reads.
+# is free; the lock is the only commit and judges every deterministic node on the bytes it reads and every review:
+# each one needs a return saved for the input it reads now.
 #
 # State, as the commands read it:
 # - Blank: no package and no card yet. Start{prof} is the first write (intake).
@@ -16,10 +17,13 @@ import Base
 # - ContractAt: q the confirmation node (the user's approval, its source and the strict Space), k the card lint, c
 #   the cold-read review (first in the Contract graph), seen.
 # - Rev: the rounds a review ran (saved returns for distinct input digests, REVIEW_ROUNDS = 2) and whether a return
-#   is saved for the input it reads now. Step asks for a review that has none for its input and fewer than 2 rounds.
-# - Seen: no check recorded; the last check is of these files (Now) with the run of the same non-empty issue list
-#   over distinct file states the checks end with (sameIssuesRun, saturating at SAME_ISSUES_STOP = 3); files changed
-#   since, giving the issue list it recorded (Since) or another one (Moved).
+#   is saved for the input it reads now. Step asks for a review that has none for its input and fewer than 2 rounds;
+#   one with 2 rounds and none for its input (Stale2: a repair no reviewer read) stops it (NEEDS_DECISION).
+# - Seen: no check recorded; the last check is of these files (Now) with the count of distinct file states its
+#   non-empty issue list shows on in the recent checks where the same node fails (sameIssuesRun, saturating at
+#   SAME_ISSUES_STOP = 3; a pass or another failing node starts it again, and the model's edits never bring an issue
+#   list of the same node back, so these are the states the checks end with); files changed since, giving the issue list
+#   it recorded (Since) or another one (Moved).
 # - Locked{prof}: stage.json at ORACLE_READY with the lock file; Drifted: a locked byte changed since the lock.
 #
 # Parts an edit touches. Each node has one owning part; an edit fixes the nodes its part owns (they pass), breaks the
@@ -32,7 +36,9 @@ import Base
 #   the card review's input.
 # - Approval (Contract: the User Confirmation section) owns q; the card review reads the card without it.
 #
-# Left out: an edit that brings back bytes or issues seen before (the model's edits are always new bytes); several
+# Left out: a return that still holds a blocker (every saved return is clear; a round-2 one with a blocker stops step
+# and the lock the way Stale2 does), a third saved return; an edit that brings back bytes or issues seen before (the
+# model's edits are always new bytes); several
 # edits between two checks (`enabled` allows one); a return saved after its input changed (it counts a round on disk
 # but answers no current input); card lint issues the generated region raises; the Formal approval (the card the
 # trace starts from is approved; withdrawing it is left out); a stage.json written by hand; the Delivery run after
@@ -316,6 +322,14 @@ def Graph.staled(+r: Rev) -> Rev:
     case _:
       r
 
+# its rounds ended unsettled: two rounds and no return for the input it reads now
+def Graph.stuck(r: Rev) -> Bool:
+  match r:
+    case Stale2{}:
+      True{}
+    case _:
+      False{}
+
 def Graph.left(r: Rev) -> Nat:
   match r:
     case NoRound{}:
@@ -496,6 +510,17 @@ def Graph.wanted_a(p: Health, a: Rev) -> Bool:
 def Graph.wanted_fc(p: Health, m: Health, k: Health, c: Rev) -> Bool:
   Bool.and(Graph.good(p), Bool.and(Graph.good(m), Bool.and(Graph.good(k), Graph.wantable(c))))
 
+# a review before the first failing node whose rounds ended unsettled: step stops on it
+def Graph.stuck_a(p: Health, a: Rev) -> Bool:
+  Bool.and(Graph.good(p), Graph.stuck(a))
+
+def Graph.stuck_fc(p: Health, m: Health, k: Health, c: Rev) -> Bool:
+  Bool.and(Graph.good(p), Bool.and(Graph.good(m), Bool.and(Graph.good(k), Graph.stuck(c))))
+
+# every review has a return saved for the input it reads now (Formal: the analyst and the card review)
+def Graph.formal_reviewed(a: Rev, c: Rev) -> Bool:
+  Bool.and(Graph.is_saved(a), Graph.is_saved(c))
+
 def Graph.formal_failing(p: Health, m: Health, k: Health, proj: Bool) -> Bool:
   Bool.or(Graph.bad(p), Bool.or(Graph.bad(m), Bool.or(Graph.bad(k), Bool.not(proj))))
 
@@ -577,18 +602,39 @@ def Graph.formal_step(+p: Health, +m: Health, +k: Health, proj: Bool, a: Rev, c:
 def Graph.contract_step(+q: Health, +k: Health, c: Rev, seen: Seen) -> Graph:
   ContractAt{q, k, c, Now{Graph.run_after(Bool.not(Graph.drafted(Graph.first2(q, k))), seen)}}
 
+# the last step asked for reviews: it did not stop on the same issues or on a review whose rounds ended unsettled
+def Graph.formal_asks(seen: Seen, +p: Health, +m: Health, +k: Health, +a: Rev, +c: Rev) -> Bool:
+  Bool.and(Graph.asks(seen), Bool.not(Bool.or(Graph.stuck_a(p, a), Graph.stuck_fc(p, m, k, c))))
+
 # a save: the returns step asked for, when the files are still the ones it checked, then the step again
 def Graph.formal_save(+p: Health, +m: Health, +k: Health, proj: Bool, +a: Rev, +c: Rev, +seen: Seen) -> Graph:
-  Graph.formal_step(p, m, k, proj, Graph.save_if(Bool.and(Graph.asks(seen), Graph.wanted_a(p, a)), a), Graph.save_if(Bool.and(Graph.asks(seen), Graph.wanted_fc(p, m, k, c)), c), seen)
+  Graph.formal_step(p, m, k, proj, Graph.save_if(Bool.and(Graph.formal_asks(seen, p, m, k, a, c), Graph.wanted_a(p, a)), a), Graph.save_if(Bool.and(Graph.formal_asks(seen, p, m, k, a, c), Graph.wanted_fc(p, m, k, c)), c), seen)
 
 def Graph.contract_save(+q: Health, +k: Health, +c: Rev, +seen: Seen) -> Graph:
   Graph.contract_step(q, k, Graph.save_if(Bool.and(Graph.asks(seen), Graph.wantable(c)), c), seen)
 
-# a step exits 1 when the check it recorded has a failing node
-def Graph.stepped(+t: Graph) -> Out:
-  Out{Graph.exit_of(Graph.recorded_fail(Graph.seen_of(t))), t}
+# a review before the first failing node ended its rounds unsettled in this state
+def Graph.stuck_in(s: Graph) -> Bool:
+  match s:
+    case FormalAt{+p, +m, +k, proj, +a, +c, seen}:
+      Bool.or(Graph.stuck_a(p, a), Graph.stuck_fc(p, m, k, c))
+    case ContractAt{q, k, c, seen}:
+      Graph.stuck(c)
+    case _:
+      False{}
 
-# the lock judges every deterministic node on the bytes it reads; it reads no review
+# a step exits 1 when the check it recorded has a failing node or it stops on a review whose rounds ended unsettled
+def Graph.stepped(+t: Graph) -> Out:
+  Out{Graph.exit_of(Bool.or(Graph.recorded_fail(Graph.seen_of(t)), Graph.stuck_in(t))), t}
+
+# the lock refuses a failing node or a review with no return saved for its input
+def Graph.formal_refused(p: Health, m: Health, k: Health, proj: Bool, a: Rev, c: Rev) -> Bool:
+  Bool.or(Graph.formal_failing(p, m, k, proj), Bool.not(Graph.formal_reviewed(a, c)))
+
+def Graph.contract_refused(q: Health, k: Health, c: Rev) -> Bool:
+  Bool.or(Graph.contract_failing(q, k), Bool.not(Graph.is_saved(c)))
+
+# the lock judges every deterministic node on the bytes it reads and every review's saved return
 def Graph.lock_out(fail: Bool, prof: Prof, s: Graph) -> Out:
   match fail:
     case True{}:
@@ -623,11 +669,11 @@ def Graph.formal_out(e: Msg, +p: Health, +m: Health, +k: Health, +proj: Bool, +a
     case Step{}:
       Graph.stepped(Graph.formal_step(p, m, k, proj, a, c, seen))
     case Check{}:
-      Out{Graph.exit_of(Graph.formal_failing(p, m, k, proj)), FormalAt{p, m, k, proj, a, c, seen}}
+      Out{Graph.exit_of(Graph.formal_refused(p, m, k, proj, a, c)), FormalAt{p, m, k, proj, a, c, seen}}
     case Save{}:
       Graph.stepped(Graph.formal_save(p, m, k, proj, a, c, seen))
     case Lock{}:
-      Graph.lock_out(Graph.formal_failing(p, m, k, proj), Formal{}, FormalAt{p, m, k, proj, a, c, seen})
+      Graph.lock_out(Graph.formal_refused(p, m, k, proj, a, c), Formal{}, FormalAt{p, m, k, proj, a, c, seen})
     case Edit{part, how}:
       Out{Exit0{}, Graph.formal_edit(part, how, p, m, k, proj, a, c, seen)}
 
@@ -638,11 +684,11 @@ def Graph.contract_out(e: Msg, +q: Health, +k: Health, +c: Rev, +seen: Seen) -> 
     case Step{}:
       Graph.stepped(Graph.contract_step(q, k, c, seen))
     case Check{}:
-      Out{Graph.exit_of(Graph.contract_failing(q, k)), ContractAt{q, k, c, seen}}
+      Out{Graph.exit_of(Graph.contract_refused(q, k, c)), ContractAt{q, k, c, seen}}
     case Save{}:
       Graph.stepped(Graph.contract_save(q, k, c, seen))
     case Lock{}:
-      Graph.lock_out(Graph.contract_failing(q, k), Contract{}, ContractAt{q, k, c, seen})
+      Graph.lock_out(Graph.contract_refused(q, k, c), Contract{}, ContractAt{q, k, c, seen})
     case Edit{part, how}:
       Out{Exit0{}, Graph.contract_edit(part, how, q, k, c, seen)}
 
@@ -768,19 +814,26 @@ def Graph.step_or_lock(b: Bool) -> Hint:
     case False{}:
       HLock{}
 
-def Graph.hint_now(r: Run, more: Bool) -> Hint:
+def Graph.stop_or(stuck: Bool, more: Bool) -> Hint:
+  match stuck:
+    case True{}:
+      HStop{}
+    case False{}:
+      Graph.step_or_lock(more)
+
+def Graph.hint_now(r: Run, stuck: Bool, more: Bool) -> Hint:
   match r:
     case K3{}:
       HStop{}
     case _:
-      Graph.step_or_lock(more)
+      Graph.stop_or(stuck, more)
 
-# the next the last check recorded when it is of these files (the stop, step while a node fails or a review waits,
-# else the lock); after an edit, step
-def Graph.hint_at(s: Seen, more: Bool) -> Hint:
+# the next the last check recorded when it is of these files (the stop on a third state with the same issues or on a
+# review whose rounds ended unsettled, step while a node fails or a review waits, else the lock); after an edit, step
+def Graph.hint_at(s: Seen, stuck: Bool, more: Bool) -> Hint:
   match s:
     case Now{r}:
-      Graph.hint_now(r, more)
+      Graph.hint_now(r, stuck, more)
     case _:
       HStep{}
 
@@ -789,9 +842,9 @@ def Graph.hint(s: Graph) -> Hint:
     case Blank{}:
       HStep{}
     case FormalAt{+p, +m, +k, proj, +a, +c, seen}:
-      Graph.hint_at(seen, Bool.or(Bool.not(Graph.drafted(Graph.first3(p, m, k))), Bool.or(Graph.wanted_a(p, a), Graph.wanted_fc(p, m, k, c))))
-    case ContractAt{+q, +k, c, seen}:
-      Graph.hint_at(seen, Bool.or(Bool.not(Graph.drafted(Graph.first2(q, k))), Graph.wantable(c)))
+      Graph.hint_at(seen, Bool.or(Graph.stuck_a(p, a), Graph.stuck_fc(p, m, k, c)), Bool.or(Bool.not(Graph.drafted(Graph.first3(p, m, k))), Bool.or(Graph.wanted_a(p, a), Graph.wanted_fc(p, m, k, c))))
+    case ContractAt{+q, +k, +c, seen}:
+      Graph.hint_at(seen, Graph.stuck(c), Bool.or(Bool.not(Graph.drafted(Graph.first2(q, k))), Graph.wantable(c)))
     case Locked{prof}:
       HInit{}
     case Drifted{}:
@@ -994,18 +1047,28 @@ def Graph.waits(s: Graph) -> Bool:
     case _:
       False{}
 
+# every review has a return saved for the input it reads now
+def Graph.reviewed(s: Graph) -> Bool:
+  match s:
+    case FormalAt{p, m, k, proj, a, c, seen}:
+      Graph.formal_reviewed(a, c)
+    case ContractAt{q, k, c, seen}:
+      Graph.is_saved(c)
+    case _:
+      False{}
+
 # step asked for the review in a state whose last check is of these files and did not stop
 def Graph.asked_a(s: Graph) -> Bool:
   match s:
-    case FormalAt{+p, m, k, proj, +a, c, seen}:
-      Bool.and(Graph.asks(seen), Graph.wanted_a(p, a))
+    case FormalAt{+p, +m, +k, proj, +a, +c, seen}:
+      Bool.and(Graph.formal_asks(seen, p, m, k, a, c), Graph.wanted_a(p, a))
     case _:
       False{}
 
 def Graph.asked_c(s: Graph) -> Bool:
   match s:
-    case FormalAt{+p, +m, +k, proj, a, +c, seen}:
-      Bool.and(Graph.asks(seen), Graph.wanted_fc(p, m, k, c))
+    case FormalAt{+p, +m, +k, proj, +a, +c, seen}:
+      Bool.and(Graph.formal_asks(seen, p, m, k, a, c), Graph.wanted_fc(p, m, k, c))
     case ContractAt{q, k, +c, seen}:
       Bool.and(Graph.asks(seen), Graph.wantable(c))
     case _:
@@ -1156,13 +1219,14 @@ def Graph.all_pass(s: Graph) -> Bool:
 
 # ---- the laws: Q(s, e, t, o) with t = step(s, e) and o = decide(s, e)
 # Q_lock_judges: on an open oracle the lock is accepted exactly when every deterministic node passes (a projection the
-# package changed after fails the card), and then the oracle is locked under its profile; a refused lock writes nothing
+# package changed after fails the card) and every review has a return saved for its current input, and then the oracle
+# is locked under its profile; a refused lock writes nothing
 def Graph.Q_lock_judges(+s: Graph, +e: Msg, +t: Graph, +o: Exit) -> Bool:
-  Graph.imp(Bool.and(Graph.is_lock(e), Graph.is_open(s)), Bool.and(Graph.iff(Graph.ok(o), Graph.all_pass(s)), Bool.and(Graph.imp(Graph.ok(o), Graph.locked_as(t, Graph.prof_of(s))), Graph.imp(Bool.not(Graph.ok(o)), Graph.same(s, t)))))
+  Graph.imp(Bool.and(Graph.is_lock(e), Graph.is_open(s)), Bool.and(Graph.iff(Graph.ok(o), Bool.and(Graph.all_pass(s), Graph.reviewed(s))), Bool.and(Graph.imp(Graph.ok(o), Graph.locked_as(t, Graph.prof_of(s))), Graph.imp(Bool.not(Graph.ok(o)), Graph.same(s, t)))))
 
-# Q_lock_only: only an accepted lock of an open oracle whose every node passes locks it
+# Q_lock_only: only an accepted lock of an open oracle whose every node passes and every review is answered locks it
 def Graph.Q_lock_only(+s: Graph, +e: Msg, +t: Graph, o: Exit) -> Bool:
-  Graph.imp(Bool.and(Bool.not(Graph.is_locked(s)), Graph.is_locked(t)), Bool.and(Graph.is_lock(e), Bool.and(Graph.is_open(s), Graph.all_pass(s))))
+  Graph.imp(Bool.and(Bool.not(Graph.is_locked(s)), Graph.is_locked(t)), Bool.and(Graph.is_lock(e), Bool.and(Graph.is_open(s), Bool.and(Graph.all_pass(s), Graph.reviewed(s)))))
 
 # Q_check_reads: --check writes nothing, and on an open oracle it fails exactly when the lock would be refused
 def Graph.Q_check_reads(+s: Graph, +e: Msg, +t: Graph, +o: Exit) -> Bool:
@@ -1186,9 +1250,10 @@ def Graph.first_ok(+t: Graph) -> Bool:
       False{}
 
 # Q_next_first: a step (or a save, which runs it) records the first failing node of the profile's order; it exits 1
-# exactly when a node fails and names the lock exactly when no node fails and no review step asks for waits
+# exactly when a node fails or a review ended its rounds unsettled, and names the lock exactly when no node fails, no review step asks for waits and no review
+# ended its rounds unsettled
 def Graph.Q_next_first(+s: Graph, +e: Msg, +t: Graph, +o: Exit) -> Bool:
-  Graph.imp(Bool.and(Graph.reruns(e), Graph.is_open(s)), Bool.and(Graph.first_ok(t), Bool.and(Graph.iff(Graph.ok(o), Bool.not(Graph.step_fail(t))), Graph.iff(Graph.hint_is(t, 1n), Bool.and(Bool.not(Graph.step_fail(t)), Bool.not(Graph.waits(t)))))))
+  Graph.imp(Bool.and(Graph.reruns(e), Graph.is_open(s)), Bool.and(Graph.first_ok(t), Bool.and(Graph.iff(Graph.ok(o), Bool.not(Bool.or(Graph.step_fail(t), Graph.stuck_in(t)))), Graph.iff(Graph.hint_is(t, 1n), Bool.and(Bool.not(Graph.step_fail(t)), Bool.and(Bool.not(Graph.waits(t)), Bool.not(Graph.stuck_in(t))))))))
 
 # Q_edit_local: an edit changes the node its part owns as it says and no other node; it takes the return away from
 # exactly the reviews whose input the part feeds, keeping their rounds; only a package or Bend edit stales the
@@ -1203,9 +1268,10 @@ def Graph.Q_rounds(+s: Graph, +e: Msg, +t: Graph, o: Exit) -> Bool:
   Graph.imp(Bool.and(Graph.is_open(s), Graph.is_open(t)), Bool.and(Graph.rounds_ok(Graph.rev_a(s), Graph.rev_a(t), Graph.is_save(e), Graph.asked_a(s)), Graph.rounds_ok(Graph.rev_c(s), Graph.rev_c(t), Graph.is_save(e), Graph.asked_c(s))))
 
 # Q_stop_third: a step (or save) records the run of the same issue list over distinct file states, and names the stop
-# exactly when it reaches 3: the same issues on a third distinct file state stop it, and nothing earlier does
+# exactly when it reaches 3 or a review ended its rounds unsettled: the same issues on a third distinct file state stop
+# it, a review input changed after its second round stops it, and nothing else does
 def Graph.Q_stop_third(+s: Graph, +e: Msg, +t: Graph, o: Exit) -> Bool:
-  Graph.imp(Bool.and(Graph.reruns(e), Graph.is_open(s)), Bool.and(Nat.is_eq(Graph.now_run(Graph.seen_of(t)), Graph.run_expected(Graph.seen_of(s), Graph.step_fail(t))), Bool.and(Graph.is_now(Graph.seen_of(t)), Graph.iff(Graph.stops(t), Nat.is_eq(Graph.now_run(Graph.seen_of(t)), 3n)))))
+  Graph.imp(Bool.and(Graph.reruns(e), Graph.is_open(s)), Bool.and(Nat.is_eq(Graph.now_run(Graph.seen_of(t)), Graph.run_expected(Graph.seen_of(s), Graph.step_fail(t))), Bool.and(Graph.is_now(Graph.seen_of(t)), Graph.iff(Graph.stops(t), Bool.or(Nat.is_eq(Graph.now_run(Graph.seen_of(t)), 3n), Graph.stuck_in(t))))))
 
 # Q_refused_keeps: a refused lock or check writes nothing
 def Graph.Q_refused_keeps(+s: Graph, +e: Msg, +t: Graph, +o: Exit) -> Bool:

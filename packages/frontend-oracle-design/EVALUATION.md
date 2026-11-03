@@ -1,3 +1,90 @@
+# 0.130.1: an independent review's findings on 0.130.0, fixed
+
+## Why
+
+An independent review of 0.127.0–0.130.0 found three major gaps (round 2 could demote a security or regression
+finding, the lock took a card whose reviews were never saved or were left unsettled, and an alternating issue list
+never stopped step), four minor ones and two nits. All are fixed here; none is carried over.
+
+## Change
+
+- M1 (oracle-iterations.mjs `securityBlocker`, `witnessedFindings`; oracle-verify.mjs `findingsResult`): the
+  confirm class runs before the verdict filter. A finding whose `category` (or `confirm.category`) is security,
+  permission or data-loss at critical/high severity blocks on any row; a backed round-2 claim (previous, regression,
+  security) blocks without `wrongPasses`, since round 2 is the only place a repair regression is caught.
+  subagent-review.md says both.
+- M2 (oracle-step.mjs `reviewGate`, `missingReturns`, `roundsStop`; oracle-stage.mjs `judgedFiles`,
+  `REVIEW_STOP_NEXT`): the lock refuses (`STAGE_GATE`) while a review kind of the profile has no return saved for
+  its current input. It reads the reviews before it runs the nodes, so they are judged on the bytes it snapshots
+  (a file changed while it judges is still `STAGE_STALE`), and names a failing node before a missing return. Step stops
+  (`NEEDS_DECISION`, exit 1, position decision) when a kind ran its 2 rounds and its input changed since, when the
+  round-2 return still holds a line opening `BLOCKING` (JSON: a `blocking` array), or when a third return is saved.
+  The round-2 instruction names that convention. The authoring reference model (test-fixtures/stage MODEL.bend)
+  adds the stuck round (`Stale2`): the lock refuses it, step exits 1 on it and a save after it saves nothing; the
+  next and stop laws say so, and LAWS.bend adds `no_lock_after_unread_repair`.
+- M3 (oracle-stage.mjs `sameIssuesRun`, `recordCheck`): each check records its first failing node, and the stop
+  counts the distinct file states carrying the last issue list in the recent checks (CHECK_LIMIT) where that same
+  node fails, so A/B/A/B on one node stops on the third A state. A pass or another failing node starts the count
+  again: counting across them (the whole window) made step stop where the authoring reference model does not (a
+  fix that brings back a later node's list, a defect broken again after a fix), and the model cannot track every
+  list's count.
+- m1 (oracle-step.mjs `contractBlank`, `--profile`; oracle-cards.mjs `contract-intake`): a blank folder bound to
+  Contract (`--profile contract/v1` or its stage record) gets the Contract intake card and no package, model or
+  Space discovery file. contract/confirmation-lock.md names the flag.
+- m2 (oracle-transition-guards.mjs `bindingCounted`; oracle-run.mjs): `BUDGET_EXHAUSTED` in the status packet uses
+  the free/bindings test `assertHarnessBudget` uses, so rebinding a counted or free harness is not shown as
+  exhausted.
+- m3 (oracle-transition-guards.mjs `reviewProbes`): after the first IMPLEMENTED_GREEN, a non-worker failing run on
+  production that passed before, or one whose next run restores the earlier production, is a review probe and no
+  product round.
+- m4 (oracle-step.mjs `translationSay`, `translationReviewed`; oracle-schema.mjs): after 2 translation rounds step
+  names `crossCheck.reviewedBy {"agent":"user","source":…,"inputDigest":…}`; it clears `cross-check-unreviewed`
+  without counting as a round, and a user record without `source` is a package issue. discovery.md says so.
+- nit1: the four dispatch skills and the Contract entry drop "First tool call after activation is"; the reads stay.
+  Contract item 4 says approval goes in the card's User Confirmation before the lock. SKILL.md,
+  controller-entry-formal.md and reference-graph.json write the header as `nodes=[node ids actually Read so far,
+[] before any]`, true for a first response that has read nothing before step. evals.json is unchanged: its
+  expectations grade the nodes listed in the run's last response.
+- nit2: `--label` is quoted with `sh()` in step's command text and pre-RED review.
+
+Measured, 0.130.0 → 0.130.1:
+
+- Role bundles: review 61,918 → 61,918 (cap 62,000). Formal Delivery closure grows by at most 698 B (from 443,066;
+  cap 446,000).
+- Cards: Contract intake 1,381 (new), Contract authoring 1,747 → 1,905, review 3,313 → 3,387.
+- Dispatch SKILL.md files −36 B each; Contract SKILL.md 4,749 → 4,763.
+- Authoring reference model: domain 4,204 × 18, reachable 730 → 728 (a save after a stuck review saves nothing),
+  diameter 15; conformance replays 16 traces, 440 events covering all 275 (view, event) items (from 19 traces, 393
+  events, 253 items).
+
+Verdicts that change: a high/critical security, permission or data-loss finding blocks on any row; a backed round-2
+regression or security finding blocks without a wrong pass; the lock refuses unsaved or unsettled reviews; step
+stops on an A/B/A/B issue run of one node; a post-GREEN review probe no longer spends the product budget; a counted harness
+rebind is no longer reported exhausted.
+
+## Tests
+
+- New: oracle-stage.test "the same issues on a third distinct file state stop step even when another issue list of
+  the same node comes between them (A/B/A/B)"; oracle-transition-guards.test "product spend counts fix rounds, not the review
+  probes after GREEN that are meant to fail"; LAWS.bend `no_lock_after_unread_repair`.
+- Extended: oracle-verify.test (a permission/high finding on a non-claimed row blocks; a medium one stays a
+  proposal); oracle-run.cases round-2 confirm classes (backed regression and security without `wrongPasses`) and
+  O11 derived budgets (counted helper shows no `BUDGET_EXHAUSTED`, a new one does); oracle-step.cases checkParity
+  (state "no reviews" is refused), scaffoldFirst (a Contract blank folder gets the Contract card and no file) and
+  translationRounds (the user record with and without `source`).
+- Fixtures given returns (the gate is unchanged): test-fixtures/saved-reviews.mjs `saveCleanReturns` (and a
+  synchronous form) writes a clean return at each path `missingReturns` names, right before a fixture's lock. Used by
+  oracle-lock.test, oracle-stage.test and the package tests contract-evidence, contract-profile,
+  contract-public-runner, contract-stale-search, contract-tway, modular-guard, profile-packets and
+  profile-public-failures, whose locks the gate refused with no saved return.
+- Changed on purpose: oracle-step.cases noThirdRound and legacyCardRounds pinned the lock after an unread round-2
+  repair; they now expect the review stop and a refused lock, plus the round-2 blocker and third-return cases.
+  cardInventory asserted that Contract has no intake card; it now asserts the `contract-intake` card. LAWS.bend
+  `no_third_round` expects the stop hint. The authoring conformance counts (states, items, traces, events) are re-pinned to the new model.
+  No skill-contract pin moved: none pinned the removed words, and controller-formal.md keeps the pinned lock
+  sentence and adds the review refusal after it.
+- Deleted: none.
+
 # 0.130.0: the controller reads one page, then only the card step prints for its position
 
 ## Why
