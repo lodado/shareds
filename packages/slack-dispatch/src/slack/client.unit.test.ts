@@ -174,6 +174,42 @@ describe('createSlackClient as the reader of what the owner can see', () => {
     )
     expect(seen[0]?.authorization).toBe(`Bearer ${tokens.user}`)
   })
+
+  it('to be every page of a long thread, following the cursor until Slack stops giving one', async () => {
+    const { fetchImpl, seen } = fakeFetch([
+      ok({ messages: [{ ts: '1.1', user: 'U1', text: 'root' }], response_metadata: { next_cursor: 'abc=' } }),
+      ok({ messages: [{ ts: '1.2', user: 'U2', text: 'later' }], response_metadata: { next_cursor: '' } }),
+    ])
+    const replies = await createSlackClient(tokens, { fetchImpl }).threadReplies('C1', '1.1', 1)
+    expect(replies.map((reply) => reply.ts)).toStrictEqual(['1.1', '1.2'])
+    expect(new URLSearchParams(seen[0]?.body).has('cursor')).toBe(false)
+    expect(new URLSearchParams(seen[1]?.body).get('cursor')).toBe('abc=')
+  })
+
+  it('to be the root once when a later page repeats it', async () => {
+    const { fetchImpl } = fakeFetch([
+      ok({ messages: [{ ts: '1.1', user: 'U1', text: 'root' }], response_metadata: { next_cursor: 'abc=' } }),
+      ok({
+        messages: [
+          { ts: '1.1', user: 'U1', text: 'root' },
+          { ts: '1.2', user: 'U2', text: 'later' },
+        ],
+      }),
+    ])
+    const replies = await createSlackClient(tokens, { fetchImpl }).threadReplies('C1', '1.1', 2)
+    expect(replies.map((reply) => reply.ts)).toStrictEqual(['1.1', '1.2'])
+  })
+
+  it('to stop at a cursor that leads to an empty page', async () => {
+    const { fetchImpl, seen } = fakeFetch([
+      ok({ messages: [{ ts: '1.1', user: 'U1', text: 'root' }], response_metadata: { next_cursor: 'abc=' } }),
+      ok({ messages: [], response_metadata: { next_cursor: 'abc=' } }),
+      ok({ messages: [{ ts: '1.9', user: 'U1', text: 'never read' }] }),
+    ])
+    const replies = await createSlackClient(tokens, { fetchImpl }).threadReplies('C1', '1.1')
+    expect(replies.map((reply) => reply.ts)).toStrictEqual(['1.1'])
+    expect(seen).toHaveLength(2)
+  })
 })
 
 describe('createSlackClient as the writer of the DMs', () => {

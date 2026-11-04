@@ -18,6 +18,7 @@ const REASON_TEXT: Record<SkipReason, string> = {
   answered: '이미 직접 답함',
   unreadable: '읽을 권한이 없는 대화',
   known: '이전 알림에 이미 있음',
+  retold: '진행 중인 항목이 있어 DM으로만 알림',
 }
 
 // A link text must not close the link, open another one or make a mention.

@@ -20,7 +20,7 @@ import { catchUp } from '../ingest/catch-up.ts'
 import { ingestMentions } from '../ingest/ingest.ts'
 import { listRepos } from '../orca/repos.ts'
 import { startSocket } from '../socket/socket.ts'
-import { logEvent, stageCounts } from '../store/store.ts'
+import { lastSystemEventAt, logEvent, stageCounts } from '../store/store.ts'
 import { cancelOrphanRuns, countActiveRuns, getWorkspace } from '../store/work.ts'
 import { ingestIssues, loadIssueText, parseIssueSourceKey } from '../usecases/ingest-issues.ts'
 import { createWorker, retriesLeft } from '../work/worker.ts'
@@ -98,6 +98,28 @@ function startOfDay(now: Date, daysBack: number): Date {
   return new Date(day.getTime() - daysBack * DAY_MS)
 }
 
+// The pass looks back this far past the last good one, so a tag that Slack's search showed late is not missed.
+const CATCH_UP_OVERLAP_MS = 10 * 60_000
+// And never further than this, so a machine that was off for a month does not read a month of tags at once.
+const MAX_CATCH_UP_DAYS = 7
+// A pause between two good passes longer than this is told to the owner.
+const GAP_NOTICE_MS = 30 * 60_000
+const POLL_RETRY_FROM_MS = 30_000
+
+// From which moment a pass has to look for tags: the start of today (or of the days the owner asked for), or earlier when
+// the last good pass was before that, as after a night with the machine off.
+export function pollSince(now: Date, ingestDays: number, lastGood: Date | null): Date {
+  const wanted = startOfDay(now, ingestDays)
+  if (lastGood === null) return wanted
+  const floor = startOfDay(now, MAX_CATCH_UP_DAYS)
+  const resume = new Date(Math.max(lastGood.getTime() - CATCH_UP_OVERLAP_MS, floor.getTime()))
+  return resume.getTime() < wanted.getTime() ? resume : wanted
+}
+
+const pad = (n: number): string => String(n).padStart(2, '0')
+const momentText = (at: Date): string =>
+  `${at.getMonth() + 1}/${at.getDate()} ${pad(at.getHours())}:${pad(at.getMinutes())}`
+
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 // The status address is a convenience: a port that is taken must not keep the service from running.
@@ -132,7 +154,17 @@ export async function createApp(deps: AppDeps): Promise<App> {
   // Nothing from an earlier process is still running, so runs it left in progress are called off first, each charged
   // the most it could have spent.
   cancelOrphanRuns(store, { plan: settings.planBudgetUsd, build: settings.buildBudgetUsd })
-  let repos = await listRepos(run)
+  // Orca only lists the repos. Closed, it does not stop the search for tags: the list stays as it was (empty at the
+  // start), and the next pass asks again.
+  let repos: Awaited<ReturnType<typeof listRepos>> = []
+  const refreshRepos = async (): Promise<void> => {
+    try {
+      repos = await listRepos(run)
+    } catch (error) {
+      reportError('orca')(error)
+    }
+  }
+  await refreshRepos()
   const repoPath = (name: string): Promise<string | undefined> =>
     Promise.resolve(repos.find((repo) => repo.name === name)?.path)
 
@@ -230,7 +262,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
   // The tracker cannot call in, so it is asked more often than Slack is. A new issue sends its digest right away
   // instead of waiting for the next mention pass.
   const pollIssues = async (): Promise<void> => {
-    if (repos.length === 0) repos = await listRepos(run)
+    if (repos.length === 0) await refreshRepos()
     const since = startOfDay(deps.now(), config.ingestDays)
     await serial(async () => {
       if ((await ingestTrackerIssues(since)) > 0) await ingestMentions(ingestDeps(), { since, dryRun: false })
@@ -238,27 +270,65 @@ export async function createApp(deps: AppDeps): Promise<App> {
   }
 
   // What the status address says about polling.
-  const poll: { at: string | null; error: string | null } = { at: null, error: null }
+  // `goodAt` is the end of the last pass that read every thread it found; the next pass looks back from there.
+  const poll: { at: string | null; error: string | null; failures: number; goodAt: Date | null } = {
+    at: null,
+    error: null,
+    failures: 0,
+    goodAt: null,
+  }
+  // A pause longer than this between two good passes is told to the owner: a few polling intervals, and not less than
+  // half an hour, so a slow pass or a short sleep is not taken for a night with the machine off.
+  const gapNoticeMs = Math.max(GAP_NOTICE_MS, 3 * config.pollIntervalMs)
+
+  // The owner is told when the service was not polling for a while (the Mac was off or asleep, the network was down),
+  // and from when the pass looked again.
+  const tellGap = async (from: Date, to: Date, since: Date): Promise<void> => {
+    try {
+      const channel = await slack.openDm(ownerId)
+      const text =
+        `${momentText(from)}부터 ${momentText(to)}까지 태그를 확인하지 못했어요 ` +
+        `(맥이 꺼졌거나 네트워크가 끊겼을 수 있어요). ${momentText(since)}부터의 태그를 다시 찾아봤어요.`
+      await slack.postMessage({ channel, text })
+    } catch (error) {
+      reportError('gap_notice')(error)
+    }
+  }
+
   const pollMentions = async (): Promise<void> => {
     try {
-      repos = await listRepos(run)
-      const since = startOfDay(deps.now(), config.ingestDays)
-      await serial(async () => {
+      await refreshRepos()
+      const startedAt = deps.now()
+      const lastGood = poll.goodAt ?? lastSystemEventAt(store, 'poll_ok')
+      const since = pollSince(startedAt, config.ingestDays, lastGood)
+      const summary = await serial(async () => {
         // The tracker's issues go in first, so the digest the mention pass sends lists them with the mentions.
         await ingestTrackerIssues(since)
         return ingestMentions(ingestDeps(), { since, dryRun: false })
       })
       poll.at = deps.now().toISOString()
       poll.error = null
+      poll.failures = 0
+      if (summary.failedThreads > 0) {
+        // A thread that could not be read stays inside the window of the next pass.
+        logEvent(store, { kind: 'system', type: 'poll_partial', payload: { failedThreads: summary.failedThreads } })
+        return
+      }
+      poll.goodAt = deps.now()
+      logEvent(store, { kind: 'system', type: 'poll_ok', payload: {} })
+      if (lastGood !== null && startedAt.getTime() - lastGood.getTime() > gapNoticeMs) {
+        await tellGap(lastGood, startedAt, since)
+      }
     } catch (error) {
       poll.error = describeError(error)
+      poll.failures += 1
       throw error
     }
   }
 
   const stops = [
     every(deps.tickMs ?? DEFAULT_TICK_MS, () => worker.tick(), reportError('worker_tick')),
-    every(config.pollIntervalMs, pollMentions, reportError('poll')),
+    every(config.pollIntervalMs, pollMentions, reportError('poll'), { retryFromMs: POLL_RETRY_FROM_MS }),
     ...(tracker === undefined ? [] : [every(config.issuePollIntervalMs, pollIssues, reportError('issue_poll'))]),
   ]
 
@@ -270,6 +340,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
     activeRuns: countActiveRuns(store),
     lastPollAt: poll.at,
     lastPollError: poll.error,
+    consecutivePollFailures: poll.failures,
   }))
 
   return {

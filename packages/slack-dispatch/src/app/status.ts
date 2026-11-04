@@ -14,6 +14,8 @@ export interface StatusSnapshot {
   activeRuns: number
   lastPollAt: string | null
   lastPollError: string | null
+  // How many passes in a row failed; 0 after a good one.
+  consecutivePollFailures: number
 }
 
 export interface StatusServer {

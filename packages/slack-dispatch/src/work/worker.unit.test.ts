@@ -1058,7 +1058,7 @@ describe('worker as the Visual QA between the build and the pull request', () =>
     expect(JSON.stringify(r.posted[0]?.blocks)).toContain('Visual QA 건너뜀: UI 파일 변경 없음.')
   })
 
-  it('to be a failed item with the reviewer reason, and nothing pushed, when the review fails', async () => {
+  it('to be a pull request that says the review failed, with the reason, when the review fails', async () => {
     const failedQa: QaOutcome = {
       status: 'failed',
       reason: '모바일에서 버튼이 겹침',
@@ -1069,14 +1069,48 @@ describe('worker as the Visual QA between the build and the pull request', () =>
     const r = rig({ config: { prEnabled: true }, agent: pass, qa: () => Promise.resolve(failedQa) })
     const key = approved(r)
     await settle(r)
-    expect(stageOf(r.store, key)).toBe('failed')
-    expect(listRuns(r.store, key).at(-1)).toMatchObject({
-      state: 'failed',
-      detail: 'Visual QA 실패: 모바일에서 버튼이 겹침',
-    })
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(listRuns(r.store, key).at(-1)).toMatchObject({ kind: 'build', state: 'succeeded' })
     expect(listRuns(r.store, key).at(-1)?.costUsd).toBeCloseTo(0.8, 5)
-    expect(r.commands.some((command) => command.includes('push') || command.includes('pr create'))).toBe(false)
-    expect(r.posted.map((message) => message.text)).toStrictEqual(['실패: web-app'])
+    const create = r.commands.find((command) => command.startsWith('gh pr create')) ?? ''
+    expect(create).toContain(
+      '## Visual QA\nVisual QA 실패 (PR은 그대로 올림).\n```text\n모바일에서 버튼이 겹침\n```\nOverlap.',
+    )
+    expect(JSON.stringify(r.posted[0]?.blocks)).toContain('Visual QA 실패 (PR은 그대로 올림). 모바일에서 버튼이 겹침')
+  })
+
+  it('to be a reason that is escaped in the card, fenced and cut in the pull request, and free of secrets', async () => {
+    // built at run time so no token-shaped literal sits in the source
+    const botToken = ['xoxb', '1234567890', 'abcdefABCDEF'].join('-')
+    const failedQa: QaOutcome = {
+      status: 'failed',
+      reason: `at <anonymous> & <http://localhost:3000|x> ${botToken} \`\`\` ${'z'.repeat(2000)}`,
+      report: `report with ${botToken}`,
+      shots: 0,
+      costUsd: 0.1,
+    }
+    const r = rig({ config: { prEnabled: true }, agent: pass, qa: () => Promise.resolve(failedQa) })
+    approved(r)
+    await settle(r)
+    const card = JSON.stringify(r.posted[0]?.blocks)
+    expect(card).toContain('at &lt;anonymous&gt; &amp; &lt;http://localhost:3000|x&gt;')
+    expect(card).not.toContain('abcdefABCDEF')
+    expect(card).not.toContain('z'.repeat(600))
+    const create = r.commands.find((command) => command.startsWith('gh pr create')) ?? ''
+    expect(create).not.toContain('abcdefABCDEF')
+    expect(create).not.toContain('z'.repeat(600))
+    expect(create).toContain("''' ")
+  })
+
+  it('to be a card that does not promise a pull request when pull requests are off', async () => {
+    const failedQa: QaOutcome = { status: 'failed', reason: 'overlap', report: '', shots: 1, costUsd: 0.1 }
+    const r = rig({ config: { prEnabled: false }, agent: pass, qa: () => Promise.resolve(failedQa) })
+    const key = approved(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    const card = JSON.stringify(r.posted[0]?.blocks)
+    expect(card).toContain('Visual QA 실패. overlap')
+    expect(card).not.toContain('PR은 그대로 올림')
   })
 
   it('to be not asked when the build failed, or left no commit', async () => {

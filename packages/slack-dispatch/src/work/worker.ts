@@ -182,7 +182,7 @@ const modelOf = (item: ItemRow): AgentModel => item.meta.model ?? DEFAULT_MODEL
 
 // The owner started the item with "build now": the plan is the one the owner typed, or else the one the digest showed.
 const digestPlanOf = (item: ItemRow): string | undefined =>
-  item.meta.direct === true ? (item.meta.ownPlan ?? item.meta.analysis?.plan) : undefined
+  item.meta.direct === true ? item.meta.ownPlan ?? item.meta.analysis?.plan : undefined
 
 // A session exists once an earlier run of the item was billed; before that there is nothing to resume. The runner
 // switches by itself if the session on disk says otherwise.
@@ -408,23 +408,40 @@ function sourceLine(item: ItemRow): string {
 }
 
 interface QaNote {
-  // One line for the card and the pull request.
+  // One fixed line for the card and the pull request.
   line: string
+  // Why the review failed, cut and with secrets removed; empty when it did not fail. It comes from the review agent or
+  // from the tail of a test run, so it is never put into a message or a pull request as it is.
+  reason: string
   // The reviewer's report, empty when QA was skipped.
   detail: string
 }
 
-function qaNote(qa: Exclude<QaOutcome, { status: 'failed' }>): QaNote {
-  if (qa.status === 'skipped') return { line: `Visual QA 건너뜀: ${qa.reason}.`, detail: '' }
-  return { line: `Visual QA 통과 (스크린샷 ${qa.shots}장).`, detail: qa.report }
+// A failed review does not stop the pull request: the owner reads the pull request anyway, so the failure goes into it
+// with its reason instead of ending the item. With pull requests off, the commit stays local and the line says so by
+// not promising one.
+function qaNote(qa: QaOutcome, prEnabled: boolean): QaNote {
+  if (qa.status === 'skipped') return { line: `Visual QA 건너뜀: ${qa.reason}.`, reason: '', detail: '' }
+  if (qa.status === 'failed') {
+    return {
+      line: `Visual QA 실패${prEnabled ? ' (PR은 그대로 올림)' : ''}.`,
+      reason: clip(redact(qa.reason), REASON_LENGTH),
+      detail: redact(qa.report),
+    }
+  }
+  return { line: `Visual QA 통과 (스크린샷 ${qa.shots}장).`, reason: '', detail: qa.report }
 }
+
+// The line of the Slack card: the reason is escaped, because test output has `<`, `>` and `&` in it.
+const qaCardLine = (qa: QaNote): string => (qa.reason === '' ? qa.line : `${qa.line} ${escapeMrkdwn(qa.reason)}`)
 
 // Only what the owner was shown in Slack goes into the pull request, so a long plan cannot publish a tail nobody read.
 function prBody(item: ItemRow, workspace: WorkspaceRow, report: string, qa: QaNote): string {
   const review = qa.detail === '' ? '' : `\n${shownReport(qa.detail)}`
+  const reason = qa.reason === '' ? '' : `\n\`\`\`text\n${qa.reason.replaceAll('```', "'''")}\n\`\`\``
   return `${sourceLine(item)}## Plan\n${shownPlan(workspace.plan)}\n\n## Report\n${shownReport(
     report,
-  )}\n\n## Visual QA\n${qa.line}${review}`
+  )}\n\n## Visual QA\n${qa.line}${reason}${review}`
 }
 
 // The item must still be waiting for its build, and the owner must not have stopped it; checked again before each
@@ -462,7 +479,7 @@ async function deliver(
 
 // `slack:<channel>:<thread>` is a mention in a channel and `dm:<channel>:<message>` a request typed to the bot; both
 // name the thread the owner wrote in.
-const ORIGIN_THREAD = /^(?:slack|dm):([A-Z0-9]+):(\d+\.\d+)$/
+const ORIGIN_THREAD = /^(?:slack|dm):([A-Z0-9]+):(\d+\.\d+)(?::\d+\.\d+)?$/
 
 const urlIsSafeToPost = (url: string): boolean => /^https:\/\/[^\s<>|]+$/.test(url)
 
@@ -525,7 +542,7 @@ async function finishBuild(ctx: Ctx, info: RunInfo, result: AgentResult, report:
   }
   await syncBoard(ctx, item.key)
   try {
-    await post(ctx, buildPrCard({ itemKey: item.key, repo: item.repo, prUrl, report, qa: qa.line }))
+    await post(ctx, buildPrCard({ itemKey: item.key, repo: item.repo, prUrl, report, qa: qaCardLine(qa) }))
   } catch (error) {
     logEvent(store, { itemKey: item.key, kind: 'system', type: 'notify_failed', payload: { error: errorText(error) } })
   }
@@ -661,12 +678,8 @@ async function buildAndDeliver(ctx: Ctx, info: RunInfo, workspace: WorkspaceRow)
   const spec = parseQaSpec(asked.report)
   const qa = await checkVisually(ctx, info, workspace, result, { routes: asked.routes, spec: spec.spec })
   info.costUsd = result.costUsd + qa.costUsd
-  if (qa.status === 'failed') {
-    await failRun(ctx, info, undefined, `Visual QA 실패: ${qa.reason}`)
-    return
-  }
   try {
-    await finishBuild(ctx, info, result, spec.report, qaNote(qa))
+    await finishBuild(ctx, info, result, spec.report, qaNote(qa, config.prEnabled))
   } catch (error) {
     if (error instanceof AgentAborted) throw error
     // The build passed but the push or the pull request did not; the commit is still in the worktree.

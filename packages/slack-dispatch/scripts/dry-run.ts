@@ -36,6 +36,7 @@ console.log(
   `mentions ${summary.mentions}, threads ${summary.threads} -> new items ${summary.created}, ` +
     `already known ${summary.alreadyKnown}, answered by the owner ${summary.handledByOwner}, ` +
     `bot posts skipped ${summary.skippedBots}, unreadable skipped ${summary.skippedUnreadable}, ` +
+    `tagged again in a thread under way ${summary.retagged}, cut by the limit ${summary.cutThreads}, ` +
     `failed ${summary.failedThreads}`,
 )
 for (const item of listItems(store)) {
