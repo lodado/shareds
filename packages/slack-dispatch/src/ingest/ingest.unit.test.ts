@@ -3,7 +3,7 @@ import type { Store } from '../store/store'
 import type { IngestDeps, IngestSlack } from './ingest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SlackApiError } from '../slack/client'
-import { closeStore, getItem, listEvents, listItems, openStore } from '../store/store'
+import { applyEvent, closeStore, getItem, listEvents, listItems, openStore } from '../store/store'
 import { ingestMentions } from './ingest'
 
 const OWNER = 'U_OWNER'
@@ -500,5 +500,199 @@ describe('ingestMentions as new items that the cheapest model reads before the d
     const fake = fakeSlack([mention(10, { channelName: 'dev-web' })])
     await ingestMentions(setup(fake), real)
     expect(sentBlocks(fake)).toContain('_분석을 못 했어요. 원본을 확인해 주세요._')
+  })
+})
+
+// A store whose clock the test moves, so that "a tag after the item was made" can be told from "a tag it covers".
+function setupClocked(fake: Fake, clock: { now: Date }): IngestDeps {
+  const store = openStore(':memory:', { now: () => clock.now })
+  opened.push(store)
+  return { store, slack: fake.slack, ownerId: OWNER, route }
+}
+
+const clockAt = (offset: number): Date => new Date(SINCE.getTime() + offset * 1000)
+
+// A reply in the thread that started at offset 10, tagging the owner at `offset`.
+const replyTag = (offset: number, text: string): MentionMatch =>
+  mention(offset, {
+    threadTs: at(10),
+    text: `<@${OWNER}> ${text}`,
+    permalink: `https://example.slack.com/archives/C1/p${offset}?thread_ts=${at(10)}`,
+  })
+
+const threadWithReply = (offset: number, text: string): Record<string, SlackMessage[]> => ({
+  [`C1:${at(10)}`]: [message(10, 'U_ROOT', 'the original post'), message(offset, 'U_OTHER', `<@${OWNER}> ${text}`)],
+})
+
+describe('ingestMentions as the reader of a later tag in a thread it already knows', () => {
+  it('to be a new item with the later tag as its summary when the earlier items are over', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'one more thing'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const [first] = listItems(deps.store)
+    if (first === undefined) throw new Error('the first item was not made')
+    applyEvent(deps.store, first.key, { type: 'reject', owner: true })
+
+    matches.push(replyTag(500, 'one more thing'))
+    clock.now = clockAt(600)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ created: 1, alreadyKnown: 0, retagged: 0 })
+    const items = listItems(deps.store)
+    expect(items.map((item) => item.threadKey)).toStrictEqual([`slack:C1:${at(10)}`, `slack:C1:${at(10)}:${at(500)}`])
+    expect(items[1]?.stage).toBe('notified')
+    expect(items[1]?.meta.summary).toContain('one more thing')
+    expect(items[1]?.meta.summary).not.toContain('the original post')
+
+    const third = await ingestMentions(deps, real)
+    expect(third).toMatchObject({ created: 0, alreadyKnown: 1, retagged: 0 })
+    expect(listItems(deps.store)).toHaveLength(2)
+  })
+
+  it('to be one DM, not a second item, when the earlier item is still under way, and told only once', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const posts = fake.posted.length
+
+    matches.push(replyTag(500, 'any news?'))
+    clock.now = clockAt(600)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ created: 0, retagged: 1 })
+    expect(listItems(deps.store)).toHaveLength(1)
+    expect(fake.posted).toHaveLength(posts + 1)
+    const told = fake.posted.at(-1)
+    expect(told?.text).toContain('진행 중인 항목의 쓰레드에서 다시 태그됐어요 (선택 대기)')
+    expect(told?.text).toContain('p500?thread_ts=')
+    expect(told?.text).toContain('any news?')
+    expect(listItems(deps.store)[0]?.meta.seenUntil).toBe(at(500))
+
+    clock.now = clockAt(900)
+    const third = await ingestMentions(deps, real)
+    expect(third).toMatchObject({ created: 0, retagged: 0, alreadyKnown: 1 })
+    expect(fake.posted).toHaveLength(posts + 1)
+  })
+
+  it('to be told to nobody in a dry run, which leaves the item as it was', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const posts = fake.posted.length
+
+    matches.push(replyTag(500, 'any news?'))
+    clock.now = clockAt(600)
+    const preview = await ingestMentions(deps, { ...real, dryRun: true })
+    expect(preview).toMatchObject({ retagged: 1 })
+    expect(fake.posted).toHaveLength(posts)
+    expect(listItems(deps.store)[0]?.meta.seenUntil).toBe(at(10))
+  })
+
+  it('to be a DM again at the next pass when the first one could not be sent', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const posts = fake.posted.length
+
+    matches.push(replyTag(500, 'any news?'))
+    clock.now = clockAt(600)
+    fake.failPost.on = true
+    const failed = await ingestMentions(deps, real)
+    expect(failed).toMatchObject({ failedThreads: 1, retagged: 0 })
+    expect(listItems(deps.store)[0]?.meta.seenUntil).toBe(at(10))
+
+    fake.failPost.on = false
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ failedThreads: 0, retagged: 1 })
+    expect(fake.posted).toHaveLength(posts + 1)
+  })
+
+  it('to be no DM, and no repeat, for a tag a program posted in a thread under way', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'build is red'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const posts = fake.posted.length
+
+    matches.push({ ...replyTag(500, 'build is red'), user: null })
+    clock.now = clockAt(600)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ created: 0, retagged: 0, alreadyKnown: 1 })
+    expect(fake.posted).toHaveLength(posts)
+    expect(listItems(deps.store)[0]?.meta.seenUntil).toBe(at(500))
+  })
+
+  it('to be a DM, not a second item, for a thread whose item failed and may be tried again', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const [first] = listItems(deps.store)
+    if (first === undefined) throw new Error('the first item was not made')
+    deps.store.db.prepare("UPDATE items SET stage = 'failed' WHERE key = ?").run(first.key)
+
+    matches.push(replyTag(500, 'any news?'))
+    clock.now = clockAt(600)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ created: 0, retagged: 1 })
+    expect(listItems(deps.store)).toHaveLength(1)
+    expect(fake.posted.at(-1)?.text).toContain('(실패, 다시 시도 가능)')
+  })
+
+  it('to be the post at the top as the summary when the reply that tagged the owner says next to nothing', async () => {
+    const tag = replyTag(20, 'ping')
+    const fake = fakeSlack([tag], {
+      [`C1:${at(10)}`]: [
+        message(10, 'U_ROOT', 'the footer link is broken on mobile'),
+        message(20, 'U_OTHER', tag.text),
+      ],
+    })
+    const deps = setup(fake)
+    await ingestMentions(deps, real)
+    expect(listItems(deps.store)[0]?.meta.summary).toContain('the footer link is broken on mobile')
+  })
+
+  it('to be the reply that tagged the owner, not the post at the top, as the summary of a first item', async () => {
+    const tag = replyTag(20, 'fix the footer')
+    const fake = fakeSlack([tag], {
+      [`C1:${at(10)}`]: [message(10, 'U_ROOT', 'the original post'), message(20, 'U_OTHER', tag.text)],
+    })
+    const deps = setup(fake)
+    await ingestMentions(deps, real)
+    const summary = listItems(deps.store)[0]?.meta.summary ?? ''
+    expect(summary).toContain('fix the footer')
+    expect(summary).not.toContain('the original post')
+  })
+})
+
+describe('ingestMentions as a pass with a limit on the threads it reads', () => {
+  it('to be a new thread read even when more than the limit of known threads were found with it', async () => {
+    const matches = Array.from({ length: 31 }, (_, index) => mention(index + 1))
+    const fake = fakeSlack(matches)
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, { ...real, maxThreads: 100 })
+
+    matches.push(mention(600))
+    clock.now = clockAt(700)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ created: 1, alreadyKnown: 31, cutThreads: 0 })
+  })
+
+  it('to be said in the log when threads with something new were left for the next pass', async () => {
+    const fake = fakeSlack([mention(10), mention(20), mention(30)])
+    const deps = setup(fake)
+    const summary = await ingestMentions(deps, { ...real, maxThreads: 2 })
+    expect(summary).toMatchObject({ created: 2, cutThreads: 1 })
+    const cut = listEvents(deps.store).find((event) => event.type === 'threads_cut')
+    expect(cut?.payload).toBe('{"cut":1,"limit":2}')
   })
 })

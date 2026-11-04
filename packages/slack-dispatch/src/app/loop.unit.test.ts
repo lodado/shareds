@@ -5,6 +5,77 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('every as a job that fails and is asked to try again sooner', () => {
+  it('to be tried again after a short pause that doubles with each failure, up to the usual pause', async () => {
+    vi.useFakeTimers()
+    let runs = 0
+    const stop = every(
+      1000,
+      () => {
+        runs += 1
+        return Promise.reject(new Error('no network'))
+      },
+      () => undefined,
+      { retryFromMs: 100 },
+    )
+    expect(runs).toBe(1)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(runs).toBe(2)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(runs).toBe(3)
+    await vi.advanceTimersByTimeAsync(400)
+    expect(runs).toBe(4)
+    await vi.advanceTimersByTimeAsync(800)
+    expect(runs).toBe(5)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(runs).toBe(5)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(runs).toBe(6)
+    stop()
+  })
+
+  it('to be back to the usual pause after a run that worked', async () => {
+    vi.useFakeTimers()
+    const outcomes = [false, true, true]
+    let runs = 0
+    const stop = every(
+      1000,
+      () => {
+        const works = outcomes[runs] ?? true
+        runs += 1
+        return works ? Promise.resolve() : Promise.reject(new Error('no network'))
+      },
+      () => undefined,
+      { retryFromMs: 100 },
+    )
+    await vi.advanceTimersByTimeAsync(100)
+    expect(runs).toBe(2)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(runs).toBe(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(runs).toBe(3)
+    stop()
+  })
+
+  it('to wait the usual pause after a failure when no short pause was asked for', async () => {
+    vi.useFakeTimers()
+    let runs = 0
+    const stop = every(
+      1000,
+      () => {
+        runs += 1
+        return Promise.reject(new Error('no network'))
+      },
+      () => undefined,
+    )
+    await vi.advanceTimersByTimeAsync(999)
+    expect(runs).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(runs).toBe(2)
+    stop()
+  })
+})
+
 describe('every as a job that repeats', () => {
   it('to be run at once and then again after each pause', async () => {
     vi.useFakeTimers()

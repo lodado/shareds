@@ -48,6 +48,9 @@ export interface ItemMeta {
   // The plan the owner typed when starting the item. With it the plan step follows the owner's plan, and a direct
   // build builds it instead of the digest's plan.
   ownPlan?: string
+  // The Slack ts of the newest tag in the thread the owner was already told about while this item was under way, so
+  // the same tag is not told again at the next poll.
+  seenUntil?: string
 }
 
 export interface NewItemOptions {
@@ -344,7 +347,7 @@ function parseMeta(json: string): ItemMeta {
     return {}
   }
   if (!isRecord(parsed)) return {}
-  const { summary, url, route, urgent, analysis, model, direct, ownPlan } = parsed
+  const { summary, url, route, urgent, analysis, model, direct, ownPlan, seenUntil } = parsed
   const read = readAnalysis(analysis)
   return {
     ...(typeof summary === 'string' ? { summary } : {}),
@@ -355,6 +358,7 @@ function parseMeta(json: string): ItemMeta {
     ...(isAgentModel(model) ? { model } : {}),
     ...(typeof direct === 'boolean' ? { direct } : {}),
     ...(isText(ownPlan) ? { ownPlan } : {}),
+    ...(isText(seenUntil) ? { seenUntil } : {}),
   }
 }
 
@@ -398,6 +402,28 @@ export function setAnalysis(store: Store, itemKey: string, analysis: Analysis): 
   inTransaction(store, () => {
     mergeMeta(store, itemKey, { analysis })
     logEvent(store, { itemKey, kind: 'system', type: 'analysis_saved', payload: { recommend: analysis.recommend } })
+  })
+}
+
+// When the newest system event of this type was logged, or null when there is none. The polling job leaves one after
+// every pass that worked, so a restart knows from which moment the next pass has to look.
+export function lastSystemEventAt(store: Store, type: string): Date | null {
+  const row = store.db
+    .prepare("SELECT ts FROM events WHERE kind = 'system' AND type = ? ORDER BY id DESC LIMIT 1")
+    .get(type)
+  if (row === undefined) return null
+  const at = Date.parse(text(row, 'ts'))
+  return Number.isNaN(at) ? null : new Date(at)
+}
+
+// Remembers that the owner was told about the tags in this item's thread up to this Slack ts.
+export function markMentionSeen(store: Store, itemKey: string, ts: string): void {
+  inTransaction(store, () => {
+    // Only forward: a tag older than the one already told about must not make that one new again.
+    const told = Number(getItem(store, itemKey)?.meta.seenUntil)
+    if (Number.isFinite(told) && told >= Number(ts)) return
+    mergeMeta(store, itemKey, { seenUntil: ts })
+    logEvent(store, { itemKey, kind: 'system', type: 'mention_retag_seen', payload: { ts } })
   })
 }
 
@@ -519,6 +545,18 @@ export function itemsOfThread(store: Store, threadKey: string): ItemRow[] {
   return store.db
     .prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE thread_key = ? ORDER BY created_at, key`)
     .all(threadKey)
+    .map(toItemRow)
+}
+
+// The items of one Slack thread: the first one made from it (`slack:<channel>:<thread>`) and the ones made later when
+// somebody tagged the owner there again (`slack:<channel>:<thread>:<tag ts>`).
+export function itemsOfSlackThread(store: Store, baseKey: string): ItemRow[] {
+  const prefix = `${baseKey}:`
+  return store.db
+    .prepare(
+      `SELECT ${ITEM_COLUMNS} FROM items WHERE thread_key = ? OR substr(thread_key, 1, ?) = ? ORDER BY created_at, key`,
+    )
+    .all(baseKey, prefix.length, prefix)
     .map(toItemRow)
 }
 

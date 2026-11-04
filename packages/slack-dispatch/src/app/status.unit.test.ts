@@ -11,6 +11,7 @@ const snapshot: StatusSnapshot = {
   activeRuns: 1,
   lastPollAt: '2026-10-23T05:05:00.000Z',
   lastPollError: null,
+  consecutivePollFailures: 0,
 }
 
 // fetch never sends a Host header of the test's choosing, so a plain request is made.

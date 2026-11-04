@@ -112,6 +112,9 @@ export function parseMatch(raw: unknown): MentionMatch | null {
 const DEFAULT_RETRIES = 3
 const SEARCH_PAGE_SIZE = 100
 const DEFAULT_SEARCH_PAGES = 3
+const THREAD_PAGE_SIZE = 200
+const MAX_THREAD_MESSAGES = 1000
+const MAX_THREAD_PAGES = 10
 
 function requestInit(token: string, params: Json, asJson: boolean): RequestInit {
   if (asJson) {
@@ -189,10 +192,28 @@ export function createSlackClient(tokens: SlackTokens, options: SlackClientOptio
       return found
     },
 
-    async threadReplies(channelId, threadTs, limit = 50) {
-      const data = await call('conversations.replies', tokens.user, { channel: channelId, ts: threadTs, limit })
-      const messages: unknown[] = Array.isArray(data.messages) ? data.messages : []
-      return messages.flatMap((message) => parseMessage(message) ?? [])
+    // `limit` is the size of one page; the pages are followed to the end of the thread, up to MAX_THREAD_MESSAGES, so a
+    // long thread is not judged (answered by the owner? tagged by a bot?) from its first page alone.
+    async threadReplies(channelId, threadTs, limit = THREAD_PAGE_SIZE) {
+      // Keyed by ts: a page after the first may repeat the root message of the thread.
+      const found = new Map<string, SlackMessage>()
+      let cursor = ''
+      for (let page = 0; page < MAX_THREAD_PAGES && found.size < MAX_THREAD_MESSAGES; page += 1) {
+        const data = await call('conversations.replies', tokens.user, {
+          channel: channelId,
+          ts: threadTs,
+          limit,
+          ...(cursor === '' ? {} : { cursor }),
+        })
+        const messages: unknown[] = Array.isArray(data.messages) ? data.messages : []
+        const parsed = messages.flatMap((message) => parseMessage(message) ?? [])
+        for (const message of parsed) found.set(message.ts, message)
+        const meta = isRecord(data.response_metadata) ? data.response_metadata : {}
+        cursor = asString(meta.next_cursor) ?? ''
+        // A cursor with nothing behind it would be followed for ever.
+        if (cursor === '' || parsed.length === 0) break
+      }
+      return [...found.values()].slice(0, MAX_THREAD_MESSAGES)
     },
 
     async openDm(userId) {

@@ -134,7 +134,8 @@ function digestClick(
   repo?: string,
 ): unknown {
   const menu = model === undefined ? {} : { [`digest.model:${digestId}`]: { selected_option: { value: model } } }
-  const box = ownPlan === undefined ? {} : { [`digest.ownplan:${digestId}`]: { type: 'plain_text_input', value: ownPlan } }
+  const box =
+    ownPlan === undefined ? {} : { [`digest.ownplan:${digestId}`]: { type: 'plain_text_input', value: ownPlan } }
   const repoBox =
     repo === undefined ? {} : { [`digest.repotext:${digestId}`]: { type: 'plain_text_input', value: repo } }
   return {
@@ -674,6 +675,7 @@ const summaryOf = (overrides: Partial<Awaited<ReturnType<InteractDeps['catchUp']
   handledByOwner: 0,
   skippedBots: 0,
   skippedUnreadable: 0,
+  retagged: 0,
   failedThreads: 0,
   cutThreads: 0,
   skipped: [],

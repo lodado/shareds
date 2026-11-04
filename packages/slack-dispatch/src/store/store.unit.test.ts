@@ -12,9 +12,12 @@ import {
   isLatestCard,
   issueCard,
   itemKeyOf,
+  itemsOfSlackThread,
+  lastSystemEventAt,
   listEvents,
   listOpenItems,
   logEvent,
+  markMentionSeen,
   openStore,
   UnknownItemError,
 } from './store'
@@ -268,6 +271,41 @@ describe('the event log as an append-only record', () => {
     expect(listEvents(store, { itemKey: web }).map((row) => row.type)).toEqual(['item_created', 'triage', 'abort'])
     expect(listEvents(store, { afterId: 2 }).map((row) => row.id)).toEqual([3, 4])
     expect(listEvents(store, { limit: 2 }).map((row) => row.id)).toEqual([1, 2])
+  })
+})
+
+describe('lastSystemEventAt as the moment of the newest system event of a type', () => {
+  it('to be null when there is none, and the time of the newest one, not of another type or kind', () => {
+    const store = memoryStore()
+    expect(lastSystemEventAt(store, 'poll_ok')).toBeNull()
+    logEvent(store, { kind: 'system', type: 'poll_ok' })
+    logEvent(store, { kind: 'system', type: 'poll_failed' })
+    logEvent(store, { kind: 'inbound', type: 'poll_ok' })
+    logEvent(store, { kind: 'system', type: 'poll_ok' })
+    expect(lastSystemEventAt(store, 'poll_ok')).toStrictEqual(new Date(Date.UTC(2026, 9, 23, 0, 0, 3)))
+  })
+})
+
+describe('itemsOfSlackThread and markMentionSeen as the items of one thread and the tags already told', () => {
+  it('to be the first item and the later ones of the thread, and not those of a thread whose key starts the same', () => {
+    const store = memoryStore()
+    createItems(store, THREAD, ['web-app'])
+    createItems(store, `${THREAD}:1730000900.000200`, ['web-app'])
+    createItems(store, `${THREAD}9`, ['web-app'])
+    createItems(store, 'slack:C1:1730000000.0001009:1730000900.000200', ['web-app'])
+    expect(itemsOfSlackThread(store, THREAD).map((item) => item.threadKey)).toStrictEqual([
+      THREAD,
+      `${THREAD}:1730000900.000200`,
+    ])
+  })
+
+  it('to be kept in the item meta and logged', () => {
+    const store = memoryStore()
+    createItems(store, THREAD, ['web-app'])
+    const key = itemKeyOf(THREAD, 'web-app')
+    markMentionSeen(store, key, '1730000900.000200')
+    expect(getItem(store, key)?.meta.seenUntil).toBe('1730000900.000200')
+    expect(listEvents(store, { itemKey: key }).map((row) => row.type)).toContain('mention_retag_seen')
   })
 })
 
