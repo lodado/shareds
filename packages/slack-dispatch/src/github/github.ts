@@ -12,10 +12,16 @@ export interface Gate {
 }
 
 const PR_URL = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/
-const PUSH_TIMEOUT_MS = 180_000
+// A repository's pre-push hook may run its whole test suite (about 6 minutes in one of them), so the push gets room.
+const PUSH_TIMEOUT_MS = 900_000
 
-export async function pushBranch(run: Run, worktreePath: string, branch: string): Promise<void> {
-  await run('git', ['-C', worktreePath, 'push', '--set-upstream', 'origin', branch], { timeoutMs: PUSH_TIMEOUT_MS })
+// `base` is the ref the pull request goes into. A pre-push hook cannot infer that on a branch's first push, and some
+// repositories stop the push until it is named in TEST_BASE, so it is always passed along.
+export async function pushBranch(run: Run, worktreePath: string, branch: string, base: string): Promise<void> {
+  await run('git', ['-C', worktreePath, 'push', '--set-upstream', 'origin', branch], {
+    timeoutMs: PUSH_TIMEOUT_MS,
+    env: { TEST_BASE: base },
+  })
 }
 
 export interface PrInput {

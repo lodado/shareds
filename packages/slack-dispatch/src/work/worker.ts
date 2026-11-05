@@ -464,7 +464,7 @@ async function deliver(
   // An earlier try got as far as opening the pull request.
   if (workspace.prUrl !== null) return workspace.prUrl
   assertActive(ctx, info)
-  await pushBranch(run, workspace.path, workspace.branch)
+  await pushBranch(run, workspace.path, workspace.branch, workspace.baseRef)
   assertActive(ctx, info)
   const url = await openPr(run, {
     worktreePath: workspace.path,

@@ -18,10 +18,20 @@ const PR = 'https://github.com/acme/web-app/pull/42'
 describe('pushBranch as the first push of an item branch', () => {
   it('to be a push that sets the upstream, from the worktree', async () => {
     const { run, calls } = recording()
-    await pushBranch(run, '/work/wt', 'dispatch-abc')
+    await pushBranch(run, '/work/wt', 'dispatch-abc', 'origin/develop')
     expect(calls).toStrictEqual([
       ['git', ['-C', '/work/wt', 'push', '--set-upstream', 'origin', 'dispatch-abc'], undefined],
     ])
+  })
+
+  it('to name the branch the pull request goes into in TEST_BASE, for a hook that cannot infer it', async () => {
+    const seen: (Readonly<Record<string, string>> | undefined)[] = []
+    const run: Run = (_file, _args, options) => {
+      seen.push(options?.env)
+      return Promise.resolve({ stdout: '', stderr: '' })
+    }
+    await pushBranch(run, '/work/wt', 'dispatch-abc', 'origin/develop')
+    expect(seen).toStrictEqual([{ TEST_BASE: 'origin/develop' }])
   })
 })
 
