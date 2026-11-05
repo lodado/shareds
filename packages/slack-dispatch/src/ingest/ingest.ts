@@ -329,8 +329,12 @@ async function ingestThread(deps: IngestDeps, candidate: Candidate, pass: Pass):
   const rootText = replies[0]?.text ?? thread.mentions[0]?.text ?? ''
   const allText = [rootText, ...thread.mentions.map((mention) => mention.text)].join('\n')
   const firstMention = Math.min(...thread.mentions.map((mention) => Number(mention.ts)))
-  // If the owner already answered in the thread after being tagged, the owner is on it.
-  const handled = replies.some((reply) => reply.user === ownerId && Number(reply.ts) > firstMention)
+  // If the owner already answered in the thread after being tagged, the owner is on it. A tag the owner wrote to
+  // themselves is not an answer: it is what makes the item, so it must not close the item that comes from an earlier one.
+  const tagTimes = new Set(candidate.thread.mentions.map((mention) => mention.ts))
+  const handled = replies.some(
+    (reply) => reply.user === ownerId && Number(reply.ts) > firstMention && !tagTimes.has(reply.ts),
+  )
   const fromBot = !includeBots && taggedByBot(replies, thread)
   const found = routeThread(
     { text: cleanSlackText(allText), links: extractLinks(allText), channelName: thread.channelName },
@@ -429,7 +433,7 @@ export async function ingestMentions(deps: IngestDeps, options: IngestOptions): 
   const upper = options.until === undefined ? '' : ` before:${dateOf(new Date(options.until.getTime() + DAY_MS))}`
   const query = `<@${ownerId}> after:${dateOf(new Date(options.since.getTime() - DAY_MS))}${upper}`
   const matches = (await slack.searchMentions(query))
-    .filter((match) => isInWindow(match, options) && match.user !== ownerId)
+    .filter((match) => isInWindow(match, options))
     .toSorted((a, b) => Number(a.ts) - Number(b.ts))
   summary.mentions = matches.length
   const candidates = groupByThread(matches).map((thread): Candidate => {

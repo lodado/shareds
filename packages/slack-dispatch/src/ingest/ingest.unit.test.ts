@@ -125,11 +125,42 @@ describe('ingestMentions as one polling pass', () => {
     expect(summary.mentions).toBe(1)
   })
 
-  it('to be a mention written by the owner left out', async () => {
-    const deps = setup(fakeSlack([mention(5, { user: OWNER })]))
+  it('to be a mention the owner wrote to themselves made an item like any other', async () => {
+    const note = mention(5, { user: OWNER, text: `<@${OWNER}> fix the footer link` })
+    const deps = setup(fakeSlack([note], { [`C1:${note.threadTs}`]: [message(5, OWNER, note.text)] }))
     const summary = await ingestMentions(deps, real)
-    expect(summary).toMatchObject({ mentions: 0, threads: 0 })
-    expect(listItems(deps.store)).toEqual([])
+    expect(summary).toMatchObject({ mentions: 1, threads: 1, created: 1, handledByOwner: 0, skippedBots: 0 })
+    expect(listItems(deps.store).map((item) => item.stage)).toEqual(['notified'])
+  })
+
+  it('to be a second note the owner wrote to themselves in one thread not an answer to the first', async () => {
+    const first = mention(5, { user: OWNER })
+    const second = mention(9, { user: OWNER, threadTs: first.threadTs })
+    const deps = setup(
+      fakeSlack([first, second], {
+        [`C1:${first.threadTs}`]: [message(5, OWNER, first.text), message(9, OWNER, second.text)],
+      }),
+    )
+    const summary = await ingestMentions(deps, real)
+    expect(summary).toMatchObject({ mentions: 2, threads: 1, created: 1, handledByOwner: 0 })
+  })
+
+  it('to be a reply of the owner after their own note still an answer', async () => {
+    const note = mention(5, { user: OWNER })
+    const deps = setup(
+      fakeSlack([note], { [`C1:${note.threadTs}`]: [message(5, OWNER, note.text), message(8, OWNER, 'done already')] }),
+    )
+    expect(await ingestMentions(deps, real)).toMatchObject({ created: 0, handledByOwner: 1 })
+  })
+
+  it('to be a note from a program left out even when it names the owner as its author', async () => {
+    const note = mention(5, { user: OWNER })
+    const deps = setup(
+      fakeSlack([note], {
+        [`C1:${note.threadTs}`]: [{ ts: note.ts, threadTs: null, user: OWNER, text: note.text, botId: 'B1' }],
+      }),
+    )
+    expect(await ingestMentions(deps, real)).toMatchObject({ created: 0, skippedBots: 1 })
   })
 
   it('to be one item for two mentions in the same thread', async () => {
