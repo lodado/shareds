@@ -1,0 +1,43 @@
+{
+  "status": "not_executed",
+  "method": "Manual or external-agent rubric scenarios. File validity is checked; agent behavior has NOT been run by this package.",
+  "cases": [
+    {
+      "id": "C-01-petting",
+      "prompt": "고양이 캐릭터를 쓰다듬으면 진짜 고양이처럼 반응하게 해줘. 너무 오래 만지면 싫어하는 것도.",
+      "must": [
+        "Collect real-cat photo and video references per behavior before building",
+        "Zone-weighted petting tolerance: cheeks and chin drain slowly, tail base and belly fast",
+        "Escalating warnings at least 0.4 s before any swat; stopping the strokes ends them",
+        "check-trace exits 0 with swat-warning exercised"
+      ]
+    },
+    {
+      "id": "C-02-toy-play",
+      "prompt": "낚싯대 장난감으로 고양이랑 놀아주는 인터랙션 만들어줘.",
+      "must": [
+        "watch → stalk → crouch with wiggle → pounce → bat, with energy falling per pounce",
+        "The pounce fires when the toy pauses or moves away, not when it charges",
+        "pounce-anticipation exercised and passing"
+      ]
+    },
+    {
+      "id": "C-03-idle-life",
+      "prompt": "가만히 있는 고양이가 살아 있는 것처럼 보이게 해줘. 지금은 숨쉬기만 반복해서 어색해.",
+      "must": [
+        "Independent irregular timers for breathing, ear flicks, blinks, tail-tip twitches and looks",
+        "Ears turn before the head; head turns stop and hold",
+        "No idle action three times in a row; durations vary"
+      ]
+    },
+    {
+      "id": "C-04-review",
+      "prompt": "이 고양이 걷는 애니메이션 왜 어색한지 봐줘.",
+      "must": [
+        "Read-only: findings P0–P3 with location, the contradicted real-cat behavior, viewer impact and smallest fix",
+        "Checks the footfall order and a steady head",
+        "No edits until asked"
+      ]
+    }
+  ]
+}

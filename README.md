@@ -40,31 +40,32 @@
 
 스킬 이름을 누르면 사용 조건과 실행 절차를 볼 수 있어요. 플러그인 하나에 여러 스킬이 들어 있기도 해요.
 
-| 스킬                                                                                                                    | 하는 일                                                                         |
-| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                              |
-| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | Bend 모델·증명까지 필수인 동작 계약과 테스트·구현·리뷰를 조율해요.              |
-| [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md)                  | Bend 없이 유한 Space를 정의하고 실제 테스트·타입·속성 증거로 검수해요.          |
-| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                                              | 요구사항을 Bend 모델·법칙·증명으로 옮기는 Formal 전용 도우미예요.               |
-| [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.      |
-| [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.           |
-| [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.            |
-| [`reference-driven-figma-design`](packages/frontend-interface-design/skills/reference-driven-figma-design/SKILL.md)     | 레퍼런스와 디자인 시스템을 바탕으로 편집 가능한 Figma 화면을 만들어요.          |
-| [`reference-driven-3d-character`](packages/reference-driven-3d-character/skills/reference-driven-3d-character/SKILL.md) | 레퍼런스 기반 3D 캐릭터의 도안·모델·요청한 동작을 만들고 단계별로 검수해요.     |
-| [`game-interface-design`](packages/game-interface-design/skills/game-interface-design/SKILL.md)                         | 게임 요청을 기획·Figma·Three.js 구현·도트 애니메이션 중 맞는 스킬로 연결해요.   |
-| [`reference-driven-game-design`](packages/game-interface-design/skills/reference-driven-game-design/SKILL.md)           | 모바일 웹게임의 핵심 규칙·플레이 흐름·HUD·손맛·검증 계획을 기획해요.            |
-| [`threejs-game-wireframe`](packages/game-interface-design/skills/threejs-game-wireframe/SKILL.md)                       | 기획을 받아 FSD·헤드리스 ECS 구조의 Three.js 프로토타입을 만들고 검증해요.      |
-| [`pixel-sprite-animation`](packages/game-interface-design/skills/pixel-sprite-animation/SKILL.md)                       | 기준 프레임과 diff로 도트 애니메이션을 만들고 타이밍·타격감 린트로 검사해요.    |
-| [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요. |
-| [`app-research`](packages/app-research/skills/app-research/SKILL.md)                                                    | 명시적으로 호출하면 앱을 게이트로 탐색해 화면·기능·정책을 근거와 함께 정리해요. |
-| [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.      |
-| [`harness-team`](packages/harness-team/skills/harness-team/SKILL.md)                                                    | 직접 일하고 지난 실수부터 고치며 위험 작업은 별도 검토해요.                     |
-| [`agent-memory-recall`](packages/agent-memory/skills/agent-memory-recall/SKILL.md)                                      | 현재 작업에 필요한 과거 기록을 Agent Memory에서 읽기 전용으로 찾아요.           |
-| [`agent-memory-log`](packages/agent-memory/skills/agent-memory-log/SKILL.md)                                            | 요청한 작업 기록을 Obsidian Agent Memory에 저장해요.                            |
-| [`agent-memory-todayilearned`](packages/agent-memory/skills/agent-memory-todayilearned/SKILL.md)                        | 요청한 배움을 날짜별 TIL 노트로 정리해요.                                       |
-| [`agent-memory-generalize`](packages/agent-memory/skills/agent-memory-generalize/SKILL.md)                              | 작업 기록에서 다른 작업에도 쓸 수 있는 개념을 근거와 함께 추출해요.             |
-| [`agent-memory-p0-rules`](packages/agent-memory/skills/agent-memory-p0-rules/SKILL.md)                                  | 규칙 후보의 근거와 범위를 검토해 수동 승격 여부를 판단해요.                     |
-| [`agent-memory-maintenance`](packages/agent-memory/skills/agent-memory-maintenance/SKILL.md)                            | Agent Memory의 중복·오래된 기록·끊어진 링크를 점검하고 정비해요.                |
+| 스킬                                                                                                                    | 하는 일                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                                               |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | Bend 모델·증명까지 필수인 동작 계약과 테스트·구현·리뷰를 조율해요.                               |
+| [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md)                  | Bend 없이 유한 Space를 정의하고 실제 테스트·타입·속성 증거로 검수해요.                           |
+| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                                              | 요구사항을 Bend 모델·법칙·증명으로 옮기는 Formal 전용 도우미예요.                                |
+| [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.                       |
+| [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.                            |
+| [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.                             |
+| [`reference-driven-figma-design`](packages/frontend-interface-design/skills/reference-driven-figma-design/SKILL.md)     | 레퍼런스와 디자인 시스템을 바탕으로 편집 가능한 Figma 화면을 만들어요.                           |
+| [`reference-driven-3d-character`](packages/reference-driven-3d-character/skills/reference-driven-3d-character/SKILL.md) | 레퍼런스 기반 3D 캐릭터의 도안·모델·요청한 동작을 만들고 단계별로 검수해요.                      |
+| [`game-interface-design`](packages/game-interface-design/skills/game-interface-design/SKILL.md)                         | 게임 요청을 기획·Figma·Three.js 구현·도트 애니메이션·고양이 동작 중 맞는 스킬로 연결해요.        |
+| [`reference-driven-game-design`](packages/game-interface-design/skills/reference-driven-game-design/SKILL.md)           | 모바일 웹게임의 핵심 규칙·플레이 흐름·HUD·손맛·검증 계획을 기획해요.                             |
+| [`threejs-game-wireframe`](packages/game-interface-design/skills/threejs-game-wireframe/SKILL.md)                       | 기획을 받아 FSD·헤드리스 ECS 구조의 Three.js 프로토타입을 만들고 검증해요.                       |
+| [`pixel-sprite-animation`](packages/game-interface-design/skills/pixel-sprite-animation/SKILL.md)                       | 기준 프레임과 diff로 도트 애니메이션을 만들고 타이밍·타격감 린트로 검사해요.                     |
+| [`lifelike-cat-motion`](packages/game-interface-design/skills/lifelike-cat-motion/SKILL.md)                             | 실제 고양이 사진·영상을 근거로 고양이 몸짓과 쓰다듬기·장난감 반응을 만들고 행동 기록을 검사해요. |
+| [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요.                  |
+| [`app-research`](packages/app-research/skills/app-research/SKILL.md)                                                    | 명시적으로 호출하면 앱을 게이트로 탐색해 화면·기능·정책을 근거와 함께 정리해요.                  |
+| [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.                       |
+| [`harness-team`](packages/harness-team/skills/harness-team/SKILL.md)                                                    | 직접 일하고 지난 실수부터 고치며 위험 작업은 별도 검토해요.                                      |
+| [`agent-memory-recall`](packages/agent-memory/skills/agent-memory-recall/SKILL.md)                                      | 현재 작업에 필요한 과거 기록을 Agent Memory에서 읽기 전용으로 찾아요.                            |
+| [`agent-memory-log`](packages/agent-memory/skills/agent-memory-log/SKILL.md)                                            | 요청한 작업 기록을 Obsidian Agent Memory에 저장해요.                                             |
+| [`agent-memory-todayilearned`](packages/agent-memory/skills/agent-memory-todayilearned/SKILL.md)                        | 요청한 배움을 날짜별 TIL 노트로 정리해요.                                                        |
+| [`agent-memory-generalize`](packages/agent-memory/skills/agent-memory-generalize/SKILL.md)                              | 작업 기록에서 다른 작업에도 쓸 수 있는 개념을 근거와 함께 추출해요.                              |
+| [`agent-memory-p0-rules`](packages/agent-memory/skills/agent-memory-p0-rules/SKILL.md)                                  | 규칙 후보의 근거와 범위를 검토해 수동 승격 여부를 판단해요.                                      |
+| [`agent-memory-maintenance`](packages/agent-memory/skills/agent-memory-maintenance/SKILL.md)                            | Agent Memory의 중복·오래된 기록·끊어진 링크를 점검하고 정비해요.                                 |
 
 ## 스킬 꽂기
 
@@ -314,20 +315,20 @@ npm으로 나갈 것들이에요.
 
 에이전트에 꽂는 플러그인이에요.
 
-| 플러그인                                                                  | 설명                                                                                                                                              |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                                                                       |
-| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, Formal 전용 `bend-proof`, TDD·근거·리뷰                                         |
-| [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                                                              |
-| [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                                                             |
-| [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                                                                  |
-| [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                                                                  |
-| [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인                                             |
-| [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                      |
-| [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스, 린트로 검사하는 도트 스프라이트 애니메이션                                    |
-| [`developer-agents`](packages/developer-agents)                           | Claude Code 서브에이전트 두 개: FSD로 UI와 비즈니스 로직을 나누는 `frontend-developer`, 3계층·클린 아키텍처·DDD로 서버를 짜는 `backend-developer` |
-| [`harness-team`](packages/harness-team)                                   | 직접 실행, 위험 작업·요청 시 별도 자기 검토, 먼저 고치는 carry-over                                                                               |
-| [`app-research`](packages/app-research)                                   | 앱 조사: 게이트를 거친 기기 탐색, 화면·전이 그래프, 근거에 묶인 기능·정책                                                                         |
+| 플러그인                                                                  | 설명                                                                                                                                               |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                                                                        |
+| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, Formal 전용 `bend-proof`, TDD·근거·리뷰                                          |
+| [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                                                               |
+| [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                                                              |
+| [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                                                                   |
+| [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                                                                   |
+| [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인                                              |
+| [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                       |
+| [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스, 린트로 검사하는 도트 스프라이트 애니메이션, 행동 기록으로 검사하는 고양이 동작 |
+| [`developer-agents`](packages/developer-agents)                           | Claude Code 서브에이전트 두 개: FSD로 UI와 비즈니스 로직을 나누는 `frontend-developer`, 3계층·클린 아키텍처·DDD로 서버를 짜는 `backend-developer`  |
+| [`harness-team`](packages/harness-team)                                   | 직접 실행, 위험 작업·요청 시 별도 자기 검토, 먼저 고치는 carry-over                                                                                |
+| [`app-research`](packages/app-research)                                   | 앱 조사: 게이트를 거친 기기 탐색, 화면·전이 그래프, 근거에 묶인 기능·정책                                                                          |
 
 ## 개발
 

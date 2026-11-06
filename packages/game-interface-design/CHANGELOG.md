@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1 — 2026-11-06
+
+- Reject mood trace events without finite valence and arousal instead of reporting an untested continuity rule as checked.
+
+## 0.6.0 — 2026-10-31
+
+- `lifelike-cat-motion` gains two references for rigging the legs. `limb-rig-and-gait` builds one shared cat skeleton (four bones per limb, joint angles measured at paw contact and lift-off for the hind limb, assumed and marked for the fore limb), a foot path with a planted stroke and a swing arc, two-bone IK, walk-to-trot gait blending, the body speed that keeps planted feet from slipping, and the solver tests (constant bone lengths, fixed planted feet, joint range, turn rate, touchdown order). `raster-view-rigging` moves an approved raster view without redrawing it: rest pose equal to the still, layered cuts (foot, walls, tips), hind legs that shear about a fixed junction below the pivot row and fold as they lift, a half stride for a view along the walking axis, and a field warp for a paw that is one lobe of the body outline, with the failures each form avoids and how to check frames.
+- `SKILL.md` links both from the rig step, adds the no-slip and short-step rules, and asks the report for the solver tests and the rest-pose difference.
+
+## 0.5.0 — 2026-10-28
+
+- Add `lifelike-cat-motion` and the `CAT_MOTION` route: make a 2D or 2.5D cat move and react like a real cat. The skill collects real-cat photos and video per behavior first, writes a behavior sheet, maps the rig's channels (never faking one channel with another), builds mood → states → channels → motion with every input going through appraisal, and reviews read-only with P0–P3 findings. References cover the behavior catalog, body-language channels and mood presets, the interaction model (petting budget by zone with escalating warnings, the play sequence, startle habituation, calls and slow blinks), and motion and timing (idle timers, lateral-sequence walk, diagonal trot, anticipation and follow-through, reduced motion).
+- Ship `node scripts/check-trace.mjs <trace.json>` in the skill folder: eight order and timing rules over a recorded behavior trace (swat warning, pounce anticipation, blink reply, startle latency, mood continuity, gait footfalls, idle variety, attention chain). It exits 0, 1 or 2 and lists the rules a trace did not exercise, so a vacuous pass is visible.
+
 ## 0.4.0 — 2026-10-21
 
 - Add `pixel-sprite-animation` and the `PIXEL_SPRITE` route: a JSON sprite spec built from a base frame plus diffs (`layers`, `ops` move/copy/scale/flip/recolor/erase, `patch`), with `BASE_DIFF` as the default route and `HAND`, `PARTS`, `3D_RIG` and `IMPORT` alternatives. Effects marked `fx: true` draw after the ops and stay out of body metrics; `base` inherits the body only.

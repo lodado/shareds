@@ -1,0 +1,179 @@
+{
+  "scope": "synthetic fixtures with real installed runner/browser, NOT existing project suites",
+  "trust_boundary": "same-user processes trusted, not a security sandbox",
+  "inventory_complete": false,
+  "config": {
+    "budget": 4,
+    "workers": 2,
+    "max_runs": 2
+  },
+  "jobs": [
+    {
+      "name": "jest",
+      "runner": "jest",
+      "version": "30.4.2",
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/jest",
+        "worktree": "$SCRATCH/jest",
+        "common": "$SCRATCH/jest/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Worker limits bound runner-managed file workers, not arbitrary threads, subprocesses, test.concurrent callbacks or programs started by tests/configuration.\nagent-test job dca16184bccd4831 runner=jest workers=1 tokens=2\n  console.log\n    SMOKE_IDENTITY_OK\n\n      at Object.witness (witness.cjs:13:10)\n\nPASS ./smoke.test.cjs\n  \u2713 synthetic arithmetic env identity (27 ms)\n\nTest Suites: 1 passed, 1 total\nTests:       1 passed, 1 total\nSnapshots:   0 total\nTime:        0.186 s\nRan all test suites.\n",
+      "output_truncated": false
+    },
+    {
+      "name": "playwright",
+      "runner": "playwright",
+      "version": "1.61.1",
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/playwright",
+        "worktree": "$SCRATCH/playwright",
+        "common": "$SCRATCH/playwright/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Worker limits bound runner-managed file workers, not arbitrary threads, subprocesses, test.concurrent callbacks or programs started by tests/configuration.\nagent-test job e45169ab0e2c4ba7 runner=playwright workers=1 tokens=2\n\nRunning 1 test using 1 worker\n\n\n\n(node:77728) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.\n(Use `node --trace-warnings ...` to show where the warning was created)\n[1/1] smoke.spec.cjs:3:1 \u203a synthetic actual browser\nsmoke.spec.cjs:3:1 \u203a synthetic actual browser\nSMOKE_IDENTITY_OK\n\n  1 passed (674ms)\n",
+      "output_truncated": false
+    },
+    {
+      "name": "vitest2",
+      "runner": "vitest",
+      "version": "2.1.9",
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/vitest2",
+        "worktree": "$SCRATCH/vitest2",
+        "common": "$SCRATCH/vitest2/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Worker limits bound runner-managed file workers, not arbitrary threads, subprocesses, test.concurrent callbacks or programs started by tests/configuration.\nagent-test job 4bd16c7868e74acc runner=vitest workers=1 tokens=2\n\n RUN  v2.1.9 $SCRATCH/vitest2\n\nstdout | smoke.test.mjs > synthetic arithmetic env identity\nSMOKE_IDENTITY_OK\n\n \u2713 smoke.test.mjs (1 test) 14ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  11:31:31\n   Duration  156ms (transform 12ms, setup 0ms, collect 9ms, tests 14ms, environment 0ms, prepare 37ms)\n\n",
+      "output_truncated": false
+    },
+    {
+      "name": "vitest3",
+      "runner": "vitest",
+      "version": "3.2.7",
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/vitest3",
+        "worktree": "$SCRATCH/vitest3",
+        "common": "$SCRATCH/vitest3/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Worker limits bound runner-managed file workers, not arbitrary threads, subprocesses, test.concurrent callbacks or programs started by tests/configuration.\nagent-test job 897615dd49e64c07 runner=vitest workers=1 tokens=2\n\n RUN  v3.2.7 $SCRATCH/vitest3\n\nstdout | smoke.test.mjs > synthetic arithmetic env identity\nSMOKE_IDENTITY_OK\n\n \u2713 smoke.test.mjs (1 test) 15ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  11:31:33\n   Duration  173ms (transform 18ms, setup 0ms, collect 17ms, tests 15ms, environment 0ms, prepare 52ms)\n\n",
+      "output_truncated": false
+    },
+    {
+      "name": "vitest4",
+      "runner": "vitest",
+      "version": "4.1.9",
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/vitest4",
+        "worktree": "$SCRATCH/vitest4",
+        "common": "$SCRATCH/vitest4/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Worker limits bound runner-managed file workers, not arbitrary threads, subprocesses, test.concurrent callbacks or programs started by tests/configuration.\nagent-test job 5ba92e73e05d47e2 runner=vitest workers=1 tokens=2\n\n RUN  v4.1.9 $SCRATCH/vitest4\n\nstdout | smoke.test.mjs > synthetic arithmetic env identity\nSMOKE_IDENTITY_OK\n\n \u2713 smoke.test.mjs (1 test) 23ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  11:31:31\n   Duration  122ms (transform 13ms, setup 0ms, import 19ms, tests 23ms, environment 0ms)\n\n",
+      "output_truncated": false
+    },
+    {
+      "name": "vitest5",
+      "runner": "vitest",
+      "version": "5.0.0",
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/vitest5",
+        "worktree": "$SCRATCH/vitest5",
+        "common": "$SCRATCH/vitest5/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_truncated": false
+    },
+    {
+      "name": "node",
+      "runner": "node",
+      "version": null,
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": true,
+      "evidence": {
+        "cwd": "$SCRATCH/linked-node",
+        "worktree": "$SCRATCH/linked-node",
+        "common": "$SCRATCH/node/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Worker limits bound runner-managed file workers, not arbitrary threads, subprocesses, test.concurrent callbacks or programs started by tests/configuration.\nagent-test job 63583cf98042453f runner=node workers=1 tokens=2\nSMOKE_IDENTITY_OK\n\u2714 synthetic arithmetic env identity (25.699291ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.743542\n",
+      "output_truncated": false
+    },
+    {
+      "name": "generic",
+      "runner": "generic",
+      "version": null,
+      "status": "pass",
+      "exit_code": 0,
+      "identity_verified": true,
+      "linked_worktree": false,
+      "evidence": {
+        "cwd": "$SCRATCH/generic",
+        "worktree": "$SCRATCH/generic",
+        "common": "$SCRATCH/generic/.git",
+        "env": "synthetic-only",
+        "arithmetic": 4
+      },
+      "output_tail": "agent-test: Generic commands reserve the full scheduler budget exclusively. Internal process/thread parallelism is unknown and cannot be guaranteed.\nagent-test job 682df96809d54274 runner=generic workers=None tokens=4\nSMOKE_IDENTITY_OK\n",
+      "output_truncated": false
+    }
+  ],
+  "samples": [
+    { "used_tokens": 0, "active_runs": 0, "queued": 0 },
+    { "used_tokens": 4, "active_runs": 2, "queued": 6 },
+    { "used_tokens": 4, "active_runs": 2, "queued": 6 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 5 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 5 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 5 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 5 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 5 },
+    { "used_tokens": 4, "active_runs": 2, "queued": 2 },
+    { "used_tokens": 4, "active_runs": 2, "queued": 2 },
+    { "used_tokens": 4, "active_runs": 2, "queued": 2 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 0 },
+    { "used_tokens": 2, "active_runs": 1, "queued": 0 },
+    { "used_tokens": 0, "active_runs": 0, "queued": 0 }
+  ],
+  "blocked": [],
+  "violations": [],
+  "observed_max_tokens": 4,
+  "observed_max_active": 2,
+  "observed_queue": true,
+  "concurrency_observed": true,
+  "cleanup": "private scheduler stopped; owned temporary resources removed",
+  "status": "pass"
+}

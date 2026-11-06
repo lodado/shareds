@@ -59,3 +59,9 @@ clone-lab/
 .omx/state/
 .omx/logs/
 .omx/metrics.json
+
+# local-only cat demos
+examples/svg-cat-rig/
+examples/cat-from-photo/
+examples/cat-raster-walk/
+examples/cat-skeleton/

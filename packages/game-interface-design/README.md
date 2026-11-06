@@ -27,19 +27,26 @@ TARGET_DIR: ./my-game
 
 사용자는 주요 단계마다 **결정 → 확인한 레퍼런스와 관찰 → 이 게임에 적용한 방식 → 대안/트레이드오프 → 검증 결과 또는 미검증 가정**을 받는다. 근거 없는 수치는 제안으로 표시하고, 출처를 못 읽었다면 확인한 것처럼 쓰지 않는다. 기록은 기존 Reference Log나 코드 블루프린트에 유지한다.
 
-## 스킬 네 개
+## 스킬 다섯 개
 
-| 스킬                           | 하는 일                                                                                                       |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` · `PIXEL_SPRITE` 중 하나로 보낸다.                 |
-| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.        |
-| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다.       |
-| `pixel-sprite-animation`       | 기준 프레임 + diff로 도트 스프라이트 애니메이션을 만들고, 타이밍·스미어·타격감 린트와 컨택트 시트로 검사한다. |
+| 스킬                           | 하는 일                                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` · `PIXEL_SPRITE` · `CAT_MOTION` 중 하나로 보낸다.   |
+| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.         |
+| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다.        |
+| `pixel-sprite-animation`       | 기준 프레임 + diff로 도트 스프라이트 애니메이션을 만들고, 타이밍·스미어·타격감 린트와 컨택트 시트로 검사한다.  |
+| `lifelike-cat-motion`          | 실제 고양이 사진·영상을 근거로 몸짓·대기 동작·쓰다듬기·장난감·놀람 반응을 만들고, 행동 기록(trace)을 검사한다. |
 
 `pixel-sprite-animation`의 하네스는 스킬 폴더(`skills/pixel-sprite-animation/`)에서 `node scripts/pixel-sprite.mjs build <spec.json>`으로 돈다.
 사용자가 파일을 주면 `attach`로 스펙에 베이스·프레임·파트로 합치고(팔레트 맞춤, 출처 기록, `.bak` 보관) diff로 이어서 작업한다.
 베이스 스프라이트는 `candidates`로 무료 에셋 후보를 라이선스 등급과 함께 보드로 비교한 뒤 사용자가 고른다.
 린트 통과는 예쁜 그림이나 좋은 타격감의 증거가 아니다. 컨택트 시트 검토는 판단으로, 게임 안 손맛과 기기 검증은 `NOT_RUN`으로 보고한다.
+
+`lifelike-cat-motion`은 행동마다 실제 고양이 사진 두 장과 영상 하나를 먼저 모으고, 기분 → 상태 → 채널 → 움직임 순서로 쌓는다.
+스킬 폴더(`skills/lifelike-cat-motion/`)의 `node scripts/check-trace.mjs <trace.json>`이 경고 없는 냥펀치, 웅크림 없는 덮치기,
+귀보다 먼저 도는 고개, 뒤섞인 발 순서 같은 순서·타이밍 위반을 잡는다. 검사 통과는 고양이답다는 증거가 아니다. 포즈와 참고 사진을 나란히 놓고 보는 것은 사람의 판단으로 남긴다.
+다리를 움직일 때는 뼈대부터 만든다. `references/limb-rig-and-gait.md`는 마디 네 개짜리 다리, 관절 각도, 걷기에서 트롯으로 섞이는 걸음 해석기와 발이 미끄러지지 않는 몸 속도를 정의한다.
+`references/raster-view-rigging.md`는 승인된 래스터 스틸을 다시 그리지 않고 잘라 둔 레이어로 움직이는 방법을 다룬다. 정지 자세는 스틸과 같아야 하고, 뒷다리는 고정된 접합부 아래만 기울고 접히며, 몸 윤곽의 한 덩어리인 앞발은 장(場) 변환으로 곡선째 움직인다.
 
 ## 요청 예시
 
@@ -151,6 +158,11 @@ game-interface-design/
       scripts/pixel-sprite.mjs              하네스 CLI (build, lint, show, import, colors, attach, candidates, blender)
       scripts/lib/                          PNG 코덱·GIF 인코더, 합성, 린트, 후보 보드, Blender 렌더
       examples/knight-slash/sprite.json     기준 프레임 + diff 예제 (린트 통과)
+      evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
+    lifelike-cat-motion/
+      SKILL.md
+      references/                           행동 목록, 몸짓 채널, 상호작용 모델, 동작·타이밍, trace 형식
+      scripts/check-trace.mjs               행동 trace 순서·타이밍 검사 (규칙 8개)
       evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
   scripts/                                  검사기, 스캐폴드, 테스트
 ```

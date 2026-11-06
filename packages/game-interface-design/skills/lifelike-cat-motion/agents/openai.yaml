@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Lifelike Cat Motion'
+  short_description: 'Reference-backed cat behavior and interaction with a trace check'
+  default_prompt: 'Use $lifelike-cat-motion to make a 2.5D cat react to petting, a toy and sudden noises like a real cat, and pass the behavior-trace check.'

@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+"""User-global one-shot test scheduler. Run --help for management commands."""
+import argparse
+import base64
+import fcntl
+import json
+import os
+from pathlib import Path
+import select
+import signal
+import socket
+import subprocess
+import sys
+import time
+
+from common import atomic_json, config, home, topology
+
+HERE = Path(__file__).resolve().parent
+OWNER_PID = os.getppid()
+
+
+def connect(root, start=True):
+    path = str(root / "scheduler.sock")
+    def attempt():
+        sock = socket.socket(socket.AF_UNIX)
+        try:
+            sock.connect(path)
+            return sock
+        except OSError:
+            sock.close()
+            raise
+    try:
+        return attempt()
+    except (FileNotFoundError, ConnectionRefusedError):
+        if not start:
+            raise
+    # Startup retries are bounded; admitted/queued jobs never poll for permits.
+    with open(root / "startup.lock", "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            return attempt()
+        except (FileNotFoundError, ConnectionRefusedError):
+            pass
+        log = root / "daemon.log"
+        if log.exists() and log.stat().st_size > 1024 * 1024:
+            os.replace(log, root / "daemon.log.1")
+        with open(log, "ab", buffering=0) as output:
+            child = subprocess.Popen([sys.executable, str(HERE / "daemon.py")],
+                                     stdin=subprocess.DEVNULL, stdout=output, stderr=output,
+                                     start_new_session=True, close_fds=True)
+        for _ in range(50):
+            try:
+                return attempt()
+            except (FileNotFoundError, ConnectionRefusedError):
+                if child.poll() is not None:
+                    break
+                time.sleep(.1)
+    raise ValueError(f"Scheduler did not start; inspect {log}. No test was launched.")
+
+
+def receive(sock):
+    pending = bytearray()
+    if os.getppid() != OWNER_PID:
+        raise InterruptedError("Owning process exited")
+    # macOS kernel events detect loss of parent/agent without periodic polling.
+    watcher = None
+    parent_fd = None
+    if not hasattr(select, "kqueue") and hasattr(os, "pidfd_open") and OWNER_PID > 1:
+        parent_fd = os.pidfd_open(OWNER_PID)
+    if hasattr(select, "kqueue"):
+        watcher = select.kqueue()
+        watcher.control([select.kevent(sock.fileno(), filter=select.KQ_FILTER_READ,
+                                      flags=select.KQ_EV_ADD)], 0)
+        ancestors = subprocess.check_output(["ps", "-axo", "pid=,ppid=,comm="], text=True)
+        table = {int(f[0]): (int(f[1]), f[2]) for line in ancestors.splitlines() if len(f := line.split(None, 2)) == 3}
+        pid = OWNER_PID
+        seen = set()
+        while pid > 1 and pid not in seen and pid in table:
+            seen.add(pid)
+            parent, command = table[pid]
+            if pid == os.getppid() or Path(command).name in ("claude", "codex", "jcode"):
+                try:
+                    watcher.control([select.kevent(pid, filter=select.KQ_FILTER_PROC,
+                        flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT, fflags=select.KQ_NOTE_EXIT)], 0)
+                except ProcessLookupError:
+                    raise InterruptedError("Parent already exited")
+            pid = parent
+    try:
+        while True:
+            if watcher:
+                events = watcher.control(None, 8, None)
+                if any(e.filter == select.KQ_FILTER_PROC for e in events):
+                    raise InterruptedError("Owning process exited")
+            elif parent_fd is not None:
+                ready, _, _ = select.select([sock, parent_fd], [], [])
+                if parent_fd in ready:
+                    raise InterruptedError("Owning process exited")
+            data = sock.recv(65536)
+            if not data:
+                raise ConnectionError("Scheduler disconnected; job was NOT automatically replayed")
+            pending.extend(data)
+            while b"\n" in pending:
+                line, _, rest = pending.partition(b"\n")
+                pending = bytearray(rest)
+                yield json.loads(line)
+    finally:
+        if watcher:
+            watcher.close()
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def rpc(root, request, start=True):
+    with connect(root, start=start) as sock:
+        sock.sendall(json.dumps(request).encode() + b"\n")
+        return next(receive(sock))
+
+
+def location(cwd):
+    def git(*args):
+        result = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True)
+        return result.stdout.strip() if result.returncode == 0 else cwd
+    return git("rev-parse", "--show-toplevel"), git("rev-parse", "--path-format=absolute", "--git-common-dir")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="action", required=True)
+    run = sub.add_parser("run", help="Run tests once within the global reservation budget")
+    run.add_argument("--runner", choices=("auto", "vitest", "playwright", "jest", "node", "generic"), default="auto")
+    run.add_argument("--workers", type=int)
+    run.add_argument("--weight", type=int, help="Reserve additional tokens, never fewer than policy requires. Does not change runner worker/thread limits.")
+    run.add_argument("--timeout", type=int)
+    run.add_argument("--allow-duplicate", action="store_true")
+    run.add_argument("--concurrent-worktree", action="store_true", help="Opt in only for independent disjoint tests")
+    run.add_argument("command", nargs=argparse.REMAINDER)
+    for name in ("status", "queue", "recover", "stop"):
+        sub.add_parser(name).add_argument("--json", action="store_true")
+    cancel = sub.add_parser("cancel")
+    cancel.add_argument("id")
+    cancel.add_argument("--json", action="store_true")
+    conf = sub.add_parser("config")
+    conf.add_argument("--set", nargs="*", default=[])
+    conf.add_argument("--json", action="store_true")
+    sub.add_parser("benchmark", add_help=False)
+    args, extra = parser.parse_known_args()
+    if args.action == "benchmark":
+        os.execv(sys.executable, [sys.executable, str(HERE / "benchmark.py"), *extra])
+    if extra:
+        parser.error("unrecognized arguments: " + " ".join(extra))
+    root = home()
+    if args.action == "config":
+        if args.set:
+            # Match startup's lock order. Read inside both locks so concurrent
+            # config writers cannot overwrite each other's independent changes.
+            with open(root / "startup.lock", "a+") as startup, open(root / "daemon.lock", "a+") as lock:
+                fcntl.flock(startup, fcntl.LOCK_EX)
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise ValueError("Stop the idle daemon before changing config: agent-test stop") from None
+                proposed = config(root)
+                for entry in args.set:
+                    key, value = entry.split("=", 1)
+                    if key not in proposed:
+                        raise ValueError("Unknown configuration key: " + key)
+                    proposed[key] = value if key == "policy" else int(value)
+                if any(type(v) is not int or not 1 <= v <= 100000 for k, v in proposed.items() if k != "policy"):
+                    raise ValueError("Configuration values must be positive bounded integers")
+                if proposed["workers"] > proposed["budget"] or proposed["policy"] not in ("fixed", "weighted"):
+                    raise ValueError("Invalid worker budget or policy")
+                atomic_json(root / "config.json", proposed)
+                values = proposed
+        else:
+            values = config(root)
+        print(json.dumps({**values, "hardware": topology()}, indent=2))
+        return 0
+    if args.action != "run":
+        response = rpc(root, {"action": args.action, **({"id": args.id} if args.action == "cancel" else {})})
+        if args.json or "jobs" not in response:
+            print(json.dumps(response, indent=2))
+        else:
+            print(f"Tokens {response['used_tokens']}/{response['config']['budget']} | active {response['active_runs']} | queued {response['queued']}")
+            for row in response["jobs"]:
+                print(f"{row['id']} {row['state']:12} runner={row['runner']} workers={row['workers']} tokens={row['tokens']} wait={row['wait_seconds']:.1f}s run={row['run_seconds']:.1f}s pid={row['pid']} {row['worktree']}")
+            print(f"Wait mean/P95: {response['mean_wait_seconds']:.2f}/{response['p95_wait_seconds']:.2f}s")
+            if response["quarantine"]:
+                print("RECOVERY BLOCKED:", json.dumps(response["quarantine"]))
+        return response.get("code", 0)
+    from commands import resolve, runner_metadata
+    cfg = config(root)
+    workers = args.workers if args.workers is not None else cfg["workers"]
+    if not 1 <= workers <= cfg["workers"]:
+        raise ValueError("Workers must be within the configured per-run maximum")
+    cwd = os.getcwd()
+    command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    metadata = runner_metadata(command, cwd, args.runner)
+    generic = metadata["runner"] == "generic"
+    if generic and args.workers is not None:
+        raise ValueError("Generic commands have unknown internal parallelism; --workers cannot constrain them")
+    argv = resolve(command, cwd, workers, runner=args.runner)
+    for limitation in metadata["limitations"]:
+        print("agent-test: " + limitation, file=sys.stderr, flush=True)
+    worktree, project = location(cwd)
+    request = {"action": "run", "argv": argv, "cwd": cwd, "worktree": worktree,
+               "project": project, "env": dict(os.environ), "workers": workers,
+               "runner": metadata["runner"], "weight": args.weight, "exclusive": generic,
+               "timeout": args.timeout if args.timeout is not None else cfg["timeout"], "allow_duplicate": args.allow_duplicate,
+               "concurrent_worktree": args.concurrent_worktree}
+    with connect(root) as sock:
+        sock.sendall(json.dumps(request).encode() + b"\n")
+        for message in receive(sock):
+            event = message.get("event")
+            if "error" in message:
+                print("agent-test: " + message["error"], file=sys.stderr)
+                return message.get("code", 75)
+            if event in ("stdout", "stderr"):
+                output = sys.stdout.buffer if event == "stdout" else sys.stderr.buffer
+                output.write(base64.b64decode(message["data"]))
+                output.flush()
+            elif event == "queued":
+                print(f"agent-test job {message['id']} runner={message['runner']} workers={message['workers']} tokens={message['tokens']}", file=sys.stderr, flush=True)
+            elif event == "exit":
+                return message["code"]
+    return 75
+
+
+def interrupt(_sig, _frame):
+    raise KeyboardInterrupt
+
+
+if __name__ == "__main__":
+    for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        signal.signal(sig, interrupt)
+    try:
+        sys.exit(main())
+    except (KeyboardInterrupt, InterruptedError):
+        sys.exit(130)
+    except (ValueError, OSError, ConnectionError) as error:
+        print(f"agent-test: {error}", file=sys.stderr)
+        sys.exit(75)

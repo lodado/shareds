@@ -17,6 +17,12 @@ or grants of rights. New synthetic examples are proposals, not observed real gam
 
 No original remote file was changed or published during creation of this archive.
 
+## Lifelike cat motion (0.5.0)
+
+The behavior rules and timings are written for this package from published cat-behavior and locomotion
+research and openly licensed photos and videos read while writing them. No text, image or video from those
+sources is bundled, and the skill files name none of them. The trace checker's tests use synthetic traces.
+
 ## Pixel sprite animation (0.4.0)
 
 The knight-slash example, its palette, the contact-sheet digit glyphs and the Blender demo scene are

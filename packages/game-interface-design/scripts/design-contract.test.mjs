@@ -136,6 +136,15 @@ test('pixel sprite behavior rubrics are declared unexecuted with unique ids', ()
   assert.equal(new Set(cases.cases.map((c) => c.id)).size, 7)
 })
 
+test('cat behavior rubrics are declared unexecuted with unique ids', () => {
+  const cases = JSON.parse(
+    readFileSync(path.join(ROOT, 'skills/lifelike-cat-motion/evals/behavior-cases.json'), 'utf8'),
+  )
+  assert.equal(cases.status, 'not_executed')
+  assert.equal(cases.cases.length, 4)
+  assert.equal(new Set(cases.cases.map((c) => c.id)).size, 4)
+})
+
 test('codex starter prompts: at most three, each at most 128 characters', () => {
   const prompts = (defaultPrompt) => codexPromptErrors({ interface: { defaultPrompt } })
   assert.deepEqual(prompts(['a', 'b', 'c']), [])

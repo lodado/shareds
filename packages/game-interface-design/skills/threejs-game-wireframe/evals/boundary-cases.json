@@ -1,6 +1,6 @@
 {
   "status": "not_executed",
-  "description": "Routing and fidelity expectations for the game-interface-design entry, threejs-game-wireframe and pixel-sprite-animation. Rubrics for a model-behavior run, not results.",
+  "description": "Routing and fidelity expectations for the game-interface-design entry, threejs-game-wireframe, pixel-sprite-animation and lifelike-cat-motion. Rubrics for a model-behavior run, not results.",
   "cases": [
     {
       "id": "plan-only",
@@ -178,6 +178,16 @@
         "ecs": "required"
       },
       "must_not": ["redraw the sprites", "rerun the full planning interview"]
+    },
+    {
+      "id": "cat-reacts-like-a-cat",
+      "prompt": "고양이 캐릭터가 쓰다듬기·장난감·큰 소리에 진짜 고양이처럼 반응하게 만들어줘.",
+      "expect": { "skill": "lifelike-cat-motion", "mode": "CAT_MOTION", "level": null, "ecs": "n/a" },
+      "must_not": [
+        "scaffold a Three.js project",
+        "invent behavior timing without real-cat references",
+        "claim the cat feels alive from the trace check alone"
+      ]
     }
   ]
 }

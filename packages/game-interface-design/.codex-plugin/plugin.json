@@ -1,7 +1,7 @@
 {
   "name": "game-interface-design",
-  "version": "0.4.0",
-  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, and lint-gated pixel sprite animation.",
+  "version": "0.6.1",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, and lifelike cat behavior with a trace check.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -13,7 +13,7 @@
   "interface": {
     "displayName": "Game Design, Prototypes and Sprites",
     "shortDescription": "Plan games, build Three.js prototypes, animate pixel sprites",
-    "longDescription": "Plan meaningful play, failure and replay, HUDs, game feel and business hypotheses; optionally produce editable Figma game UI; then turn the plan into a local Three.js prototype whose rules run in a headless ECS inside an FSD page slice, with typecheck, Steiger, headless, build and browser verification. Animate pixel sprites from a base frame plus diffs, gated by palette, phase, timing, smear and hit-feel lint with a contact-sheet review.",
+    "longDescription": "Plan meaningful play, failure and replay, HUDs, game feel and business hypotheses; optionally produce editable Figma game UI; then turn the plan into a local Three.js prototype whose rules run in a headless ECS inside an FSD page slice, with typecheck, Steiger, headless, build and browser verification. Animate pixel sprites from a base frame plus diffs, gated by palette, phase, timing, smear and hit-feel lint with a contact-sheet review. Make a 2D or 2.5D cat move and react like a real cat, from idle life to petting warnings, toy play and startle, built from real-cat references and checked by a behavior-trace script.",
     "developerName": "lodado",
     "category": "Productivity",
     "capabilities": ["Research", "Figma", "Write", "Code"],

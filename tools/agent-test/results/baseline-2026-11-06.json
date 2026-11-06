@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "project": "/Users/chungheon/Desktop/programming/deep-agent-uiux-nextjs",
+  "fixed_tests": [
+    "src/entities/document/lib/piiMask.test.ts",
+    "src/entities/document/lib/fieldSchemaAdapter.attachMeta.test.ts",
+    "src/entities/document/lib/fieldSchemaAdapter.bbox.test.ts",
+    "src/entities/document/lib/fieldSchemaAdapter.confidence.test.ts",
+    "src/entities/document/lib/fieldSchemaAdapter.maskstate.test.ts",
+    "src/entities/document/lib/maskVisibility.test.ts",
+    "src/entities/document/lib/review-utils.test.ts",
+    "src/entities/document/lib/schemaFieldValueType.test.ts"
+  ],
+  "jobs_per_experiment": 4,
+  "sample_interval_s": 0.5,
+  "scratch": "/Users/chungheon/.jcode/scratch/agent-test-benchmark-i720280u",
+  "environment_before": {
+    "time": "2026-11-06T01:53:51.242371+00:00",
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "cpu_count": 10,
+    "memory": {
+      "command": ["vm_stat"],
+      "exit_code": 0,
+      "stdout": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                     8352.\nPages active:                                 486172.\nPages inactive:                               480950.\nPages speculative:                              3832.\nPages throttled:                                   0.\nPages wired down:                             284226.\nPages purgeable:                                5253.\n\"Translation faults\":                     5452040112.\nPages copy-on-write:                       419058215.\nPages zero filled:                        2015791237.\nPages reactivated:                         572645568.\nPages purged:                               17761276.\nFile-backed pages:                            170883.\nAnonymous pages:                              800071.\nPages stored in compressor:                   540993.\nPages occupied by compressor:                 267970.\nDecompressions:                            562063933.\nCompressions:                              711848849.\nPageins:                                    81409374.\nPageouts:                                     201952.\nSwapins:                                     7503792.\nSwapouts:                                   22317143.\nPages tagged:                                 121702.\nPages tagged resident:                        103186.\nPages tagged compressed:                       18516.\nPages tag-storage:                             49152.\nPages tag-storage holding tags:                 5589.\nPages tag-storage free:                           49.\nPages tag-storage non-tag pageable:            43334.\nPages tag-storage non-tag wired:                  75.\nBytes of compressed tags:                    2887744.\nTagged compressions:                         7711523.\nTagged decompressions:                       7465481.\n",
+      "stderr": ""
+    },
+    "swap": {
+      "command": ["sysctl", "vm.swapusage"],
+      "exit_code": 0,
+      "stdout": "vm.swapusage: total = 11264.00M  used = 9600.00M  free = 1664.00M  (encrypted)\n",
+      "stderr": ""
+    },
+    "hardware": {
+      "command": ["sysctl", "hw.memsize", "hw.ncpu"],
+      "exit_code": 0,
+      "stdout": "hw.memsize: 25769803776\nhw.ncpu: 10\n",
+      "stderr": ""
+    },
+    "pressure": {
+      "memory": {
+        "command": ["sysctl", "-n", "kern.memorystatus_vm_pressure_level"],
+        "exit_code": 0,
+        "stdout": "1\n",
+        "stderr": ""
+      },
+      "thermal": {
+        "command": ["pmset", "-g", "therm"],
+        "exit_code": 0,
+        "stdout": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+        "stderr": ""
+      },
+      "severe": false
+    },
+    "process_snapshot": "omitted: unrelated process data is not retained"
+  },
+  "node": {
+    "command": ["/Users/chungheon/.nvm/versions/node/v26.7.0/bin/node", "--version"],
+    "exit_code": 0,
+    "stdout": "v26.7.0\n",
+    "stderr": ""
+  },
+  "vitest": {
+    "command": [
+      "/Users/chungheon/.nvm/versions/node/v26.7.0/bin/node",
+      "/Users/chungheon/Desktop/programming/deep-agent-uiux-nextjs/node_modules/vitest/vitest.mjs",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "vitest/4.1.9 darwin-arm64 node-v26.7.0\n",
+    "stderr": ""
+  },
+  "experiments": [
+    {
+      "name": "concurrent1-workers1",
+      "repeat": 1,
+      "command": [
+        "/Users/chungheon/.nvm/versions/node/v26.7.0/bin/node",
+        "/Users/chungheon/Desktop/programming/deep-agent-uiux-nextjs/node_modules/vitest/vitest.mjs",
+        "run",
+        "src/entities/document/lib/piiMask.test.ts",
+        "src/entities/document/lib/fieldSchemaAdapter.attachMeta.test.ts",
+        "src/entities/document/lib/fieldSchemaAdapter.bbox.test.ts",
+        "src/entities/document/lib/fieldSchemaAdapter.confidence.test.ts",
+        "src/entities/document/lib/fieldSchemaAdapter.maskstate.test.ts",
+        "src/entities/document/lib/maskVisibility.test.ts",
+        "src/entities/document/lib/review-utils.test.ts",
+        "src/entities/document/lib/schemaFieldValueType.test.ts",
+        "--no-cache",
+        "--configLoader=runner",
+        "--attachmentsDir=/Users/chungheon/.jcode/scratch/agent-test-benchmark-i720280u/attachments",
+        "--reporter=dot",
+        "--maxWorkers=1"
+      ],
+      "wall_s": 1.064450833000592,
+      "jobs": [
+        {
+          "index": 0,
+          "log_path": "/Users/chungheon/.jcode/scratch/agent-test-benchmark-i720280u/concurrent1-workers1-0/job-0.log",
+          "exit_code": 1,
+          "run_s": 0.39062591700349003,
+          "wait_s": 0.01216658299381379,
+          "cpu_user_s": 0.25198899999999996,
+          "cpu_system_s": 0.070413
+        },
+        {
+          "index": 1,
+          "log_path": "/Users/chungheon/.jcode/scratch/agent-test-benchmark-i720280u/concurrent1-workers1-0/job-1.log",
+          "exit_code": 1,
+          "run_s": 0.2210702080046758,
+          "wait_s": 0.4345321669970872,
+          "cpu_user_s": 0.206474,
+          "cpu_system_s": 0.036284
+        },
+        {
+          "index": 2,
+          "log_path": "/Users/chungheon/.jcode/scratch/agent-test-benchmark-i720280u/concurrent1-workers1-0/job-2.log",
+          "exit_code": 1,
+          "run_s": 0.16803708400402684,
+          "wait_s": 0.6865305829996942,
+          "cpu_user_s": 0.16433999999999999,
+          "cpu_system_s": 0.025814
+        },
+        {
+          "index": 3,
+          "log_path": "/Users/chungheon/.jcode/scratch/agent-test-benchmark-i720280u/concurrent1-workers1-0/job-3.log",
+          "exit_code": 1,
+          "run_s": 0.1495463750034105,
+          "wait_s": 0.8848660420044325,
+          "cpu_user_s": 0.14860299999999999,
+          "cpu_system_s": 0.022008999999999997
+        }
+      ],
+      "jobs_requested": 4,
+      "jobs_successful": 0,
+      "exit_failures": 4,
+      "jobs_per_second": 0.0,
+      "cpu_user_system_s": 0.9259259999999999,
+      "sampled_max_tree_rss_kib": 92976,
+      "sampled_max_tree_cpu_percent": 33.3,
+      "samples": [
+        {
+          "elapsed_s": 0.012176042000646703,
+          "cpu_percent": 0.0,
+          "rss_kib": 576,
+          "process_count": 1,
+          "processes": [[85857, 85841, 0.0, 576]],
+          "sample_error": null
+        },
+        {
+          "elapsed_s": 0.5473547500005225,
+          "cpu_percent": 33.3,
+          "rss_kib": 92976,
+          "process_count": 1,
+          "processes": [[85871, 85841, 33.3, 92976]],
+          "sample_error": null
+        }
+      ],
+      "pressure_checks": [
+        {
+          "elapsed_s": 4.3330073822289705e-6,
+          "memory": {
+            "command": ["sysctl", "-n", "kern.memorystatus_vm_pressure_level"],
+            "exit_code": 0,
+            "stdout": "1\n",
+            "stderr": ""
+          },
+          "thermal": {
+            "command": ["pmset", "-g", "therm"],
+            "exit_code": 0,
+            "stdout": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+            "stderr": ""
+          },
+          "severe": false
+        }
+      ],
+      "abort": null
+    }
+  ],
+  "accounting": "Bounded, stdlib-only real Vitest benchmark. No installs or project edits.\n\nCPU accounting uses wait4 on each owned child. On Unix this includes descendants\nwhose usage the child collected by waiting, not detached/unwaited descendants.\nThe process-tree ps samples independently expose live descendant CPU and RSS.\n",
+  "stop_reason": "test_failure",
+  "summary_medians": [
+    {
+      "name": "concurrent1-workers1",
+      "repeats": 1,
+      "wall_s": 1.064450833000592,
+      "cpu_user_system_s": 0.9259259999999999,
+      "sampled_max_tree_rss_kib": 92976,
+      "sampled_max_tree_cpu_percent": 33.3,
+      "jobs_per_second": 0.0,
+      "exit_failures": 4,
+      "aborts": []
+    }
+  ],
+  "environment_after": {
+    "time": "2026-11-06T01:53:52.448456+00:00",
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "cpu_count": 10,
+    "memory": {
+      "command": ["vm_stat"],
+      "exit_code": 0,
+      "stdout": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                    20782.\nPages active:                                 474486.\nPages inactive:                               471383.\nPages speculative:                              2263.\nPages throttled:                                   0.\nPages wired down:                             289412.\nPages purgeable:                                3711.\n\"Translation faults\":                     5452122801.\nPages copy-on-write:                       419061330.\nPages zero filled:                        2015832840.\nPages reactivated:                         572649678.\nPages purged:                               17761284.\nFile-backed pages:                            170606.\nAnonymous pages:                              777526.\nPages stored in compressor:                   552597.\nPages occupied by compressor:                 273177.\nDecompressions:                            562064911.\nCompressions:                              711861729.\nPageins:                                    81410767.\nPageouts:                                     201952.\nSwapins:                                     7503792.\nSwapouts:                                   22317143.\nPages tagged:                                 121682.\nPages tagged resident:                        103137.\nPages tagged compressed:                       18545.\nPages tag-storage:                             49152.\nPages tag-storage holding tags:                 5589.\nPages tag-storage free:                           98.\nPages tag-storage non-tag pageable:            43161.\nPages tag-storage non-tag wired:                  75.\nBytes of compressed tags:                    2892928.\nTagged compressions:                         7711571.\nTagged decompressions:                       7465500.\n",
+      "stderr": ""
+    },
+    "swap": {
+      "command": ["sysctl", "vm.swapusage"],
+      "exit_code": 0,
+      "stdout": "vm.swapusage: total = 11264.00M  used = 9600.00M  free = 1664.00M  (encrypted)\n",
+      "stderr": ""
+    },
+    "hardware": {
+      "command": ["sysctl", "hw.memsize", "hw.ncpu"],
+      "exit_code": 0,
+      "stdout": "hw.memsize: 25769803776\nhw.ncpu: 10\n",
+      "stderr": ""
+    },
+    "pressure": {
+      "memory": {
+        "command": ["sysctl", "-n", "kern.memorystatus_vm_pressure_level"],
+        "exit_code": 0,
+        "stdout": "1\n",
+        "stderr": ""
+      },
+      "thermal": {
+        "command": ["pmset", "-g", "therm"],
+        "exit_code": 0,
+        "stdout": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+        "stderr": ""
+      },
+      "severe": false
+    },
+    "process_snapshot": "omitted: unrelated process data is not retained"
+  }
+}
