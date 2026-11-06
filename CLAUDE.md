@@ -9,20 +9,30 @@ Install these plugins at user scope only. Do not add `--scope project` installs 
 `claude plugin update --scope project`: a project-scope install is a second copy that goes stale.
 
 After successfully committing and pushing a change under `packages/<plugin>/skills/`, with the
-version bump its contract test requires, refresh the installs:
+version bump its contract test requires (one version in the plugin's `package.json`, `.claude-plugin/plugin.json`,
+`.codex-plugin/plugin.json` when present, and its entry in the root `.claude-plugin/marketplace.json`), refresh the
+installs:
 
 ```sh
-git -C ~/orca/my-Vibe-Coding-Helper merge --ff-only main  # marketplace root; skip if it has local work
+git -C ~/orca/my-Vibe-Coding-Helper merge --ff-only main  # Codex's local marketplace source; skip if it has local work
 claude plugin marketplace update my-vibe-coding-helper
 claude plugin update <plugin>@my-vibe-coding-helper
 codex plugin add <plugin>@my-vibe-coding-helper
 rsync -a packages/<plugin>/skills/<skill>/ "$HOME/.jcode/skills/<skill>/"
 ```
 
-A flat layout (`packages/<plugin>/skills/SKILL.md`, e.g. frontend-oracle-design) copies
+A flat layout (`packages/<plugin>/skills/SKILL.md`, e.g. frontend-system-design) copies
 `skills/` to `~/.jcode/skills/<plugin>/`. Run this only after the push succeeds. The rsync does
 not delete host-local files; verify each install against the repository source and preserve
 local-only data. Restart Claude to load the new plugin version.
+
+## Checks
+
+`pnpm lint` and `pnpm test` at the root run every package through turbo (cached); `pnpm test` also runs
+`.claude/hooks/*.test.mjs`. For one package, filter by its `package.json` name, which can differ from the folder
+(`pnpm --filter @lodado/harness-team-plugin test`). The pre-commit hook runs lint-staged and then both full commands;
+commit headers follow conventional commits and stay within 100 characters. A fresh Orca worktree has no `node_modules`
+or `.husky/_/`, so commits fail until `pnpm install --frozen-lockfile` runs.
 
 ## slack-dispatch service
 
