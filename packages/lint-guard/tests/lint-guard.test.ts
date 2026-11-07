@@ -44,6 +44,28 @@ test('git commit passes when the diff is clean', async ($, on) => {
   expect(result).toEqual({ result: 'tool ran' })
 })
 
+// git quotes a non-ASCII path as octal UTF-8 bytes; the mod runtime has no Node `Buffer` to decode it.
+const QUOTED_DOC_DIFF = [
+  '+++ "b/src/__docs__/\\354\\225\\204\\355\\202\\244\\355\\205\\215\\354\\262\\230.md"',
+  '@@ -0,0 +1,1 @@',
+  '+# 문서',
+].join('\n')
+const QUOTED_CODE_DIFF = DIFF_WITH_EVASION.replace('+++ b/src/a.ts', '+++ "b/src/\\355\\225\\234\\352\\270\\200.ts"')
+
+test('git commit passes when the clean diff has a git-quoted non-ASCII path', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: QUOTED_DOC_DIFF, stderr: '' } }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })
+  expect(result).toEqual({ result: 'tool ran' })
+})
+
+test('git commit names the decoded path of an evasion in a git-quoted non-ASCII file', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: QUOTED_CODE_DIFF, stderr: '' } }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })
+  expect(result.deny).toContain('src/한글.ts:3 as-any')
+})
+
 test('git commit is denied when the diff cannot be read', async ($, on) => {
   on('tool.call', () => ({ result: 'tool ran' }))
   on('process.run', () => ({ value: { exitCode: 128, stdout: '', stderr: 'fatal: broken' } }))

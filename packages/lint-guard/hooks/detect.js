@@ -121,7 +121,18 @@ export function evasionsInToolCall(e) {
 
 const SIMPLE_ESCAPES = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 }
 
+// The mod runtime has no Node globals such as `Buffer`, so UTF-8 bytes are decoded with
+// ECMAScript's own `decodeURIComponent`; bytes that are not valid UTF-8 keep git's quoted form.
+function utf8(bytes, quoted) {
+  try {
+    return decodeURIComponent(bytes.map((byte) => `%${byte.toString(16).padStart(2, '0')}`).join(''))
+  } catch {
+    return quoted
+  }
+}
+
 // git quotes a path with non-ASCII bytes, tabs or quotes as a C string: "b/\303\251.ts".
+// Everything inside the quotes is ASCII: each other byte is an octal escape.
 function diffPath(target) {
   const raw = target.endsWith('\t') ? target.slice(0, -1) : target
   if (!raw.startsWith('"')) return raw.replace(/^b\//, '')
@@ -136,10 +147,10 @@ function diffPath(target) {
       bytes.push(SIMPLE_ESCAPES[inner[at + 1]])
       at += 1
     } else {
-      bytes.push(...Buffer.from(inner[at]))
+      bytes.push(inner.charCodeAt(at))
     }
   }
-  return Buffer.from(bytes).toString('utf8').replace(/^b\//, '')
+  return utf8(bytes, inner).replace(/^b\//, '')
 }
 
 // Added lines per file from `git diff -U0`, with the new-file line number of each.
