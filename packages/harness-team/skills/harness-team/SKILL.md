@@ -20,6 +20,9 @@ permissions and does not change the user-facing tone. The agent owns execution, 
   with reasons. Review-only tasks report findings without edits.
 - State the goal, observable completion criteria, scope, reuse candidates, and verification commands.
   Finish the requested scope, not just a plan.
+- When the result depends on reasoning rather than a fixed procedure, write one to three mistake scenarios before
+  building, one line each: the step that can go wrong, the wrong result, and why it is likely. Skip generic ones that
+  would fit any task. A fixed-procedure task or a plain answer gets none, and nothing is written in its place.
 
 ## Context budget
 
@@ -48,7 +51,8 @@ Review-only tasks make no edits.
 Review the requirements, complete on-disk diff, new files, and check results against this checklist. Read every diff
 line and new file; do not sample or accept "generally fine."
 
-- Evidence: each completion criterion has command results, tests, or code evidence; reported statuses match execution.
+- Evidence: each completion criterion has command results, tests, or code evidence; reported statuses match execution;
+  each declared mistake scenario is shown not to have happened.
 - Behavior: empty/null inputs, boundaries, errors, retries, concurrency, ordering, and every affected caller.
 - Tests: new behavior has regression coverage that fails without the change; no weakened, skipped, or deleted checks,
   lint suppressions, type escapes, or widened ignores.
@@ -68,6 +72,10 @@ Review-only tasks return findings without applying them.
 
 Report the outcome, key files, actual check commands with `PASS`, `FAIL`, `NOT_RUN`, or `N/A`, and the review verdict
 and whether it was independent, or that no review was required. Never invent runs, reviewers, or savings.
+
+Under `Decisions`, list a choice only when it was material and the user could reasonably have chosen otherwise, in one
+line: the options, the pick, and why. Choices that host rules require you to ask are asked, not listed. Write nothing
+when there were none. Report each declared mistake scenario once, in one line, with its outcome: the signal that prevented it, or that it occurred.
 
 When persistent repository memory exists, the carry-over ledger lives there, not in the final report:
 
