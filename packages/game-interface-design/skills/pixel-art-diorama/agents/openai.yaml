@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Pixel Art Diorama'
+  short_description: 'Low-res 3D pixel-art diorama with a draw-call budget and headless checks'
+  default_prompt: 'Use $pixel-art-diorama to build a three.js scene that renders as pixel art, keep draw calls low, and verify it with headless SwiftShader screenshots.'

@@ -1,8 +1,8 @@
 {
   "name": "@lodado/game-interface-design-plugin",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "private": true,
-  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, and lifelike cat behavior with a trace check.",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, lifelike cat behavior with a trace check, and three.js pixel-art dioramas with a draw-call budget.",
   "license": "MIT",
   "scripts": {
     "lint": "eslint scripts skills/pixel-sprite-animation/scripts skills/lifelike-cat-motion/scripts",

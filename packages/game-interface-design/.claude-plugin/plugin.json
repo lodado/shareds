@@ -1,7 +1,7 @@
 {
   "name": "game-interface-design",
-  "version": "0.6.2",
-  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, and lifelike cat behavior with a trace check.",
+  "version": "0.7.0",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, lifelike cat behavior with a trace check, and three.js pixel-art dioramas with a draw-call budget.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -22,6 +22,7 @@
     "pixel-art",
     "sprite-animation",
     "character-behavior",
-    "cat-animation"
+    "cat-animation",
+    "pixel-art-diorama"
   ]
 }

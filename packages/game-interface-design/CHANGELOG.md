@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 — 2026-11-07
+
+- New skill `pixel-art-diorama`, a three.js scene rendered as pixel art: a low-res render target with depth outlines, dark-midtone Bayer dither and palette quantization, a toon ramp, an orthographic camera at 31° snapped to the texel grid with camera-side cutaways, an optional headless simulation (fixed step, generator coroutines, grid A\*, closed-form rolling and lobs), a draw-call budget (static bake with live nodes, one instanced mesh for every doll, off-screen render skip, shadow map sized to the frame) and headless SwiftShader verification. Its references carry the complete modules of a worked example, each code block opening with its module path.
+- The router sends a three.js scene rendered as pixel art to the new `PIXEL_DIORAMA` mode, and diorama reviews stay read-only there.
+
 ## 0.6.1 — 2026-11-06
 
 - Reject mood trace events without finite valence and arousal instead of reporting an untested continuity rule as checked.

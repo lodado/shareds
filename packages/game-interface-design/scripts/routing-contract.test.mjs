@@ -15,7 +15,7 @@ const SKILLS = fileURLToPath(new URL('../skills/', import.meta.url))
 const read = (rel) => readFileSync(path.join(SKILLS, rel), 'utf8')
 const cases = JSON.parse(read('threejs-game-wireframe/evals/boundary-cases.json'))
 
-const MODES = new Set(['PLAN_ONLY', 'FIGMA', 'THREEJS_WIREFRAME', 'PIXEL_SPRITE', 'CAT_MOTION'])
+const MODES = new Set(['PLAN_ONLY', 'FIGMA', 'THREEJS_WIREFRAME', 'PIXEL_SPRITE', 'CAT_MOTION', 'PIXEL_DIORAMA'])
 const LEVELS = new Set([null, 'LAYOUT_ONLY', 'FLOW_PROTOTYPE', 'PLAYABLE_GREYBOX'])
 const ECS = new Set(['n/a', 'optional', 'required'])
 const SKILL_FOR_MODE = {
@@ -24,6 +24,7 @@ const SKILL_FOR_MODE = {
   THREEJS_WIREFRAME: 'threejs-game-wireframe',
   PIXEL_SPRITE: 'pixel-sprite-animation',
   CAT_MOTION: 'lifelike-cat-motion',
+  PIXEL_DIORAMA: 'pixel-art-diorama',
 }
 const ECS_FOR_LEVEL = { LAYOUT_ONLY: 'n/a', FLOW_PROTOTYPE: 'optional', PLAYABLE_GREYBOX: 'required' }
 
@@ -127,6 +128,24 @@ test('cat behavior requests route to the cat lane, which owns its review and lin
   }
   assert.match(cat, /`node scripts\/check-trace\.mjs <trace\.json>`/)
   assert.match(cat, /Never\s+claim\s+the\s+cat\s+feels\s+alive\s+on\s+the\s+strength\s+of\s+the\s+check\s+alone/)
+})
+
+// Low risk: static instruction routing for the diorama lane; the code it quotes is tested in the app it came from.
+test('pixel-art 3D diorama requests route to the diorama lane, which owns its review and ships whole modules', () => {
+  const router = read('game-interface-design/SKILL.md')
+  const diorama = read('pixel-art-diorama/SKILL.md')
+  assert.match(router, /A review request[^\n]*diorama scene → Pixel Art Diorama[^\n]*stays read-only/)
+  assert.match(router, /animating its sprites stays `PIXEL_SPRITE`/)
+  assert.match(diorama, /ordered\s+P0–P3/)
+  assert.match(diorama, /without editing until asked/)
+  assert.match(diorama, /NOT_RUN/)
+  for (const ref of ['render-pipeline', 'camera', 'scene', 'simulation', 'draw-calls', 'verification', 'pitfalls']) {
+    assert.match(diorama, new RegExp(`\\(references/${ref}\\.md\\)`), ref)
+  }
+  // each code block opens with its module path, so its relative imports resolve
+  for (const ref of ['render-pipeline', 'camera', 'scene', 'simulation', 'draw-calls', 'verification']) {
+    assert.match(read(`pixel-art-diorama/references/${ref}.md`), /^```\w*\n\/\/ (?:src|qa)\/\S+\.\w+$/m, ref)
+  }
 })
 
 test('product copy rules ship byte-identical to the frontend-interface-design copy', () => {

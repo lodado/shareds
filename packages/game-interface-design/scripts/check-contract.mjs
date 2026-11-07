@@ -12,7 +12,7 @@ import { validateReport } from './validate-design.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PLUGIN = 'game-interface-design'
-const SKILLS = ['game-interface-design', 'lifelike-cat-motion', 'pixel-sprite-animation', 'reference-driven-game-design', 'threejs-game-wireframe']
+const SKILLS = ['game-interface-design', 'lifelike-cat-motion', 'pixel-art-diorama', 'pixel-sprite-animation', 'reference-driven-game-design', 'threejs-game-wireframe']
 const IGNORED_DIRS = new Set(['node_modules', 'dist', '.git', 'test-results', 'playwright-report', '.test-tmp'])
 const LINK = /\]\((?<inner>[^)]*)\)/g
 

@@ -1,0 +1,25 @@
+# Pitfalls
+
+Read screenshots against this table. Rows without a mark were seen on screen or in a failing test
+while building the worked example; rows marked _(guarded)_ are failure modes its code was written to avoid,
+so they were not observed there.
+
+| Symptom                                                    | Cause                                                                                               | Fix                                                                                   |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Whole scene shimmers a pixel while the camera follows      | target between texels                                                                               | snap the target on the camera's right and up axes each frame ([camera](camera.md))    |
+| Green star patches on the court                            | floor 5 mm above the grass cap; the depth buffer cannot separate them from the grass's triangle fan | `FLOOR_Y` 3 cm, lift everything standing on it by the same constant, tighten near/far |
+| Lines across flat floors in the wide view                  | fixed outline threshold; floor depth changes `texel × cot 31°` per pixel                            | threshold `0.2 + texelWorld × 2.5`                                                    |
+| Floodlit patches show the previous floor texture           | one floor material with its `map` swapped                                                           | one material per surface; swap `floor.material`                                       |
+| A hitch when the lights come on _(guarded)_                | toggling `visible` changes the light count and recompiles every shader                              | switch lights with `intensity = 0`                                                    |
+| Turning the lamps on recolours other objects _(guarded)_   | lamp faces used the shared per-colour material                                                      | a dedicated lamp material                                                             |
+| Island looks like a flat plate                             | rock layers too shallow for a 31° view                                                              | deep, steep layers (about 28 m) and aim the wide view below the grass                 |
+| Two team kits become one colour _(guarded)_                | palette had no entry near one kit                                                                   | one palette entry per kit; a test that each kit snaps to its own colour               |
+| Penalty arcs drawn as 270° loops                           | arc end angle wrapped the wrong way                                                                 | wrap the end to within π of the start; test the arc span                              |
+| An animated part stands still after optimizing             | it was baked: the copy is drawn, the original moves                                                 | `markLive` on everything that changes after build                                     |
+| Faces vanish on a mirrored part after baking _(guarded)_   | negative-determinant matrix flips the winding                                                       | reverse each triangle when the determinant is negative                                |
+| Dolls disappear near the frame edge _(guarded)_            | instanced mesh culled with a stale bounding sphere                                                  | `frustumCulled = false` on instances that move                                        |
+| Frame cost stays high while reading below the stage        | rendering an off-screen canvas                                                                      | `IntersectionObserver` skips render; the simulation keeps running                     |
+| `THREE.BufferGeometry.toNonIndexed(): already non-indexed` | calling it on every geometry                                                                        | call it only when `geometry.index` is set                                             |
+| A scripted sequence never ends _(guarded)_                 | `until` predicate never became true                                                                 | a timeout on every `until`                                                            |
+| GLSL in a TS string trips the lint guard                   | `void main()` reads as a `void` expression                                                          | `.glsl` files imported with `?raw`                                                    |
+| Vitest fails on `@voca/ui`-style packages (`__extends`)    | CJS/ESM mix in the component library's dependencies                                                 | `resolve.mainFields: ["module", "main"]` and `server.deps.inline` for that chain      |

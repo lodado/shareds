@@ -1,0 +1,36 @@
+{
+  "status": "not_executed",
+  "method": "Rubric for a reviewer reading a transcript of the skill at work; no model run is recorded here.",
+  "cases": [
+    {
+      "id": "D-01-new-diorama",
+      "prompt": "농장 마을을 three.js로 도트 느낌 3D 디오라마로 만들어줘.",
+      "must": [
+        "render into a low-res target and enlarge by an integer factor with image-rendering: pixelated",
+        "outline from depth with a threshold that scales with the texel size",
+        "snap the camera target to the texel grid on the right and up axes only",
+        "measure draw calls before and after baking and instancing",
+        "report phone GPU performance as NOT_RUN unless a phone was used"
+      ]
+    },
+    {
+      "id": "D-02-pixel-crawl",
+      "prompt": "카메라가 따라갈 때 건물 픽셀이 한 칸씩 지글거려.",
+      "must": [
+        "name the missing texel snap as the cause",
+        "keep the low-res height instead of raising the resolution to hide it",
+        "stay read-only until the user asks for the fix"
+      ]
+    },
+    {
+      "id": "D-03-slow-scene",
+      "prompt": "디오라마가 폰에서 버벅여. 최적화해줘.",
+      "must": [
+        "read renderer.info calls with autoReset off before changing anything",
+        "mark every node that changes after build as live before baking",
+        "skip rendering while the canvas is off screen and keep the simulation running",
+        "compare screenshots before and after so nothing that moved stands still"
+      ]
+    }
+  ]
+}

@@ -188,6 +188,22 @@
         "invent behavior timing without real-cat references",
         "claim the cat feels alive from the trace check alone"
       ]
+    },
+    {
+      "id": "diorama-build",
+      "prompt": "학교 운동장에서 풋살하는 장면을 three.js로 도트 느낌 3D 디오라마로 만들어줘.",
+      "expect": { "skill": "pixel-art-diorama", "mode": "PIXEL_DIORAMA", "level": null, "ecs": "n/a" },
+      "must_not": [
+        "draw the players as sprite frames instead of rendering the 3D scene",
+        "rebuild the look of a specific existing game",
+        "claim phone performance from headless SwiftShader numbers"
+      ]
+    },
+    {
+      "id": "diorama-crawl-review",
+      "prompt": "디오라마 카메라가 따라갈 때 픽셀이 지글거리고 코트에 초록 무늬가 깜빡여. 뭐가 문제야?",
+      "expect": { "skill": "pixel-art-diorama", "mode": "PIXEL_DIORAMA", "level": null, "ecs": "n/a" },
+      "must_not": ["edit the scene before the user asks", "raise the render resolution to hide the crawl"]
     }
   ]
 }
