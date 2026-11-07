@@ -17,9 +17,11 @@ The adapter is the only boundary between the model and the product. It exports:
 
 Every call may be async. The adapter imports product modules and test harnesses only. It must not import
 `MODEL.bend`, a generated `*.model.mjs`, any `oracle-*.mjs` script or `fast-check`, read files, or compute
-expected values: it observes, it does not re-implement. With `state`, `command` and `relations` in the SPEC it
-also exports `concretize(modelState)`, `step(productState, command)` and `project(productState)` for the property
-suite.
+expected values: it observes, it does not re-implement. A fake dependency fails in every way the real one can:
+it rejects, throws before returning a promise, and stays pending until the event that settles it. Keep the fakes
+in the adapter file: RED and GREEN compare only the adapter and `out`, so a fake in another file could change
+after RED unnoticed. With `state`, `command` and `relations` in the SPEC it also exports
+`concretize(modelState)`, `step(productState, command)` and `project(productState)` for the property suite.
 
 A real bug trace goes in `BUGS.json` beside `MODEL.bend`:
 `[{ "id": "B1", "trace": [{ "$": "Click" }, { "$": "Click" }] }]`. The model computes its expectation each time.

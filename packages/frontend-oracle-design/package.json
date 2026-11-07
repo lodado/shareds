@@ -1,6 +1,6 @@
 {
   "name": "@lodado/frontend-oracle-design-plugin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Six-step frontend behavior work: a 7-axis spec, a Bend proof, generated fast-check conformance tests, RED, GREEN and one review.",
   "license": "MIT",

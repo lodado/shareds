@@ -31,6 +31,7 @@ import {
   sha256,
   treeDigest,
 } from './fod-spec.mjs'
+import { parseBendTypes } from './oracle-types.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const TEMPLATE = join(HERE, '..', 'templates', 'SPEC.md')
@@ -104,6 +105,31 @@ function oracleModel(root, args) {
   return { status: done.status, json, output: `${done.stdout}${done.stderr}`.trim().split('\n').slice(-12).join('\n') }
 }
 
+// oracle-model 보고에서 사람이 읽을 부분 — 나머지(command·inputs·cells)는 실패 원인을 가린다
+// (check·prove-reach는 Bend 출력을 `output`에 담는다)
+const REPORT_KEYS = new Set(['file', 'reason', 'hint', 'message', 'output', 'stderr', 'stdout'])
+const lastLines = (text, count) => text.trim().split('\n').slice(-count).join('\n')
+
+function reportTexts(value, out) {
+  if (Array.isArray(value)) {
+    for (const item of value) reportTexts(item, out)
+    return out
+  }
+  if (!value || typeof value !== 'object') return out
+  for (const [key, item] of Object.entries(value)) {
+    if (REPORT_KEYS.has(key) && typeof item === 'string' && item.trim()) out.push(lastLines(item, 20))
+    else if (key === 'counterexample' && item) out.push(`counterexample: ${JSON.stringify(item)}`)
+    else reportTexts(item, out)
+  }
+  return out
+}
+
+/** Bend 실패를 고치는 데 필요한 글만: 이유·힌트·Bend가 찍은 오류·반례. JSON이 아니면 출력 끝부분. */
+export function bendText(result) {
+  const texts = result.json ? [...new Set(reportTexts(result.json, []))] : []
+  return texts.length > 0 ? texts.join('\n') : result.output
+}
+
 /**
  * 법칙이 말하는 규칙 id. 법칙 이름 앞머리(`law r1_pending_no_post:`)이거나 바로 위 주석(`# R1, R2: ...`)이다.
  */
@@ -162,6 +188,57 @@ function traceFindings(root, run) {
   return out
 }
 
+/** LAWS.bend의 법칙 이름 → 본문(들여쓴 줄을 공백 하나로 이은 것). */
+function lawBodies(text) {
+  const laws = new Map()
+  for (const chunk of text.split(/^(?=law\s)/m)) {
+    const [head, ...rest] = chunk.split('\n')
+    const name = /^law\s+(\w+)\s*:/.exec(head)?.[1]
+    // 본문은 들여쓴 줄과 빈 줄이다; 맨 앞에서 시작하는 첫 줄(주석·def)에서 끝난다
+    const end = rest.findIndex((line) => line.trim() !== '' && !/^\s/.test(line))
+    const body = end === -1 ? rest : rest.slice(0, end)
+    if (name) laws.set(name, body.map((line) => line.trim()).filter(Boolean).join(' '))
+  }
+  return laws
+}
+
+/**
+ * 법칙만 보고 아는 빈틈: 같은 본문의 법칙 두 개(하나는 아무것도 더 말하지 않는다), init을 말하는 법칙이 없음(셀 법칙은 모든 상태에서
+ * 성립해 시작 상태를 정하지 못한다 — 시작 화면이 틀린 모델도 증명된다).
+ */
+export function lawFindings(lawsText, { prefix, where }) {
+  const out = []
+  const byBody = new Map()
+  for (const [name, body] of lawBodies(lawsText)) byBody.set(body, [...(byBody.get(body) ?? []), name])
+  for (const names of byBody.values())
+    if (names.length > 1)
+      out.push(finding('LAW_DUPLICATE', where, `법칙 ${names.join(', ')}의 본문이 같다 — 하나는 아무것도 더 말하지 않는다`,
+        '각 법칙이 서로 다른 효과·상태를 말하게 고친다. witness라면 규칙마다 그 규칙의 결과가 보이는 서로 다른 끝 상태를 적는다'))
+  // 주석이나 helper def가 init을 말해도 법칙이 시작을 고정하지는 않는다 — 법칙 본문만 본다
+  const init = new RegExp(`\\b${prefix}\\.init\\b`)
+  if (![...lawBodies(lawsText).values()].some((body) => init.test(body)))
+    out.push(finding('LAW_INIT_UNPINNED', where, `${prefix}.init을 말하는 법칙이 없다 — 시작 상태가 SPEC과 달라도 증명된다`,
+      `시작 화면을 고정하는 법칙을 더한다: \`{${prefix}.observe(${prefix}.init()) == <Entry·Data 축이 말하는 시작> : ...}\` 또는 init에서 출발하는 exs witness`))
+  return out
+}
+
+/**
+ * 공간이 쓰지 않는 모델 부분: 선언된 Msg 생성자 중 bound 안의 어떤 trace에도 없는 것, init과 한 번도 다르지 않은 관찰.
+ * 생성 테스트는 공간의 trace만 모니 둘 다 테스트되지 않는다.
+ */
+export function usageFindings(modelText, usage, { prefix, bound, where }) {
+  const out = []
+  const declared = (parseBendTypes(modelText).get('Msg') ?? []).map(({ name }) => name)
+  const unused = declared.filter((name) => !usage.events[name])
+  if (unused.length > 0)
+    out.push(finding('MODEL_EVENT_NEVER_OFFERED', where, `${prefix}.next가 bound ${bound} 안에서 ${unused.join(', ')}를 한 번도 내놓지 않는다 — 그 사건의 규칙은 테스트되지 않는다`,
+      '그 사건이 일어날 수 있는 상태에서 next가 허용하게 고친다(설정 전·로딩 전 같은 시작 상태 포함). 더 긴 trace에서만 나오면 bound를 늘리고, 쓰지 않는 생성자면 지운다'))
+  if (!usage.observed)
+    out.push(finding('MODEL_OBSERVES_NOTHING', where, `bound ${bound} 안의 모든 관찰이 init의 관찰과 같다 — 어떤 결함도 생성 테스트에서 보이지 않는다`,
+      `${prefix}.observe가 규칙이 말하는 화면·요청 값을 돌려주게 고친다`))
+  return out
+}
+
 export function prove({ root, id }) {
   const run = load(root, id)
   if (run.text === null) return check({ root, id })
@@ -173,19 +250,22 @@ export function prove({ root, id }) {
   const { model } = run
   const checked = oracleModel(root, ['check', '--file', model.model])
   if (checked.status !== 0) {
-    out.push(finding('PROVE_MODEL_INVALID', model.model, 'MODEL.bend가 Bend 검사를 통과하지 못한다', checked.output))
+    out.push(finding('PROVE_MODEL_INVALID', model.model, 'MODEL.bend가 Bend 검사를 통과하지 못한다', bendText(checked)))
     return { findings: out }
   }
   const proof = oracleModel(root, ['prove', '--dir', relative(root, run.modelDir)])
   if (proof.json?.status !== 'proven')
-    out.push(finding('PROVE_FAILED', relative(root, join(run.modelDir, 'PROOF.bend')), '법칙 증명이 닫히지 않았다', proof.output))
+    out.push(finding('PROVE_FAILED', relative(root, join(run.modelDir, 'PROOF.bend')), '법칙 증명이 닫히지 않았다', bendText(proof)))
   const reach = model.safe ? oracleModel(root, ['prove-reach', '--model', model.model, '--prefix', model.prefix, '--safe', model.safe]) : null
   if (reach && reach.json?.status !== 'proven')
-    out.push(finding('PROVE_REACH_FAILED', model.model, `도달 가능한 모든 상태에서 ${model.safe}가 참이라는 증명이 닫히지 않았다`, reach.output))
+    out.push(finding('PROVE_REACH_FAILED', model.model, `도달 가능한 모든 상태에서 ${model.safe}가 참이라는 증명이 닫히지 않았다`, bendText(reach)))
   const space = oracleModel(root, ['space', '--model', model.model, '--prefix', model.prefix, '--bound', model.bound])
   if (space.json?.complete !== true)
     out.push(finding('SPACE_INCOMPLETE', model.model, `bound ${model.bound} 안의 trace 공간이 예산 안에서 닫히지 않는다`,
       `bound를 낮추거나 상태가 끝없이 자라지 않게 모델을 유한하게 만든다\n${space.output}`))
+  if (space.json?.complete === true)
+    out.push(...usageFindings(readFileSync(join(root, model.model), 'utf8'), space.json.usage, { prefix: model.prefix, bound: model.bound, where: model.model }))
+  out.push(...lawFindings(readFileSync(join(run.modelDir, 'LAWS.bend'), 'utf8'), { prefix: model.prefix, where: relative(root, join(run.modelDir, 'LAWS.bend')) }))
   if (out.length > 0) return { findings: out }
   const record = {
     at: new Date().toISOString(),
@@ -258,8 +338,21 @@ export function missingPackages(files) {
 
 const listOption = (value) => (value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [])
 
-/** 두 묶음의 출력 파일 이름. 같으면 속성 묶음이 trace 묶음(cover·W·순서·버그·표본)을 덮어쓴다. */
-export const suiteNames = (prefix) => ({ trace: prefix.toLowerCase(), state: `${prefix.toLowerCase()}-state` })
+/**
+ * gen이 부를 투영: trace 묶음은 늘, 속성 묶음은 SPEC이 state·command·relations를 줄 때. 출력 파일 이름이 같으면 속성 묶음이
+ * trace 묶음(cover·W·순서·버그·표본)을 덮어쓴다.
+ */
+export function emitPlan(model) {
+  const name = model.prefix.toLowerCase()
+  const relations = listOption(model.relations)
+  const plan = [{ suite: 'trace', name }]
+  if (model.state && model.command && relations.length > 0)
+    plan.push({ suite: 'state', name: `${name}-state`, stateType: model.state, commandType: model.command, relations })
+  return plan
+}
+
+/** 투영·Bend 설치가 던진 코드의 고치는 법. */
+export const genFix = (code) => GEN_FIXES[code] ?? (code.startsWith('BEND_') ? BEND_FIX : '메시지대로 고친 뒤 fod.mjs gen')
 
 /** 정규화한 생성 옵션 — 투영 모듈이 받는 이름으로. */
 function genOptions(root, id, model, bin) {
@@ -293,19 +386,14 @@ export async function gen({ root, id }) {
   try {
     const { bin } = await ensureBend()
     const base = genOptions(root, id, model, bin)
-    const trace = await emitTrace({ ...base, name: suiteNames(model.prefix).trace, bound: Number(model.bound) })
-    files.push(...trace.files)
-    verification.trace = trace.verification
-    const relations = listOption(model.relations)
-    if (model.state && model.command && relations.length > 0) {
-      const state = await emitState({ ...base, name: suiteNames(model.prefix).state, stateType: model.state, commandType: model.command, relations })
-      files.push(...state.files)
-      verification.state = state.verification
+    for (const { suite, ...options } of emitPlan(model)) {
+      const emitted = suite === 'trace' ? await emitTrace({ ...base, ...options, bound: Number(model.bound) }) : await emitState({ ...base, ...options })
+      files.push(...emitted.files)
+      verification[suite] = emitted.verification
     }
   } catch (error) {
     if (!error.code) throw error
-    const fix = GEN_FIXES[error.code] ?? (error.code.startsWith('BEND_') ? BEND_FIX : '메시지대로 고친 뒤 fod.mjs gen')
-    return { findings: [finding(error.code, model.adapter, error.message, fix)] }
+    return { findings: [finding(error.code, model.adapter, error.message, genFix(error.code))] }
   }
   const missing = missingPackages(files)
   if (missing.length > 0)
@@ -336,17 +424,51 @@ const approvalDigest = (dir) => {
   return existsSync(file) ? sha256(readFileSync(file, 'utf8')) : null
 }
 
+// adapter를 고친 뒤에는 RED가 다시 기록된다 — 판단은 늘 마지막 RED로
+const latestRed = (runs) => runs.findLast((entry) => entry.phase === 'red')
+
 const currentRuns = (dir) => {
   const approval = approvalDigest(dir)
   return readRuns(dir).filter((entry) => entry.approval === approval)
 }
 
-function execute(root, command) {
+// 끝나지 않는 promise를 기다리는 테스트는 출력 없이 영원히 멈춘다 — 시간을 넘기면 끊고 그렇다고 알린다
+export const RUN_TIMEOUT_MS = 5 * 60 * 1000
+
+const TIMEOUT_MARK = 'fod.mjs: run timed out'
+
+// spawnSync의 timeout은 직속 자식(sh)만 죽여 vitest worker 같은 손자가 남는다 — 명령을 제 프로세스 그룹에서 돌리고 그룹째 끊는다.
+// 그룹이 달라 터미널의 Ctrl-C가 닿지 않으니 신호도 그룹에 넘긴다. 명령이 끝나도 그룹에 남은 프로세스(띄워 두고 잊은 서버)는
+// 출력 pipe를 잡고 있어 spawnSync가 끝나지 않으니 함께 끊는다. 표시는 동기로 써야 바로 뒤 exit에 잘리지 않는다.
+const WATCHDOG = `const { spawn } = require('node:child_process')
+const { writeSync } = require('node:fs')
+const [command, ms] = process.argv.slice(1)
+const child = spawn(command, { shell: true, detached: true, stdio: 'inherit' })
+const stop = (signal) => { try { process.kill(-child.pid, signal) } catch {} }
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { stop(signal); process.exit(130) })
+const timer = setTimeout(() => { writeSync(2, '\\n${TIMEOUT_MARK}\\n'); stop('SIGKILL'); process.exit(124) }, Number(ms))
+child.on('exit', (code, signal) => { clearTimeout(timer); stop('SIGKILL'); process.exit(code ?? (signal ? 1 : 0)) })`
+
+export function execute(root, command, limitMs = RUN_TIMEOUT_MS) {
   // 바깥 node --test의 자식 프로토콜 변수를 지운다 — 남기면 자식 테스트가 사람이 읽는 실패 줄 대신 직렬화된 보고를 낸다
   const { NODE_TEST_CONTEXT: _parent, ...env } = process.env
-  const done = spawnSync(command, { cwd: root, env, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const done = spawnSync(process.execPath, ['-e', WATCHDOG, '--', command, String(limitMs)], {
+    cwd: root,
+    env,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    // watchdog 자체가 멈춘 경우의 마지막 안전장치
+    timeout: limitMs + 30_000,
+  })
   const output = `${done.stdout ?? ''}${done.stderr ?? ''}`
-  return { exit: done.status ?? 1, output, failing: failingTests(output), tail: output.trim().split('\n').slice(-15).join('\n') }
+  return {
+    exit: done.status ?? 1,
+    timedOut: done.error?.code === 'ETIMEDOUT' || (done.status === 124 && output.includes(TIMEOUT_MARK)),
+    limitMs,
+    output,
+    failing: failingTests(output),
+    tail: output.trim().split('\n').slice(-15).join('\n'),
+  }
 }
 
 function changedProduct(root, approval) {
@@ -369,13 +491,19 @@ function phaseGate({ root, id, run, phase, red, tests, cmd }) {
         red.command === model.test ? `fod.mjs run green ${id}` : `fod.mjs run green ${id} -- ${shellQuote(red.command)}`)]
     if (red.tests === tests) return []
     return [finding('GREEN_TESTS_CHANGED', `${model.out}, ${model.adapter}`, 'RED 뒤에 생성 테스트나 adapter가 바뀌었다',
-      'adapter·테스트를 RED 때로 되돌린다. 모델이 틀렸으면 1·2단계로 돌아가 다시 증명·승인·생성한다')]
+      `실수로 바꿨으면 RED 때로 되돌린다. adapter를 고친 것이면 제품 수정분을 치워 두고(steps/5-green.md "Setting the fix aside") fod.mjs run red ${id}부터 다시 한다. 모델이 틀렸으면 1·2단계`)]
   }
-  if (red) return [finding('RED_DONE', where, '이 승인에는 이미 RED가 있다', `제품을 고치고 fod.mjs run green ${id}`)]
+  // 새 adapter·생성 테스트로는 RED를 다시 본다 — 고치기 전 제품에서 그 테스트가 결함을 잡는지가 아직 증명되지 않았다
+  if (red?.tests === tests) return [finding('RED_DONE', where, '이 승인과 지금 테스트·adapter에는 이미 RED가 있다', `제품을 고치고 fod.mjs run green ${id}`)]
   const changed = changedProduct(root, readJson(join(run.dir, 'approval.json')))
   if (changed.length === 0) return []
   return [finding('RED_PRODUCT_CHANGED', changed.join(', '), 'RED 전에 제품 범위 파일이 승인 때와 달라졌다',
     '제품 변경을 따로 보관하고 승인 때 내용으로 되돌린 뒤(steps/5-green.md "Setting the fix aside") RED를 먼저 본다 — 테스트가 고치기 전의 결함을 잡는지가 RED의 증거다')]
+}
+
+const TIMEOUT_FIX = {
+  red: '고치기 전 제품이 settle하지 않는 promise를 테스트가 await하지 않게, deferred를 테스트가 직접 resolve·reject한다.',
+  green: '고친 제품이 settle하지 않는 promise가 남았다: 제품이 그 promise를 끝내게 고치거나, 손 테스트라면 deferred를 테스트가 직접 settle한다.',
 }
 
 // 생성 테스트의 이름은 모두 `[MODEL]`로 시작하고, 표본 테스트는 `"row":"MODEL"`을 로그로 남긴다
@@ -383,13 +511,33 @@ const GENERATED_RAN = /\[MODEL\]|"row":\s*"MODEL"/
 const generatedFailed = (failing) => failing.some((line) => line.includes('[MODEL]'))
 
 /** 새 기능의 RED: 제품 범위 파일이 아직 없어서 adapter의 import가 실패했다. 다른 모듈이 없으면 하네스 문제다. */
-const productModuleMissing = (output, { root, globs }) =>
-  [...output.matchAll(/Cannot find module '([^']+)'/g)].some(([, missing]) => {
-    const absolute = missing.replace(/^file:\/\//, '')
-    if (!isAbsolute(absolute)) return false
-    const file = relative(root, absolute)
-    return file !== '..' && !file.startsWith(`..${sep}`) && globs.some((glob) => path.matchesGlob(file, glob))
+// node는 절대 경로를, vitest는 import에 적힌 상대 경로와 `imported from <절대 경로>`를 찍는다(경로에 공백이 있을 수 있다)
+const MISSING_MODULE = /Cannot find module '([^']+)'(?: imported from ([^\n]+))?/g
+
+const fileUrl = (text) => text.trim().replace(/^'|'$/g, '').replace(/^file:\/\//, '')
+
+function missingPath(specifier, importer) {
+  const plain = fileUrl(specifier)
+  if (isAbsolute(plain)) return plain
+  if (importer && /^\.\.?\//.test(plain)) return resolve(dirname(fileUrl(importer)), plain)
+  return null
+}
+
+const inside = (root, absolute, globs) => {
+  const file = relative(root, absolute)
+  return file !== '..' && !file.startsWith(`..${sep}`) && globs.some((glob) => path.matchesGlob(file, glob))
+}
+
+// 없는 모듈이 모두 제품 범위이고, 그걸 찾은 쪽이 adapter·생성 테스트·제품 파일일 때만 — 손 테스트의 import는 생성 테스트가 돌았다는 증거가 아니다
+const productModuleMissing = (output, { root, globs, adapter, out }) => {
+  const missing = [...output.matchAll(MISSING_MODULE)]
+  const loader = [adapter, `${out}/**`, ...globs]
+  return missing.length > 0 && missing.every(([, specifier, importer]) => {
+    const absolute = missingPath(specifier, importer)
+    if (!absolute || !inside(root, absolute, globs)) return false
+    return !importer || inside(root, resolve(fileUrl(importer)), loader)
   })
+}
 
 /**
  * 실행 결과 판정. RED는 생성 테스트(`[MODEL]`)가 실패해야 한다 — 다른 줄의 실패, 로드되지 않은 테스트 파일, out을 돌리지
@@ -397,6 +545,9 @@ const productModuleMissing = (output, { root, globs }) =>
  */
 export function judge(phase, cmd, result, scope) {
   const output = result.output ?? ''
+  if (result.timedOut)
+    return [finding('RUN_TIMEOUT', cmd, `${(result.limitMs ?? RUN_TIMEOUT_MS) / 1000}초 안에 끝나지 않아 멈췄다 — 끝나지 않는 promise를 기다리는 테스트가 있다`,
+      `${TIMEOUT_FIX[phase]} 마지막 출력:\n${result.tail}`)]
   const unloaded = result.exit !== 0 && output.match(/Cannot find package '([^']+)'/)?.[1]
   if (unloaded)
     return [finding(phase === 'red' ? 'RED_NOT_A_TEST_FAILURE' : 'GREEN_FAILED', cmd, `패키지 ${unloaded}가 설치되지 않아 테스트 파일이 로드되지 않았다`,
@@ -426,13 +577,14 @@ export function runPhase({ root, id, phase, command }) {
   const gen = readJson(join(run.dir, 'gen.json'))
   if (!fresh(gen, run) || !fresh(readJson(join(run.dir, 'approval.json')), run) || gen.out !== treeDigest(root, [model.out]))
     return { findings: [finding('RUN_TESTS_STALE', model.out, '생성 테스트가 지금 승인·모델의 것이 아니거나 손으로 바뀌었다', `fod.mjs gen ${id}`)] }
-  const red = currentRuns(run.dir).find((entry) => entry.phase === 'red')
+  const red = latestRed(currentRuns(run.dir))
   const tests = testsDigest(root, model)
   const cmd = command || model.test
   const blocked = phaseGate({ root, id, run, phase, red, tests, cmd })
   if (blocked.length > 0) return { findings: blocked }
   const result = execute(root, cmd)
-  const failures = judge(phase, cmd, result, { root, globs: readJson(join(run.dir, 'approval.json')).globs })
+  const scope = { root, globs: readJson(join(run.dir, 'approval.json')).globs, adapter: model.adapter, out: model.out }
+  const failures = judge(phase, cmd, result, scope)
   if (failures.length > 0) return { findings: failures, failing: result.failing }
   const entry = { phase, at: new Date().toISOString(), approval: approvalDigest(run.dir), exit: result.exit, failing: result.failing, tests, command: cmd }
   appendFileSync(join(run.dir, 'run.jsonl'), `${JSON.stringify(entry)}\n`)
@@ -462,8 +614,10 @@ export function status({ root, id }) {
   if (!fresh(readJson(join(run.dir, 'approval.json')), run)) return step(2, `사용자에게 승인을 받고 fod.mjs approve ${id} --by <이름>`)
   const gen = readJson(join(run.dir, 'gen.json'))
   if (!fresh(gen, run) || gen.out !== treeDigest(root, [run.model.out])) return step(3, `adapter를 쓰고 fod.mjs gen ${id}`)
-  if (!runs.some((entry) => entry.phase === 'red')) return step(4, `fod.mjs run red ${id}`)
-  if (!runs.some((entry) => entry.phase === 'green')) return step(5, `제품을 고치고 fod.mjs run green ${id}`)
+  const red = latestRed(runs)
+  if (!red) return step(4, `fod.mjs run red ${id}`)
+  if (red.tests !== testsDigest(root, run.model)) return step(4, `adapter·생성 테스트가 RED 뒤에 바뀌었다: 제품 수정분을 치워 두고 fod.mjs run red ${id}`)
+  if (!runs.slice(runs.indexOf(red) + 1).some((entry) => entry.phase === 'green')) return step(5, `제품을 고치고 fod.mjs run green ${id}`)
   return step(6, '독립 리뷰어 1명이 fod.mjs run green을 다시 돌리고 리뷰한다')
 }
 

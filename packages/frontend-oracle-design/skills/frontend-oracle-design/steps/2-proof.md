@@ -12,7 +12,10 @@ collections or identities.
      commands, responses, timers, other tabs).
    - `<Prefix>.init() -> State`, a total `<Prefix>.step(s, m) -> State` (an ignored event is a named outcome,
      never a missing arm), `<Prefix>.observe(s)` (what the screen and the network show) and
-     `<Prefix>.next(history) -> List<Msg>` (the events the environment allows next).
+     `<Prefix>.next(+h: +List<Msg>) -> List<Msg>` (the events the environment allows next). A history read
+     more than once takes `+` on the parameter and the type, in `next` and in any `run(+ms: +List<Msg>, s)`.
+   - Name no type or constructor after one Base already declares (`Done`, `Fail`, `Some`, `None`, `Nil`,
+     `Con`, `Result`, `Event`): use `Sent`, `Failed`.
    - Each 7-axis row that is not `N/A` lands in the model: Data and Value as finite classes, Async as states and
      response events, Order as what `next` allows, Entry and Data starting conditions as the first events
      `next([])` offers (one per class, so every later order runs from each start), Environment
@@ -32,16 +35,30 @@ model, or add a question.
 It checks the SPEC, then reports every problem of the rules ↔ laws, the axes ↔ model identifiers, the Bend check,
 the kernel proof, `prove-reach` when the SPEC sets `safe`, and the trace space at `bound` — all at once.
 
-| Code                  | Fix                                                                                                                                                                              |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MODEL_FILE_MISSING`  | write the three files at the SPEC's `model` path                                                                                                                                 |
-| `RULE_WITHOUT_LAW`    | add `# R<n>:` above the law that states it, or mark the rule `(모델 밖: <reason>)`                                                                                               |
-| `AXIS_NOT_IN_MODEL`   | name the model identifiers for that axis in backticks; each must exist in `MODEL.bend`                                                                                           |
-| `PROVE_MODEL_INVALID` | fix the Bend error it prints ([model-patterns](../references/model-patterns.md#bend-check-failures)); `consumed more than once` is the usual first one: mark that parameter `+s` |
-| `PROVE_FAILED`        | complete the proof (bend-proof, "Reading a failure"); a counterexample means the model or the law is wrong                                                                       |
-| `PROVE_REACH_FAILED`  | the printed trace reaches a state that breaks `safe`: fix `step` or ask whether the rule holds                                                                                   |
-| `SPACE_INCOMPLETE`    | lower `bound`, or keep the state finite                                                                                                                                          |
-| `APPROVE_PROOF_STALE` | something changed after the proof: rerun `prove`                                                                                                                                 |
+| Code                        | Fix                                                                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MODEL_FILE_MISSING`        | write the three files at the SPEC's `model` path                                                                                                                                 |
+| `RULE_WITHOUT_LAW`          | add `# R<n>:` above the law that states it, or mark the rule `(모델 밖: <reason>)`                                                                                               |
+| `AXIS_NOT_IN_MODEL`         | name the model identifiers for that axis in backticks; each must exist in `MODEL.bend`                                                                                           |
+| `PROVE_MODEL_INVALID`       | fix the Bend error it prints ([model-patterns](../references/model-patterns.md#bend-check-failures)); `consumed more than once` is the usual first one: mark that parameter `+s` |
+| `PROVE_FAILED`              | complete the proof (bend-proof, "Reading a failure"); a counterexample means the model or the law is wrong                                                                       |
+| `PROVE_REACH_FAILED`        | the printed trace reaches a state that breaks `safe`: fix `step` or ask whether the rule holds                                                                                   |
+| `SPACE_INCOMPLETE`          | lower `bound`, or keep the state finite                                                                                                                                          |
+| `MODEL_EVENT_NEVER_OFFERED` | let `next` offer that event wherever it can happen (before setup or loading too), raise `bound` when it needs a longer trace, or delete the constructor                          |
+| `MODEL_OBSERVES_NOTHING`    | `observe` must return what the rules talk about: the shown values, the request count                                                                                             |
+| `LAW_DUPLICATE`             | two laws say the same thing: make each witness end in the state its own rule produces                                                                                            |
+| `LAW_INIT_UNPINNED`         | add a law that fixes the start: `observe(init())` equals what the Entry and Data axes say, or a witness from `init`                                                              |
+| `APPROVE_PROOF_STALE`       | something changed after the proof: rerun `prove`                                                                                                                                 |
+
+## Check the model before asking
+
+`prove` cannot judge these, and each one found later in review costs a whole new approval and RED:
+
+- A rule about how many times something happens ("once", "at most N") observes a count, not a flag, and the
+  counter reaches N+1 within `bound` instead of stopping at N.
+- `next` offers every event in every state where the user or the environment could cause it, including before
+  setup is done (no role chosen, nothing loaded yet).
+- Each rule's witness ends in a state only that rule explains.
 
 ## Ask once
 

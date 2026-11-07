@@ -256,6 +256,9 @@ type Search is Data:
   Search{latest: Nat, shown: Nat, open: List<&2, Nat>}
 ```
 
+A law that binds such a field spells the same region, `for open: List<&2, Nat>`; `for open: List<Nat>` fails
+the proof with `&1` against `&2`.
+
 <!-- excerpt: test-fixtures/stale-search-env/MODEL.bend -->
 
 ```python

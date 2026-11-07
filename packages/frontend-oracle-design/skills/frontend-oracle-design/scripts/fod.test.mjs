@@ -11,20 +11,26 @@ import { checkSpec } from './fod-spec.mjs'
 import {
   approve,
   axisNames,
+  bendText,
   check,
   drop,
+  emitPlan,
+  execute,
   failingTests,
   gen,
+  genFix,
   init,
   judge,
+  lawFindings,
   missingPackages,
   prove,
   rulesWithLaws,
   runPhase,
   shellQuote,
   status,
-  suiteNames,
+  usageFindings,
 } from './fod.mjs'
+import { spaceUsage } from './oracle-model.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const PACKAGE = fileURLToPath(new URL('../../../', import.meta.url))
@@ -174,7 +180,7 @@ test('failing test names come from node --test, vitest and TAP output', () => {
 })
 
 // 판정 범위: 승인이 제품 파일로 고정한 glob
-const SCOPE = { root: '/p', globs: ['src/**'] }
+const SCOPE = { root: '/p', globs: ['src/**'], adapter: 'test/feed.adapter.mjs', out: 'test/oracle' }
 const judged = (phase, output, exit = 1) => judge(phase, 'npm test', { exit, output, failing: failingTests(output), tail: output }, SCOPE).map(({ code }) => code)
 
 test('a generated test file that cannot load its package is never a RED, even when another test fails', async (t) => {
@@ -204,11 +210,86 @@ test('RED is only a failing generated test, or the new product module that does 
   assert.deepEqual(judged('red', "✖ x.oracle.test.mjs\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '/p/test/helper.mjs' imported from /p/src/feed.adapter.mjs\n"), ['RED_NOT_A_TEST_FAILURE'],
     'a missing harness file outside the product globs is a broken harness')
   assert.deepEqual(judged('red', "Error: Cannot find module 'left-pad'\n"), ['RED_NOT_A_TEST_FAILURE'], 'a bare name is never a product path')
+  // vitest 5 prints the specifier as written and the importing file (seen in a real run)
+  const vitest = (specifier) =>
+    ` ❯ x.oracle.test.mjs (0 test)\n FAIL  x.oracle.test.mjs [ x.oracle.test.mjs ]\nError: Cannot find module '${specifier}' imported from /p/src/feed.adapter.mjs\n`
+  assert.deepEqual(judged('red', vitest('./feed.mjs')), [], 'vitest: the missing product module resolves next to the adapter')
+  assert.deepEqual(judged('red', vitest('../test/helper.mjs')), ['RED_NOT_A_TEST_FAILURE'], 'vitest: a missing harness file stays a harness failure')
   assert.deepEqual(judged('red', '✖ x\n'), ['RED_NOT_A_TEST_FAILURE'], 'a failure line from a command that never ran the generated tests')
   assert.deepEqual(judged('red', '✔ [MODEL] [T1] Issue (2ms)\n✖ hand test\n'), ['RED_PASSED'], 'the model tests passed; only a hand test failed')
   assert.deepEqual(judged('red', "✔ [MODEL] [T1] Issue (2ms)\n✖ hand.test.mjs\nError: Cannot find module '/p/src/new.mjs' imported from /p/test/hand.test.mjs\n"), ['RED_PASSED'],
     'a missing product module in a hand test does not stand in for generated tests that passed')
   assert.deepEqual(judged('red', '✔ [MODEL] [T1] Issue (2ms)\n', 0), ['RED_PASSED'])
+  assert.deepEqual(
+    judged('red', "Error: Cannot find module '/p/src/new.mjs' imported from /p/test/hand.test.mjs\nError: Cannot find module '/p/test/helpr.mjs' imported from /p/test/feed.adapter.mjs\n"),
+    ['RED_NOT_A_TEST_FAILURE'], 'a hand test importing the new module does not cover an adapter that failed on a harness file')
+  assert.deepEqual(judged('red', "Error: Cannot find module '/p/src/new.mjs' imported from /p/test/hand.test.mjs\n"), ['RED_NOT_A_TEST_FAILURE'],
+    'only the adapter, the generated tests or product files load the generated suite')
+  assert.deepEqual(judged('red', "Error: Cannot find module '/p/src/feed.mjs' imported from /p/test/oracle/feed.oracle.test.mjs\n"), [])
+  const spaced = { ...SCOPE, root: '/Users/x/My App' }
+  const output = "Error: Cannot find module './../src/feed.mjs' imported from /Users/x/My App/test/feed.adapter.mjs\n"
+  assert.deepEqual(judge('red', 'npm test', { exit: 1, output, failing: [], tail: output }, spaced), [], 'a root with a space')
+})
+
+test('a run that never finishes is cut off and named, at RED and at GREEN', () => {
+  for (const phase of ['red', 'green']) {
+    const result = { exit: 1, timedOut: true, output: '✔ [MODEL] [T1] Issue\n', failing: [], tail: '✔ [MODEL] [T1] Issue' }
+    const [found, ...rest] = judge(phase, 'npm test', result, SCOPE)
+    assert.equal(found.code, 'RUN_TIMEOUT', phase)
+    assert.deepEqual(rest, [])
+    assert.match(found.fix, phase === 'red' ? /고치기 전 제품/ : /고친 제품/)
+  }
+})
+
+// 끊긴 프로세스는 출력 pipe를 닫은 뒤라 execute가 돌아온 시점에 이미 죽었다 — 아직 거둬지지 않은 zombie(Z)도 죽은 것이다
+const gone = (pid) => {
+  const stat = spawnSync('/bin/ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).stdout.trim()
+  return stat === '' || stat.startsWith('Z')
+}
+
+test('a timed-out command is stopped with every process it started', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'fod-timeout-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  // 셸이 띄운 손자가 끝나지 않는 테스트 worker 역할을 한다
+  const result = execute(root, 'sleep 30 & echo $! > child.pid; wait', 500)
+  assert.equal(result.timedOut, true)
+  assert.equal(gone(Number(await readFile(join(root, 'child.pid'), 'utf8'))), true, 'the grandchild is gone')
+  const quick = execute(root, 'echo done; exit 3', 5000)
+  assert.deepEqual([quick.timedOut, quick.exit, quick.output.trim()], [false, 3, 'done'])
+
+  // a suite that starts a server and never stops it: the run ends with the command, not at the time limit
+  const started = Date.now()
+  const leftover = execute(root, 'sleep 33 & echo $! > server.pid; echo ok', 20_000)
+  assert.deepEqual([leftover.timedOut, leftover.exit, leftover.output.trim()], [false, 0, 'ok'])
+  assert.ok(Date.now() - started < 10_000, 'did not wait for the leftover process')
+  assert.equal(gone(Number(await readFile(join(root, 'server.pid'), 'utf8'))), true, 'the leftover process is gone')
+  assert.doesNotMatch(execute(root, '-x', 5000).output, /bad option/, 'a command starting with - is not a node option')
+})
+
+test('a Bend failure shows the reason, the hint and what Bend printed, not the whole report', () => {
+  const json = {
+    status: 'failed',
+    command: ['bend', 'PROOF.bend'],
+    inputs: [{ path: 'MODEL.bend', sha256: 'abc' }],
+    stderr: 'Mismatch:\n- expected : List<&1, Nat>\n- detected : List<&2, Nat>',
+    hint: 'spell the region of the bound list',
+    counterexample: { trace: [{ $: 'Issue' }] },
+  }
+  const text = bendText({ json, output: JSON.stringify(json) })
+  assert.match(text, /List<&2, Nat>/)
+  assert.match(text, /spell the region/)
+  assert.match(text, /counterexample: \{"trace"/)
+  assert.doesNotMatch(text, /sha256/)
+  assert.equal(bendText({ json: null, output: 'plain tail' }), 'plain tail')
+  // oracle-model check and prove-reach put Bend's own text under `output`, with or without a hint
+  const checked = { files: [{ file: 'MODEL.bend', status: 'failed', output: "Location: MODEL.bend:12\n- expected : Search\n- detected : Nat" }] }
+  const checkText = bendText({ json: checked, output: JSON.stringify(checked) })
+  assert.match(checkText, /Location: MODEL\.bend:12/)
+  assert.doesNotMatch(checkText, /"status"/)
+  const reach = { status: 'failed', proof: { file: 'REACH.bend', arms: 3, bytes: 900 }, output: 'Mismatch at arm 2', hint: 'step breaks safe' }
+  const reachText = bendText({ json: reach, output: JSON.stringify(reach) })
+  assert.match(reachText, /Mismatch at arm 2/)
+  assert.match(reachText, /step breaks safe/)
 })
 
 test('GREEN needs exit 0 and the generated tests in the output', () => {
@@ -226,6 +307,37 @@ test('the suggested GREEN command survives the shell and comes back as the comma
   }
 })
 
+test('laws that repeat each other or never pin the start are reported before approval', () => {
+  const where = 'search/LAWS.bend'
+  const witness = (name) => `law ${name}:\n  exs t: List<M.Msg>\n  {M.Search.observe(M.Search.run(t, M.Search.init())) == 2n : Nat}\n`
+  assert.deepEqual(lawFindings(`import Base\n\n# R2: a\n${witness('r2_shown')}\n# R3: b\n${witness('r3_shown')}`, { prefix: 'Search', where }).map(({ code }) => code), ['LAW_DUPLICATE'])
+  const cell = 'law issue_advances:\n  for latest: Nat\n  {M.Search.step(M.Search{latest, 0n}, M.Issue{}) == M.Search{1n+latest, 0n} : M.Search}\n'
+  assert.deepEqual(lawFindings(cell, { prefix: 'Search', where }).map(({ code }) => code), ['LAW_INIT_UNPINNED'], 'cell laws hold in every state and fix no start')
+  assert.deepEqual(lawFindings(`${cell}\n${witness('r3_shown')}`, { prefix: 'Search', where }), [])
+  assert.deepEqual(lawFindings(`# R1: Search.init shows nothing\n${cell}`, { prefix: 'Search', where }).map(({ code }) => code), ['LAW_INIT_UNPINNED'],
+    'a comment naming init pins nothing')
+})
+
+test('an event next never offers and an observation that never changes are reported before approval', () => {
+  const model = 'type Msg is Data:\n  Issue{}\n  Respond{id: Nat}\n  Cancel{}\n\ntype Search is Data:\n  Search{latest: Nat}\n'
+  const options = { prefix: 'Search', bound: 4, where: 'search/MODEL.bend' }
+  const found = usageFindings(model, { events: { Issue: 9, Respond: 6 }, observed: false }, options)
+  assert.deepEqual(found.map(({ code }) => code), ['MODEL_EVENT_NEVER_OFFERED', 'MODEL_OBSERVES_NOTHING'])
+  assert.match(found[0].message, /Cancel를 한 번도/)
+  assert.deepEqual(usageFindings(model, { events: { Issue: 9, Respond: 6, Cancel: 1 }, observed: true }, options), [])
+
+  // the space side: counts per constructor, and whether any prefix observation differs from init
+  const space = {
+    initial: 0,
+    cases: [
+      { trace: [{ $: 'Issue' }, { $: 'Issue' }], observations: [0, 0] },
+      { trace: [{ $: 'Issue' }, { $: 'Respond', id: 1 }], observations: [0, 1] },
+    ],
+  }
+  assert.deepEqual(spaceUsage(space), { events: { Issue: 2, Respond: 1 }, observed: true })
+  assert.equal(spaceUsage({ ...space, cases: [space.cases[0]] }).observed, false)
+})
+
 test('axis cells name concrete model identifiers; the generic machine names are not evidence', () => {
   assert.deepEqual(axisNames('`Feed.Load(Empty)`, `Respond`'), ['Load', 'Empty', 'Respond'])
   assert.deepEqual(axisNames('`Search.latest`'), ['latest'])
@@ -233,8 +345,20 @@ test('axis cells name concrete model identifiers; the generic machine names are 
   assert.deepEqual(axisNames('-'), [])
 })
 
-test('the trace suite and the state suite are written to different files', () => {
-  assert.deepEqual(suiteNames('Search'), { trace: 'search', state: 'search-state' })
+test('gen writes the trace suite always and the state suite only when asked, to different files', () => {
+  assert.deepEqual(emitPlan({ prefix: 'Search' }), [{ suite: 'trace', name: 'search' }])
+  const plan = emitPlan({ prefix: 'Toggle', state: 'Toggle', command: 'Cmd', relations: 'R_blocked_keeps, R_free_applies' })
+  assert.deepEqual(plan.map(({ suite, name }) => [suite, name]), [['trace', 'toggle'], ['state', 'toggle-state']])
+  assert.deepEqual(plan[1].relations, ['R_blocked_keeps', 'R_free_applies'])
+  assert.deepEqual(emitPlan({ prefix: 'Toggle', state: 'Toggle', relations: 'R1' }).length, 1, 'no command type, no state suite')
+})
+
+test('every code gen can pass through has a fix, and a Bend install failure points at the installer', () => {
+  for (const code of ['USAGE', 'TYPE_UNSUPPORTED', 'RELATION_INVALID', 'SAMPLING_BOUND_REQUIRED', 'ADAPTER_SUSPECT', 'SPACE_INCOMPLETE'])
+    assert.doesNotMatch(genFix(code), /메시지대로/, code)
+  for (const code of ['BEND_DOWNLOAD_FAILED', 'BEND_CHECKSUM_MISMATCH', 'BEND_INSTALL_FAILED', 'BEND_UNSUPPORTED_PLATFORM'])
+    assert.match(genFix(code), /ensure-bend\.mjs/, code)
+  assert.match(genFix('SOMETHING_NEW'), /메시지대로/)
 })
 
 test('[bend] six steps on stale-search: prove, approve, generate, a RED the hook guards, GREEN, review', async (t) => {
@@ -287,6 +411,19 @@ test('[bend] six steps on stale-search: prove, approve, generate, a RED the hook
   await writeFile(adapter, `${adapterText}\n// edited\n`)
   assert.deepEqual(codes(runPhase({ root, id, phase: 'green' })), ['GREEN_TESTS_CHANGED'])
   await writeFile(adapter, adapterText)
+  assert.deepEqual(codes(runPhase({ root, id, phase: 'green' })), [])
+  assert.equal(status({ root, id }).step, 6)
+
+  // a review fix to the adapter alone needs no new approval, but a new RED on the unfixed product
+  await writeFile(adapter, `${adapterText}\n// review fix\n`)
+  assert.equal(status({ root, id }).step, 4)
+  assert.deepEqual(codes(runPhase({ root, id, phase: 'green' })), ['GREEN_TESTS_CHANGED'])
+  assert.deepEqual(codes(runPhase({ root, id, phase: 'red' })), ['RED_PRODUCT_CHANGED'], 'the fix is still in place')
+  await writeFile(product, BUGGY)
+  assert.deepEqual(codes(runPhase({ root, id, phase: 'red' })), [])
+  assert.deepEqual(codes(runPhase({ root, id, phase: 'red' })), ['RED_DONE'])
+  assert.equal(status({ root, id }).step, 5)
+  await writeFile(product, FIXED)
   assert.deepEqual(codes(runPhase({ root, id, phase: 'green' })), [])
   assert.equal(status({ root, id }).step, 6)
 

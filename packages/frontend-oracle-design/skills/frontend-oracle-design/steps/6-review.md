@@ -17,12 +17,20 @@ Checklist:
 
 The reviewer returns all findings once, ordered blocker, major, minor, nit, each with `file:line`, a failure
 scenario and a fix. Apply every finding, rerun the affected command, and review again only when a blocker or
-major was fixed — two rounds at most. After the second, list what remains as proposals in the report.
+major was fixed, whatever the fix touched (a fix that only adds hand tests counts) — two rounds at most. The
+second round looks only at the fixes. After it, list what remains as proposals in the report. A minor or nit
+whose fix would edit the SPEC or the Bend files (and so restart approval) is a proposal too.
 
-A fix that only touches product files inside the `product` globs needs `run green` again. A fix that changes the
-SPEC, the Bend files or the adapter needs a new approval with the product fix set aside, as in
-[step 5, Setting the fix aside](5-green.md#setting-the-fix-aside). Approved with the fix already in place, the
-tests usually pass at `run red`, and RED proves nothing.
+What a fix needs again:
+
+- Product files only: `run green`.
+- The adapter: no new approval. Set the product fix aside
+  ([step 5, Setting the fix aside](5-green.md#setting-the-fix-aside)), `run red`, restore it, `run green`.
+- The SPEC or the Bend files: as for the adapter, with `prove`, ask, `approve` and `gen` before `run red`.
+- A hand test: `run red` does not record hand tests, so run that test itself with the fix set aside and keep its
+  failure line for the report, then restore the fix and `run green`.
+
+Run with the fix still in place, the tests usually pass at `run red`, and RED proves nothing.
 
 ## Report
 

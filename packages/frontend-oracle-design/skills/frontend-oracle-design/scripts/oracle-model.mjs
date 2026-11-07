@@ -358,6 +358,21 @@ function computeSpace(model, bound, maxCases) {
   }
 }
 
+/**
+ * 공간 전체가 실제로 쓰는 것: 사건 생성자마다 그 사건을 담은 case 수, init과 다른 관찰이 하나라도 있는지. 생성 테스트는 공간의
+ * trace만 몰기 때문에, 선언만 되고 `next`가 내놓지 않는 사건이나 바뀌지 않는 관찰은 테스트되지 않는다.
+ */
+export function spaceUsage(space) {
+  const events = {}
+  const initial = stableStringify(space.initial)
+  let observed = false
+  for (const { trace, observations } of space.cases) {
+    for (const name of new Set(trace.map((event) => event?.$).filter(Boolean))) events[name] = (events[name] ?? 0) + 1
+    if (!observed) observed = observations.some((value) => stableStringify(value) !== initial)
+  }
+  return { events, observed }
+}
+
 export const LISTED_CASES = 200
 
 /**
@@ -1608,6 +1623,7 @@ async function main() {
     const minimum = minimalCover(model, space, { graph })
     const report = {
       ...listedSpace(space, options.cases === undefined ? LISTED_CASES : Number(options.cases)),
+      usage: spaceUsage(space),
       cover: { ...cover, cases: coverCases.length },
       analysis: analyzeConfigurations(graph, {
         traces: minimum.cases.map(({ trace }) => trace),

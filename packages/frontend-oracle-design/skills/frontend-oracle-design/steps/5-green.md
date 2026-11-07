@@ -21,12 +21,15 @@ place, the tests usually pass at RED, and RED proves nothing.
 3. Run `prove`, ask, `approve`, `gen` and `run red`.
 4. Restore the fix with `tar -xf .ai/oracles/<id>/fix.tar`, delete `fix.tar`, and `run green`.
 
-| Code                    | Fix                                                                      |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `GREEN_NO_RED`          | record RED first (step 4)                                                |
-| `GREEN_COMMAND_CHANGED` | run green with the command RED recorded (the printed fix gives it)       |
-| `GREEN_TESTS_CHANGED`   | restore the generated tests and the adapter to their RED content         |
-| `GREEN_TESTS_NOT_RUN`   | the command passed without running a `[MODEL]` test: make it run `out`   |
-| `GREEN_FAILED`          | fix the product for the first listed case (or install the named package) |
+| Code                    | Fix                                                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `GREEN_NO_RED`          | record RED first (step 4)                                                                                                              |
+| `GREEN_COMMAND_CHANGED` | run green with the command RED recorded (the printed fix gives it)                                                                     |
+| `GREEN_TESTS_CHANGED`   | changed by mistake: restore them to their RED content. An adapter fix: set the product fix aside and `run red` again (no new approval) |
+| `GREEN_TESTS_NOT_RUN`   | the command passed without running a `[MODEL]` test: make it run `out`                                                                 |
+| `GREEN_FAILED`          | fix the product for the first listed case (or install the named package)                                                               |
+
+A run cut off after 5 minutes is the timeout of [step 4](4-red.md): at GREEN the fixed product still leaves a
+promise pending.
 
 Next: [step 6](6-review.md).
