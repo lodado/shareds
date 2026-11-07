@@ -1,10 +1,9 @@
 # Bend proof from requirements — state, event and transition
 
 Read this when you write, prove or repair `MODEL.bend`, `LAWS.bend` or `PROOF.bend` from requirements, when a
-proof fails, or when the laws look too weak to pin the model. Policy, lock, review and delivery rules stay in
-[`bend-cross-verification.md`](bend-cross-verification.md); modelling patterns (time, attempts, error kinds,
+proof fails, or when the laws look too weak to pin the model. Modelling patterns (time, attempts, error kinds,
 counters, collections) stay in [`model-patterns.md`](model-patterns.md). Nothing here decides policy: every
-value comes from an approved source or an Open question.
+value comes from a SPEC source or a question.
 
 ## The model is a machine
 
@@ -18,11 +17,11 @@ value comes from an approved source or an Open question.
 - **Environment** — `next(history)` is the environment unrolled over the history. Keep the environment in the
   state when a law holds only on traces the environment allows (below).
 
-The input families keep their Space discovery dispositions and land in the machine as follows. Async gives
+The SPEC's seven axes land in the machine as follows. Async gives
 states and response events. Order is the set of orders `next` allows. Data and Value are finite field or payload
-classes. When Entry changes behaviour, it is `modeled: behavior` as a first event (`Enter{kind}`), so a law over
+classes. When Entry changes behaviour, it is a first event (`Enter{kind}`), so a law over
 every trace covers every entry. Environment gives environment events (`Remount`, observer events). Platform stays
-outside the model unless behaviour differs. Inherited policies keep their laws in `LAWS.bend` beside the new ones.
+outside the model unless behaviour differs. 이어받는 규칙 keep their laws in `LAWS.bend` beside the new ones.
 
 ## Requirement sentence → law
 
@@ -41,7 +40,7 @@ outside the model unless behaviour differs. Inherited policies keep their laws i
 - "Never more than N": a counter invariant; a saturated counter also needs a law that the counts it merges are
   observed alike (trace).
 
-The order of refusal reasons comes from the source; without one it is an Open question. Write cell laws as
+The order of refusal reasons comes from the source; without one it is a question. Write cell laws as
 three-argument relations, `<Prefix>.<R>(s: State, c: Command, t: State) -> Bool`, stated as
 `{R(s, c, step(s, c)) == True{} : Bool}` for every `s` and `c` — the `emit-state --relation` form. With
 three-argument relations the frame laws are required: without "a refused or stayed event keeps the state", a
@@ -137,7 +136,7 @@ law never_double_charge:
   {M.Pay.at_most_one(M.Pay.run(t, M.Pay.init())) == True{} : Bool}
 ```
 
-Put the invariant and its lemmas in `PROOF.bend`, which is never locked. The invariant is a rule over the state:
+Put the invariant and its lemmas in `PROOF.bend`. The invariant is a rule over the state:
 
 <!-- excerpt: test-fixtures/pay/PROOF.bend -->
 
@@ -273,8 +272,6 @@ def Search.next(h: List<Msg>) -> List<Msg>:
   contain them unless the product exposes them: the round trip `project(concretize(s)) == s` would fail on a
   field the product does not have.
 - Leave the environment out of the state when `observe` returns the whole state.
-- `oracle-package.mjs derive` reports each environment field as a hidden axis (here `state.Search.Search.open`);
-  on a locked package that changes the Derived Axes and needs a new revision.
 - The oracle space does not change: this variant and the stale-search model give the same cases and
   `spaceDigest` at bounds 3 to 5.
 
@@ -291,7 +288,7 @@ A witness is an `exs` law with a trace taken from `space --cases`. A progress cl
   `respond_ok` are examples).
 - A concrete state and event break the invariant: a counterexample to induction, which `laws --invariant` lists
   with `reached`. Check it as an `exs` law like `weak_is_not_inductive`. If a trace reaches it, the model or the
-  requirement is wrong: fix the model or ask a `POLICY_GAP` question. If `reached` is `null`, no trace within
+  requirement is wrong: fix the model or ask the user a question. If `reached` is `null`, no trace within
   the bound reaches it and the invariant is probably too weak: add the missing conjunct.
 - A state that moves while claiming `Refused` passes every law: the frame laws are missing.
 - The law is proven but says less than the requirement: the reviewer decides; never fit the law to the model.
@@ -311,9 +308,9 @@ Failing to build a proof never shows a product defect by itself.
 ## Commands in this release
 
 `scripts/oracle-model.mjs check --file <file>` ([model-patterns](model-patterns.md#bend-check-failures) lists its
-failures and fixes), and `prove --dir <dir> --require <law>...` and
-`space --model <MODEL.bend> --prefix <Prefix> --bound <n>` as
-[bend-cross-verification](bend-cross-verification.md) §3 describes, and `laws` and `prove-reach` as above:
+failures and fixes), and `prove --dir <dir> --require <law>...`,
+`space --model <MODEL.bend> --prefix <Prefix> --bound <n>`, and `laws` and `prove-reach` as above (`fod.mjs prove`
+runs `check`, `prove`, `prove-reach` and `space` for you):
 `--max-evals` (default 1,000,000) caps the evaluations of `laws`, `--max-cells` (default 100,000 states ×
 events) the domain of `prove-reach`. A `closed` `space` cover's `diameter` is the longest of the shortest
 traces to each configuration; a `capped` cover has `diameter: null`.

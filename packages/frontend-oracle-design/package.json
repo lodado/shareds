@@ -1,16 +1,12 @@
 {
   "name": "@lodado/frontend-oracle-design-plugin",
-  "version": "0.130.1",
+  "version": "1.0.0",
   "private": true,
-  "description": "Shared formal Oracle and finite Contract frontend design, TDD, evidence gates, and independent review.",
+  "description": "Six-step frontend behavior work: a 7-axis spec, a Bend proof, generated fast-check conformance tests, RED, GREEN and one review.",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint skills scripts --ignore-pattern 'skills/frontend-oracle-design/bundles/**' && node skills/frontend-oracle-design/scripts/generate-reference-bundles.mjs --check && node skills/frontend-oracle-design/evals/to-skill-creator-evals.mjs --check",
-    "test": "node --test --test-concurrency=4 scripts/*.test.mjs skills/frontend-oracle-design/scripts/*.test.mjs",
-    "workflow-docs:generate": "node skills/frontend-oracle-design/scripts/generate-workflow-docs.mjs",
-    "workflow-docs:check": "node skills/frontend-oracle-design/scripts/generate-workflow-docs.mjs --check",
-    "bundles:generate": "node skills/frontend-oracle-design/scripts/generate-reference-bundles.mjs",
-    "bundles:check": "node skills/frontend-oracle-design/scripts/generate-reference-bundles.mjs --check"
+    "lint": "eslint skills scripts",
+    "test": "node --test --test-concurrency=4 skills/frontend-oracle-design/scripts/*.test.mjs"
   },
   "devDependencies": {
     "fast-check": "4.10.2",

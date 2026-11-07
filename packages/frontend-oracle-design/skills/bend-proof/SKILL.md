@@ -1,44 +1,24 @@
 ---
 name: bend-proof
-description: 'Use only when writing, proving or repairing Bend files (MODEL.bend, LAWS.bend, PROOF.bend) from requirements: a state/event/transition machine, its cell laws, all-trace safety invariants, witnesses and ranking functions; or when a Bend proof fails or the laws look too weak to pin the model. Bend files only: a request that also fixes, builds or delivers product behavior goes to frontend-oracle-design, which calls this skill.'
+description: 'Use only when writing, proving or repairing Bend files (MODEL.bend, LAWS.bend, PROOF.bend) from requirements: a state/event/transition machine, its cell laws, all-trace safety invariants, witnesses and ranking functions; or when a Bend proof fails or the laws look too weak to pin the model. Bend files only: a request that also fixes, builds or delivers product behavior goes to frontend-oracle-design, whose step 2 is this work.'
 allowed-tools:
   - Bash
 ---
 
 # Bend Proof
 
-## Entry
+Read [bend-proof](../frontend-oracle-design/references/bend-proof.md) in full, and
+[model-patterns](../frontend-oracle-design/references/model-patterns.md) when the model has time, retries, error
+kinds, counters, collections or identities. Inside a frontend-oracle-design run, follow its
+[step 2](../frontend-oracle-design/steps/2-proof.md) instead of this page.
 
-First read [bend-proof](../frontend-oracle-design/references/bend-proof.md) without offset or limit. Read
-[model-patterns](../frontend-oracle-design/references/model-patterns.md) when the model has retries,
-delays, staleness, error kinds, remounts, request counts, counters, collections or identities.
-Scripts in `../frontend-oracle-design/scripts/`: `oracle-model.mjs` (`check`, `laws`, `prove`,
-`prove-reach`, `space`); `ensure-bend.mjs` installs a missing Bend.
+Standalone, take the requirement text and a directory:
 
-## Modes
+1. List what the requirement leaves open and ask the person before writing Bend.
+2. Write `MODEL.bend` (states, events, a total `step`, `observe`, `next`), `LAWS.bend` (one law per requirement
+   sentence, with the sentence in the comment above it) and `PROOF.bend`.
+3. Run `node ../frontend-oracle-design/scripts/oracle-model.mjs` `check --file`, `laws` (counterexamples, free
+   cells), `prove --dir`, `prove-reach` for a finite machine, and `space`.
+4. Report each law's scope (cell, every trace, witness or rank) and what is not proven.
 
-- **Inside an Oracle run** the Formal author invokes this skill with the controller's approved sources,
-  confirmed axes and package path, and writes only what that role allows. The reviewer reads
-  bend-proof's checklist instead. Policy, approval, lock, stage and delivery rules stay with the
-  controller and [bend-cross-verification](../frontend-oracle-design/references/bend-cross-verification.md).
-- **Standalone** takes requirement text and a directory and writes `MODEL.bend`, `LAWS.bend` and
-  `PROOF.bend` there. The person who asked approves `LAWS.bend`; no independent reading is claimed. If the
-  files are sources of an Oracle lock, stop and return to `$frontend-oracle-design`: only `PROOF.bend` is
-  free.
-
-## Procedure
-
-1. Collect the cells the requirement leaves open: ask the person (standalone) or return them to the
-   controller before any Bend.
-2. In an Oracle run the analyst's independent State Model comes from the controller.
-3. Write the machine: states, events, a total `step`, the outcome in the state, the environment.
-4. Translate each requirement sentence with bend-proof's table; keep the frame laws.
-5. Check each file; run `laws` (counterexamples, free cells), `prove-reach` (finite machine),
-   `prove --dir` (it generates finite cells) and `space`.
-6. Report each law's scope (cell, every trace, witness or rank) and what is not proven: the product is
-   only tested.
-
-## Never
-
-No card, lock, approval, stage transition, receipt, consumer test or production edit. Never narrow a
-requirement to obtain a proof; a policy the source leaves open is `NEEDS_DECISION`.
+Never narrow a requirement to obtain a proof. A policy the requirement leaves open is a question for the person.

@@ -2,8 +2,8 @@
  * A component or hook body runs on every render and on the server as well as in the browser.
  * Reading the clock, a random id or the host locale there makes the same props render different
  * markup - hydration mismatches, unstable keys and snapshots that change between machines.
- * `Date.now()` and `Math.random()` belong to react-hooks/purity; this rule covers the rest of the
- * tokens the Oracle nondeterminism scan looks for. Pass the value in, or create it in an event
+ * `Date.now()` and `Math.random()` belong to react-hooks/purity; this rule covers the other clock,
+ * random and locale reads. Pass the value in, or create it in an event
  * handler or effect. A deliberate one carries `// oracle:nondeterminism <reason>`.
  */
 const { getStatement } = require('./lib/reason-comment')

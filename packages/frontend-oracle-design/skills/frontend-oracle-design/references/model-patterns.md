@@ -1,35 +1,30 @@
 # Model patterns — rules, strong laws, time, errors, attempts and effect counts
 
-Read this before writing `MODEL.bend`, `LAWS.bend` and `PROOF.bend`. It adds modeling patterns to
-[`bend-cross-verification.md`](bend-cross-verification.md) §2; it creates no policy and no product
-structure — the product keeps the shape [`types/state-ladder.md`](types/state-ladder.md) gives it. Every value below
-(retry count, delay, error kind, staleness bound) comes from an approved source or an Open question —
-never from the pattern.
+Read this before writing `MODEL.bend`, `LAWS.bend` and `PROOF.bend` when the model has time, retries, error
+kinds, counters, collections or identities. It creates no policy and no product structure. Every value below
+(retry count, delay, error kind, staleness bound) comes from a SPEC source or a question — never from the
+pattern.
 
 ## Short feedback loops and cohesive modules
 
-Separate authoring time from kernel time and finite-Space runtime before optimizing. A long
-`card` run is not evidence that proving a law is slow. `ORACLE_TIMING=1` on
-`oracle-verify.mjs card` separates regeneration from cross-check time. Profile the slow phase on
-unchanged inputs, not a smaller bound presented as the same workload.
+Separate authoring time from kernel time and finite-space runtime before optimizing. Profile the slow
+phase on unchanged inputs, not a smaller bound presented as the same workload.
 
 - **One responsibility per module.** Keep the registered MODEL, LAWS and PROOF entrypoints.
   Where the domain needs helpers, use Bend file imports for cohesive state operations or reusable
   proof lemmas rather than one giant transition/proof or one file per arbitrary case. MODEL owns
-  transitions, LAWS owns the approved statements, PROOF owns their derivations. Keep the world
-  and source goals independent as adequacy requires. Do not duplicate a model rule in a classifier.
+  transitions, LAWS owns the approved statements, PROOF owns their derivations.
 - **Check the smallest changed unit first.** Run `oracle-model.mjs check --file <changed-file>`
   after a model/helper edit, then the affected proof entry with the registered laws through the
   normal `prove` path. Fix quantities, types and decreasing recursion arguments before another
-  full derive/adequacy/cross-check cycle. Helpers matching computed values and reusable induction
+  full `fod.mjs prove`. Helpers matching computed values and reusable induction
   lemmas reduce repeated debugging; they do not replace the complete proof verdict.
 - **Factor a rule, not the guarantee.** Use structural recursion and lemmas over the actual domain.
   A finite case proof may be generated, but do not hand-maintain its Cartesian answer table or
   replace an unbounded law with a finite sample. Splitting proofs must retain cross-field and
   ordering obligations, not turn coupled axes into assumed-independent ones.
-- **Keep revision boundaries intact.** Imported files participate in source/input digests. An
-  imported helper change still needs the applicable derivation, review and lock invalidation.
-  A new module is not permission for another review round.
+- **Imported files count.** A Bend file the model imports is part of the proof; changing it makes the proof
+  and the approval stale like any other model change.
 - **Do not trade coverage for speed.** Ordered prefixes and observations remain distinct. Adding
   branching choices or a larger bound can multiply traces; measure that separately from per-step
   copying. Do not drop events, merge histories by final state, reduce bounds or skip proofs to
@@ -134,8 +129,7 @@ hypothesis); a case whose hypothesis computes to `False{}` closes with
 quantity the def returns (`+List<M.Ver>`), or the kernel reports `List<&1, …>` against `List<&2, …>`.
 
 A model that folds these axes into one event (`Failed` meaning "every retry failed") is not wrong, but
-the folded part leaves the proof and the generated conformance and becomes a hand-written test or a
-`Not formalized` line. Unfold the axis when a contract row depends on it.
+the folded part leaves the proof and the generated conformance and becomes a hand-written test (a `모델 밖` rule). Unfold the axis when a rule depends on it.
 
 ## Time is an event
 
@@ -173,7 +167,7 @@ the policy distinguishes, never the raw value; the adapter owns the concrete sou
 - **Randomness:** the environment chooses — `next(history)` offers every outcome (`JitterLow{}`,
   `JitterHigh{}` for a retry delay), so a law holds for all of them; the adapter pins `Math.random`.
 
-A source that leaves the boundary, precision or duration open is a `NEEDS_DECISION` question about
+A source that leaves the boundary, precision or duration open is a SPEC question about
 that class, not a reason to drop the axis.
 
 ## Attempts, not outcomes
@@ -195,7 +189,7 @@ State one law per transition and one witness for "fails N times, then succeeds".
 ## Environment faults — decide each
 
 `next(history)` is the environment model: it offers exactly what the user, network, timers and other tabs
-may do. Decide every row as an event in `next` or as `excluded: S<n> <reason>`; "the model did not need it"
+may do. Decide every fault below as an event in `next` or as `N/A — <reason>` on its SPEC axis; "the model did not need it"
 is not a reason.
 
 | Fault                                            | Event in `next`                                     | Pattern                                           |
@@ -206,7 +200,7 @@ is not a reason.
 | late after cancel, unmount or logout             | `Resolve` stays in `next` after `Cancel`, `Unmount` | Owner lifetime                                    |
 | partial failure                                  | one error kind per outcome the policy distinguishes | Error kinds                                       |
 | retry resend                                     | `Tick{}` re-sends the same request                  | Attempts, not outcomes                            |
-| offline, hidden tab, second tab or device        | `Offline{}`, `Hidden{}`, `OtherTab{…}`              | only when a row depends on them                   |
+| offline, hidden tab, second tab or device        | `Offline{}`, `Hidden{}`, `OtherTab{…}`              | only when a rule depends on them                  |
 | clock jump, expiry                               | `Expire{}`, `Remount{elapsed}`                      | Time is an event                                  |
 
 ## Progress is a ranking function
@@ -241,13 +235,13 @@ reaches the terminal one and its `witness`.
 - A live-to-live step that leaves the rank unchanged refutes this strict-decrease law, not necessarily
   the product's liveness. If policy permits stuttering or unrelated events, record the missing premise
   and the narrower claim. Do not delete those events, weaken the law, or invent a retry bound to pass.
-  An undecided policy goes to `NEEDS_DECISION`.
+  An undecided policy is a SPEC question.
 - Set `Bound` at least the rank of `init` plus one for this strict-decrease pattern. It bounds modeled
   transitions, not elapsed time or an unbounded number of scheduler stutters. State which live states,
   transitions and terminal condition the law covers.
 - The rank carries over within the checked traces only when the adapter observes the relevant product
   transitions. It does not cover unexecuted traces or real scheduling. Strong fairness, starvation and
-  wall-clock deadlines remain `Not formalized` unless separate evidence establishes them. Reuse existing
+  wall-clock deadlines stay outside the proof unless separate evidence establishes them. Reuse existing
   conformance tests where they observe the required behavior, add product-boundary checks where they do not.
 
 The rank argument assumes a well-founded order and strict decrease on the transitions being claimed.
@@ -263,19 +257,19 @@ type Err is Data:
 
 When the policy treats every kind alike, quantify the law over the kind (`for k: M.Err`); one law covers
 all of them. When kinds differ, write one law per kind. A kind the policy does not mention (for example a
-4xx) is an Open question, not a default branch.
+4xx) is a SPEC question, not a default branch.
 
 ## Requests, fetches and effects are different counts
 
 Keep separate observed counters for the policy's unit (`requests`: a page request), the transport
 (`fetches`: network calls, retries included) and the user-visible effect (`effects`). Each has its own
-`## Terms` row whose `path` says how the adapter tells them apart — for example "a call with a new cursor,
+SPEC rule, and the adapter says how it tells them apart — for example "a call with a new cursor,
 or the first call after a retry press, is a request; a repeated call with the same cursor after a
 rejection is a retry". A count the test cannot attribute is an observation gap, not evidence.
 
 ## Owner lifetime
 
-Model leaving and returning as events (`Unmount`, `Remount{elapsed}`) when a row depends on them, and
+Model leaving and returning as events (`Unmount`, `Remount{elapsed}`) when a rule depends on them, and
 observe the cache and the screen separately: a response may still update a cache after unmount, while
 the unmounted screen must not change. Late completions after `Unmount` stay in `next` — dropping them
 because a correct product ignores them hides the defect.
@@ -347,14 +341,13 @@ contract and test the client's resend, not the server's rule.
 ## Library-owned behavior
 
 A dependency landmine whose behavior changes an outcome (for example a background refetch that a
-concurrent fetch can overwrite) becomes an event (`StaleRefetch`) with its own laws, and its landmine row
-is dispositioned `covered(O*)` by those rows. Interleavings the model does not name stay with
-`fc.scheduler` properties or Open questions.
+concurrent fetch can overwrite) becomes an event (`StaleRefetch`) with its own laws, and those laws cover it. Interleavings the model does not name stay with
+`fc.scheduler` properties or SPEC questions.
 
 ## Space size
 
-Each unfolded event multiplies the trace space. If `space` stops with `complete: false`, lower `Bound` in
-a new revision and raise the fast-check sample count; never trim events to make the space fit. Report the
+Each unfolded event multiplies the trace space. If `space` stops with `complete: false`, lower `bound` in
+the SPEC and raise the fast-check sample count; never trim events to make the space fit. Report the
 new bound and the sampled length range together.
 
 ## Bend names
@@ -382,7 +375,7 @@ Failure text → cause → fix:
 - `a declared constructor (unknown: M.X)` → `X` is not in that type, or the module prefix is wrong → use
   a constructor from the type's `type` block under its import alias.
 - `a filled definition (an unfilled law ...)` → a `law f` has no `def f` with the same name → add `def f`
-  that proves it, or remove a law the card does not claim.
+  that proves it, or remove a law no rule claims.
 - `an import ('import Base', ...)` → the file does not open with its imports → first line `import Base`,
   then `import ./file.bend as M`.
 - `cases for M.X` → a `match` leaves out constructor `X` (every missing one is listed) → add a case for

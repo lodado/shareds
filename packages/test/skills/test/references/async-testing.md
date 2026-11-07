@@ -1,7 +1,7 @@
 # Async test construction
 
 Use this guidance when implementing an approved async contract, not as a mandatory recipe for every
-Oracle design. Expected outcomes still come only from the card; these are harness choices.
+spec. Expected outcomes still come only from the approved rules; these are harness choices.
 
 - Keep the actual state owner and minimal consumer in integration tests; control the external boundary
   rather than mocking the entire owner. For query-backed tests, isolate the client per test and clean
@@ -15,7 +15,7 @@ Oracle design. Expected outcomes still come only from the card; these are harnes
 - Test cancellation separately from inversion. Preventing A's delivery does not demonstrate safety
   when A arrives late. Use a cancellation-insensitive boundary when the approved race contract needs
   actual late delivery; verify signal propagation separately when cancellation is part of the contract.
-- Select cache and scope premises from the card, distinguishing current-key cache from previous-key
+- Select cache and scope premises from the rules, distinguishing current-key cache from previous-key
   placeholder when relevant. Do not silently choose a retention, isolation, or retry policy in a fixture.
 
 The existing `$test` Order/sequence evidence and single assertion-owner rules still apply. A proposed

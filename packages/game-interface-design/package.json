@@ -1,6 +1,6 @@
 {
   "name": "@lodado/game-interface-design-plugin",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, and lifelike cat behavior with a trace check.",
   "license": "MIT",

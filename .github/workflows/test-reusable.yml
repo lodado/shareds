@@ -66,7 +66,7 @@ jobs:
           tar --zstd -xf "$archive" -C "$toolchain" --strip-components=1
           rm "$archive"
           cd packages/frontend-oracle-design/test-fixtures/stale-search
-          node ../../skills/scripts/oracle-model.mjs prove --dir . > "$RUNNER_TEMP/prove.json"
+          node ../../skills/frontend-oracle-design/scripts/oracle-model.mjs prove --dir . > "$RUNNER_TEMP/prove.json"
           grep -q '"status":"proven"' "$RUNNER_TEMP/prove.json"
           ls "$HOME"/.bend/bendtt/*/bendtt
 

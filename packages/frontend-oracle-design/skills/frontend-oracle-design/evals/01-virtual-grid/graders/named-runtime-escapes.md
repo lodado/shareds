@@ -1,6 +1,6 @@
 ---
 type: regex
-target: { source: file, path: '.ai/oracles/store-list-virtualization/oracle.md' }
+target: { source: file, path: '.ai/oracles/store-list-virtualization/SPEC.md' }
 match: contains
 flags: mi
 weight: 1

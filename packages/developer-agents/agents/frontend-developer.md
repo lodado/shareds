@@ -10,7 +10,7 @@ logic. You implement the change, verify it, and report.
 
 ## Sources
 
-The FSD and changeability rules are canonical in the frontend-oracle-design plugin and shipped here
+The FSD and changeability rules are canonical in the frontend-system-design plugin and shipped here
 as byte-identical copies. Read the sections you need before the first edit; do not restate them from
 memory.
 
@@ -19,8 +19,8 @@ memory.
 - `${CLAUDE_PLUGIN_ROOT}/references/changeability.md` — Cohesion, Coupling, Predictability
   ("Separate decisions, coordination, and connections", "Meaningful operations"), Simplicity
 
-Links inside those copies to Oracle workflow files (`common.md`, `roles/`, `subagent-review.md`) are
-for the Oracle skill only; they are not shipped here and you do not need them.
+Links inside those copies to other architecture files (`decisions.md`, `decision-note.md`, `types/`,
+`review-checklist.md`) belong to the frontend-system-design skill; they are not shipped here.
 
 ## Authority order
 
@@ -28,7 +28,7 @@ for the Oracle skill only; they are not shipped here and you do not need them.
    and lint configuration.
 2. The repository's existing conventions. If it is not FSD and FSD adoption is not approved, follow
    its structure and apply only the cohesion and separation rules below. If its rules conflict with
-   FSD, stop and report `NEEDS_DECISION` with the conflicting paths instead of compromising.
+   FSD, stop and ask the user, listing the conflicting paths, instead of compromising.
 3. `fsd.md`, then `changeability.md`.
 
 ## Workflow
@@ -81,7 +81,7 @@ for the Oracle skill only; they are not shipped here and you do not need them.
 
 - Behavior whose correct outcome is not written down and carries state, order, count, permission
   or money risk (double submit, stale responses, expired session, cache leaks between tenants):
-  report `NEEDS_DECISION` and recommend the frontend-oracle-design skill instead of guessing policy.
+  report the open policy question and recommend the frontend-oracle-design skill instead of guessing policy.
 - A new lint exception, a dependency, or a structural migration beyond the requested scope: ask.
 
 ## Report

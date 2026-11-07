@@ -1,7 +1,7 @@
 {
   "name": "@lodado/frontend-system-design-plugin",
-  "version": "0.3.0",
-  "description": "Oracle-dependent companion for well-known frontend system design problems.",
+  "version": "0.4.0",
+  "description": "Standalone frontend architecture (FSD, code structure, changeability, types) and verified guides for well-known feature system design.",
   "private": true,
   "scripts": {
     "test": "node --test skills/scripts/*.test.mjs"

@@ -3,10 +3,10 @@
 Read this only when setting DB and persistence boundaries in full-stack work. It does not mandate a
 particular framework, ORM, database, or frontend architecture.
 
-## Intake
+## Survey
 
-Before implementation and the Oracle lock, confirm the following in the actual repo and record the
-paths and responsibilities in the approved architecture source.
+Before implementation, confirm the following in the actual repo and record the paths and
+responsibilities in the approved architecture document.
 
 - The backend source root and public server entry points
 - The data-access boundary that may import the DB driver·ORM
@@ -14,8 +14,8 @@ paths and responsibilities in the approved architecture source.
 - Where schema·migration·seed and integration tests are owned
 - The persistence and reset policies for local·test·production
 
-If a boundary is unresolved, do not create a new layer first. Return to `NEEDS_DECISION` and lock it
-after the approved architecture is stable.
+If a boundary is unresolved, do not create a new layer first. Ask the user and record the decision
+once the approved architecture is stable.
 
 In an FSD repo, follow "Server Code Placement" in [`fsd.md`](fsd.md) for placing server domain code
 — do not create an `src/server/` root outside the layers; put it in the owning slice's `api` segment

@@ -1,6 +1,6 @@
 ---
 name: frontend-visual-qa
-description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA. Verifies rendered UI and browser journeys against an approved Oracle Card or user-approved visual source, records reproducible artifacts, and reports findings without changing product policy or production code. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
+description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA. Verifies rendered UI and browser journeys against approved spec rules or a user-approved visual source, records reproducible artifacts, and reports findings without changing product policy or production code. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
 allowed-tools:
   - Bash
 ---
@@ -8,67 +8,67 @@ allowed-tools:
 # Frontend Visual QA
 
 실제 렌더 결과와 브라우저 journey를 검증하는 **독립 evidence skill**이다. 제품 정책,
-Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
+명세 작성, behavior TDD, production 수정은 소유하지 않는다.
 
 ## 불변 경계
 
 - 사용자가 screenshot 비교 또는 직접 브라우저 QA를 명시적으로 요청했을 때만
-  실행한다. 승인된 Oracle의 `Visual QA authorization: approved`도 명시적 요청으로 인정한다.
-  둘 다 없으면 `frontend-oracle-design`이 필요성을 추측해
-  자동 실행하지 않는다. 탐색 phase는 같은 방식으로 승인된 Oracle의
-  `Exploration authorization: approved`가 있을 때만 실행한다.
-- 승인된 Oracle Card, Figma, 디자인 시스템, baseline과 사용자의 명시적 답변만
-  기대 결과의 출처다. 현재 production 화면은 관찰 자료일 뿐 자동 baseline이 아니다.
-- 새 정책·baseline 선택·허용치 변경이 필요하면 `NEEDS_DECISION`으로 돌아간다.
+  실행한다. 다른 스킬이 필요성을 추측해 자동 실행하지 않는다. 탐색 phase도 사용자가
+  탐색(dogfood)을 명시적으로 요청했을 때만 실행한다.
+- 승인된 명세 규칙(`frontend-oracle-design` run의 `SPEC.md` `R*`), Figma, 디자인 시스템,
+  baseline과 사용자의 명시적 답변만 기대 결과의 출처다. 현재 production 화면은 관찰 자료일 뿐
+  자동 baseline이 아니다.
+- 새 정책·baseline 선택·허용치 변경이 필요하면 `QUESTION`으로 멈추고 추천안과 함께 묻는다.
 - product source와 테스트 assertion을 수정하지 않는다. 제품 결함은 재현 증거와 함께
-  `frontend-oracle-design`의 `VALID_RED` 흐름으로 돌려보낸다.
+  보고하고, `frontend-oracle-design` run이 있으면 그 run의 RED 단계로 돌려보낸다.
 - 브라우저 조작은 **Playwright, agent-browser 또는 이미 연결된 browser MCP** 중 하나로 수행한다.
   repo에 이미 설치된 쪽을 먼저 쓰고, 이 스킬만을 위해 dependency나 새 runner를
-  추가하지 않는다. 모두 없으면 `NEEDS_DECISION`으로 멈추고 어느 쪽을 쓸지 묻는다.
+  추가하지 않는다. 모두 없으면 `QUESTION`으로 멈추고 어느 쪽을 쓸지 묻는다.
   같은 journey를 여러 도구로 중복 실행하지 않는다. 공식 PASS가 필요하면 아래 trusted
   Playwright 경로를 선택하고, 관찰 도구에서 필요한 증거를 얻지 못하면 미검증으로 남긴다.
-- certifiable visual `PASS` producer는 trusted `oracle-run --adapter node-test` run뿐이다. 그 run의
-  locked test가 Playwright를 호출하고 schema-v3 artifact를 발행해야 한다. standalone Playwright adapter는
-  지원하지 않는다. agent-browser와 Browser MCP는 observation artifact를 수집할 수 있지만 `pending`·non-verifying으로
-  보고하며 `VISUAL_VERIFIED`나 `BROWSER_VERIFIED`를 만들지 않는다.
-  agent-browser의 내부 구현과 무관하게 그 기록을 Playwright locked test provenance로 바꾸지 않는다.
-- 새 Oracle Delivery 상태를 만들지 않는다. 결과는 보조 artifact이며
-  `IMPLEMENTED_GREEN`이나 `REVIEW_VERIFIED`를 대신하지 않는다.
+- certifiable visual `PASS` producer는 `fod.mjs run green <id>`가 기록한 통과 run뿐이다. 그 run의
+  기록(`run.jsonl`의 `command`)이 그 Playwright test를 실행하는 명령이어야 한다. 기록 없이 따로
+  돌린 Playwright 실행은 관찰이다. agent-browser와 Browser MCP는 observation artifact를 수집할 수 있지만
+  `pending`·non-verifying으로 보고하며 `VISUAL_VERIFIED`나 `BROWSER_VERIFIED`를 만들지 않는다.
+  agent-browser의 내부 구현과 무관하게 그 기록을 Playwright test 실행 기록으로 바꾸지 않는다.
+- run 기록을 직접 쓰지 않는다. 결과는 보조 artifact이며 `frontend-oracle-design`의 GREEN이나
+  리뷰를 대신하지 않는다.
 
 ## 1. 모드 선택
 
 사용자 요청에서 필요한 모드만 실행한다.
 
-| 모드           | 사용 시점                                                 | 종료 판정                                                                                                 |
-| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Screenshot     | 승인 baseline과 실제 렌더의 drift 비교·baseline 후보 확인 | trusted node-test run의 locked Playwright test면 `VISUAL_VERIFIED`, 아니면 pending 또는 `VISUAL_FAILED`   |
-| Direct browser | 사람이 쓰는 것처럼 실제 화면에 들어가 핵심 journey 검증   | trusted node-test run의 locked Playwright test면 `BROWSER_VERIFIED`, 아니면 pending 또는 `BROWSER_FAILED` |
-| Both           | 두 검증을 명시적으로 모두 요청                            | 두 판정을 각각 보고                                                                                       |
+| 모드           | 사용 시점                                                 | 종료 판정                                                                                     |
+| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Screenshot     | 승인 baseline과 실제 렌더의 drift 비교·baseline 후보 확인 | 기록된 green run의 Playwright test면 `VISUAL_VERIFIED`, 아니면 pending 또는 `VISUAL_FAILED`   |
+| Direct browser | 사람이 쓰는 것처럼 실제 화면에 들어가 핵심 journey 검증   | 기록된 green run의 Playwright test면 `BROWSER_VERIFIED`, 아니면 pending 또는 `BROWSER_FAILED` |
+| Both           | 두 검증을 명시적으로 모두 요청                            | 두 판정을 각각 보고                                                                           |
 
 요청하지 않은 모드를 “더 안전하다”는 이유로 추가하지 않는다.
 
 ## 2. 진입 게이트
 
 1. 대상 레포의 `AGENTS.md`·`CLAUDE.md`, 실제 실행 script와 기존 browser 관례를 읽는다.
-2. Oracle이 있으면 lock을 검증하고 revision을 기록한다. mismatch면 실행하지 않는다.
-3. 검증할 D/O 행, route, state, viewport와 baseline source를 사용자 요청 또는
-   승인된 Oracle authorization에서 고정한다.
+2. `frontend-oracle-design` run이 있으면 `fod.mjs status <id>`로 단계를 확인하고 승인(`approval.json`)의
+   spec digest를 기록한다. 승인 뒤 SPEC이 바뀌어 status가 앞 단계로 돌아갔으면 실행하지 않는다.
+3. 검증할 규칙(`R*`)·화면 항목, route, state, viewport와 baseline source를 사용자 요청 또는
+   승인된 SPEC에서 고정한다.
 4. baseline 권위나 기대 결과가 미결이면 현재 자료와 한 번에 묶은 질문을 제시하고
-   `NEEDS_DECISION`으로 멈춘다.
+   `QUESTION`으로 멈춘다.
 5. local/test/staging 환경을 우선한다. production/live는 명시적으로 허용된 read-only
    관찰만 수행하며 submit·삭제·결제 같은 부작용을 만들지 않는다.
 
-Oracle이 없으면 exploratory observation은 가능하지만 `VERIFIED`를 발급하지 않는다.
-관찰 결과와 “정책 기준 없음”을 명시하고 `NEEDS_DECISION`으로 끝낸다.
+기록된 green run이 없으면 exploratory observation은 가능하지만 `VERIFIED`를 발급하지 않는다.
+승인 source도 없으면 관찰 결과와 “정책 기준 없음”을 명시하고 `QUESTION`으로 끝낸다.
 
 ## 레퍼런스 재현 인계
 
 명시적으로 승인된 QA에 재현 작업의 증거 패킷이 주어지면 evidence log·state matrix·
-asset provenance·unsupported items·host contract를 요청 행과 연결한다.
+asset provenance·unsupported items·host contract를 요청 항목과 연결한다.
 증거 패킷은 QA 실행 승인이나 baseline 승인이 아니다. 진입 게이트와 기존 판정 조건을
 그대로 적용하고, 관측·추론·adapted 상태를 승인된 기대 결과와 구분한다.
 
-요청된 motion·interaction 행은 시작·의미 있는 중간 진행·끝·역방향·취소/닫기와
+요청된 motion·interaction 항목은 시작·의미 있는 중간 진행·끝·역방향·취소/닫기와
 reduced-motion을 동일 조건에서 확인한다. 정적 자료만 있거나 상태를 재현할 수 없으면
 unsupported 항목과 미검증 이유를 보고하며 통과로 바꾸지 않는다. 자산 권리 미확인은
 별도 release blocker로 보고하고, evidence-only 자산이 배포 입력에 포함됐는지 확인한다.
@@ -92,8 +92,8 @@ UI 변경이면 최소 320px과 대표 desktop을 확인한다. 앱이 두 theme
 확인하고 motion 변경이면 reduced-motion도 확인한다. 무관한 조합을 곱집합으로
 늘리지 않고 영향받은 상태만 선택한다.
 
-내용 길이에 따라 레이아웃이 달라지는 행이면 아래 콘텐츠 스트레스 조건을 확인 후보로 둔다. 사용자 요청이나
-승인된 authorization에 들어 있는 조건만 실행하고, 빠진 조건은 `남은 것`에 미검증으로 적는다.
+내용 길이에 따라 레이아웃이 달라지는 항목이면 아래 콘텐츠 스트레스 조건을 확인 후보로 둔다. 사용자 요청이나
+승인된 SPEC에 들어 있는 조건만 실행하고, 빠진 조건은 `남은 것`에 미검증으로 적는다.
 
 - 긴 문자열: 이름, 제목, 버튼 라벨, 오류 문구
 - 큰 숫자: 긴 금액, 큰 개수, 음수, 소수점
@@ -103,7 +103,7 @@ UI 변경이면 최소 320px과 대표 desktop을 확인한다. 앱이 두 theme
 
 값은 승인 source나 기존 fixture에서 고르고, 맞는 fixture가 없으면 값을 지어내지 않고 미검증으로 남긴다. 잘림·말줄임·줄바꿈 중 무엇이 맞는지는
 정책이다. 승인 source가 정하지 않았으면 겹침·가로 오버플로·조작 불가처럼 어떤 정책에서도
-틀린 결과만 결함으로 보고하고, 나머지는 `POLICY_GAP` 후보로 남긴다.
+틀린 결과만 결함으로 보고하고, 나머지는 `QUESTION` 후보로 남긴다.
 
 임의 sleep을 사용하지 않는다. 화면 readiness, network response, animation 종료,
 font readiness 같은 관찰 가능한 barrier를 기다린다.
@@ -114,12 +114,12 @@ font readiness 같은 관찰 가능한 barrier를 기다린다.
 2. stable copy·role·의미 구조는 DOM/a11y evidence로, 관계는 layout evidence로,
    최종 drift는 screenshot으로 확인한다.
 3. actual과 approved baseline을 같은 환경에서 생성하고 exact diff를 보존한다.
-4. mismatch면 영향받은 Oracle 행과 expected/actual/diff를 함께 기록한다.
+4. mismatch면 영향받은 규칙·화면 항목과 expected/actual/diff를 함께 기록한다.
 5. baseline을 자동 update하지 않는다.
 
 일반 compare는 baseline read×1, write×0이다. 새 baseline이나 tolerance 변경은 변경
-전후 차이를 사용자에게 보여주고 명시적 승인을 받은 뒤 새 Oracle revision에서만
-적용한다. 최초 자동 생성 screenshot을 승인으로 간주하지 않는다.
+전후 차이를 사용자에게 보여주고 명시적 승인을 받은 뒤에만 적용한다. FOD run이면 SPEC을 고쳐
+다시 승인받는다. 최초 자동 생성 screenshot을 승인으로 간주하지 않는다.
 
 ## 5. Direct browser 모드
 
@@ -143,7 +143,7 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
   이 run 전용 session을 사용하고 기존 사용자 브라우저에 자동 연결하지 않는다.
 - `snapshot -i`로 조작 대상을 확인한다. ref는 현재 snapshot에만 유효하므로 navigation이나
   DOM 변경 뒤에는 다시 `snapshot -i`를 얻고 새 ref로 조작한다.
-- snapshot은 의미 구조 증거이지 시각적 검수가 아니다. Screenshot 모드의 요청 행은
+- snapshot은 의미 구조 증거이지 시각적 검수가 아니다. Screenshot 모드의 요청 항목은
   별도 스크린샷으로 확인하고, focus·network·console 증거를 못 얻으면 N/A와 이유를 남긴다.
 - 종료 시 이 run이 만든 session만 닫는다. 관찰 결과는 `report.md`에 `pending`으로 기록하고
   schema-v3의 passed producer나 journey receipt로 포장하지 않는다.
@@ -152,26 +152,25 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
 
 ## 6. 탐색 phase — bounded exploration (dogfood)
 
-카드 `User Confirmation`의 `Exploration authorization: approved`가 있을 때만, 요청 행
-검증을 **모두 마친 뒤** 실행한다. 필드가 없거나 `declined`면 건너뛴다 — "더 안전하다"는
-이유로 추가하지 않는다는 원칙 그대로다.
+사용자가 탐색을 명시적으로 요청했을 때만, 요청 항목 검증을 **모두 마친 뒤** 실행한다.
+요청이 없으면 건너뛴다 — "더 안전하다"는 이유로 추가하지 않는다는 원칙 그대로다.
 
 dogfood는 별도 QA 단계나 PASS 도구가 아니라 이 탐색을 수행하는 방식이다. 설치된
 dogfood 스킬이 있으면 읽고 활용하되 이 스킬의 승인·범위·시간·부작용 제한이 우선한다.
 CLI가 지원하면 `agent-browser skills get dogfood --full`로 버전 일치 지침을 읽는다.
 dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직접 수행한다.
 변경과 관련된 승인 범위의 핵심 journey 1~3개를 실제 사용자 목표로 골라 수행하며,
-매번 전체 앱을 탐색하지 않는다. 화면 검수나 요청 행 검증을 dogfood로 대체하지 않는다.
+매번 전체 앱을 탐색하지 않는다. 화면 검수나 요청 항목 검증을 dogfood로 대체하지 않는다.
 이슈 개수 목표를 채우려고 범위를 늘리거나 발견을 만들어내지 않는다.
 
 1. time-box: 상호작용 30회 또는 10분 중 먼저 도달하는 쪽. 초과 탐색 금지.
 2. 투어는 승인된 journey 표면 안에서만: 새로고침 mid-flow, back/forward, 빠른 연타·연속
    Enter, pending 중 리사이즈·필터 변경, 스크롤 중 조작, 빈/최대 데이터.
-3. 판정 기준은 카드 `I*` 불변식과 implicit oracle **만**: console error·uncaught
+3. 판정 기준은 승인 SPEC 규칙(`R*`)과 implicit oracle **만**: console error·uncaught
    exception, 실패한 network 응답, dead click, 가로 오버플로, 포커스 소실, 요청 횟수.
    정책 판단·미적 판단은 하지 않는다.
 4. driver가 Playwright면 탐색을 chromium과 **webkit** 두 engine에서 실행한다(동봉
-   engine이라 의존 추가 없음). 카드가 Platform 차원을 선언하지 않았어도 실행한다 —
+   engine이라 의존 추가 없음). SPEC의 Platform 축이 `N/A`여도 실행한다 —
    축을 몰라도 불변식 위반은 관측면에 뜬다. agent-browser 또는 browser MCP driver면 실제
    사용한 브라우저만으로 실행하고 engine·version과 미검증 플랫폼을 기록한다.
 5. 도구 유발 현상을 구분해 기록한다 — Playwright는 클릭 전에 대상으로 스크롤하므로,
@@ -181,11 +180,11 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
    - 이슈별 route·환경·재현 단계·expected/actual·심각도(§7)와 스크린샷 경로를 기록한다.
      동적 문제는 가능하면 녹화/trace를 함께 남기고, 재현하지 못하면 그 사실을 명시한다.
      증거의 토큰·쿠키·개인정보는 마스킹하고 최종 저장된 bytes의 digest를 기록한다.
-   - `I*`·implicit oracle 위반 → `PRODUCT_DEFECT` 후보 + 재현 증거 →
-     `frontend-oracle-design`의 `VALID_RED` 흐름으로 회송
-   - 카드가 침묵하는 동작 관찰 → `POLICY_GAP` 후보(질문+증거+추천) → `NEEDS_DECISION`
-   - 단순한 UX·미적 선호 → advisory `NON_ORACLE_OPINION`; 결함이나 baseline 변경 근거로 쓰지 않는다.
-   - 탐색 결과는 `VERIFIED` 판정에 영향을 주지 않는다. 후보가 있어도 요청 행이 전부
+   - 규칙·implicit oracle 위반 → `PRODUCT_DEFECT` 후보 + 재현 증거 →
+     `frontend-oracle-design` run이 있으면 그 RED 단계로 회송
+   - SPEC이 침묵하는 동작 관찰 → `QUESTION` 후보(질문+증거+추천)
+   - 단순한 UX·미적 선호 → advisory `UNSOURCED_OPINION`; 결함이나 baseline 변경 근거로 쓰지 않는다.
+   - 탐색 결과는 `VERIFIED` 판정에 영향을 주지 않는다. 후보가 있어도 요청 항목이 전부
      일치하고 trusted producer 조건도 충족하면 해당 모드는 `VERIFIED`고, 후보는 별도 항목으로 보고한다.
      agent-browser·Browser MCP 관찰은 여전히 `pending`이다.
 
@@ -193,14 +192,14 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
 
 | 관찰                                                      | 판정·라우팅                                              |
 | --------------------------------------------------------- | -------------------------------------------------------- |
-| 요청한 행 전부 승인 source와 일치 + trusted producer 충족 | 해당 모드 `VERIFIED`                                     |
+| 요청 항목 전부 승인 source와 일치 + trusted producer 충족 | 해당 모드 `VERIFIED`                                     |
 | agent-browser·Browser MCP 관찰                            | `pending`·non-verifying, 관찰·미검증 이유 기록           |
 | 승인 source와 실제 UI가 불일치                            | `VISUAL_FAILED` 또는 `BROWSER_FAILED` + `PRODUCT_DEFECT` |
-| 카드에 기대 결과가 없거나 source 충돌                     | `NEEDS_DECISION` + `POLICY_GAP`                          |
-| 요청한 행의 artifact 누락                                 | 해당 모드 FAILED + `EVIDENCE_GAP`                        |
+| SPEC에 기대 결과가 없거나 source 충돌                     | `QUESTION`                                               |
+| 요청 항목의 artifact 누락                                 | 해당 모드 FAILED + `EVIDENCE_GAP`                        |
 | locator·fixture·font·viewport 조건 오류                   | `HARNESS_DEFECT`, 2회 안에서만 보정                      |
 | server·browser·credential·tool 문제                       | `FAIL` + `ENVIRONMENT_DEFECT`                            |
-| 출처 없는 미적 선호                                       | advisory `NON_ORACLE_OPINION`                            |
+| 출처 없는 미적 선호                                       | advisory `UNSOURCED_OPINION`                             |
 
 결함을 발견해도 이 스킬 안에서 product를 고치고 재승인하지 않는다.
 
@@ -214,17 +213,18 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
 - **P3** — 사소한 완성도·일관성
 
 발견마다 위치(route·viewport·state와 selector 또는 artifact 경로), 검증 상태(근거 run 또는
-`pending`), 기준 출처(Oracle 행·baseline·승인 source), 사용자 영향, 가장 작은 수정 방향을
-적는다. `NON_ORACLE_OPINION`은 P3를 넘지 않는다. 심각도는 판정과 라우팅을 바꾸지 않는다.
+`pending`), 기준 출처(SPEC 규칙·baseline·승인 source), 사용자 영향, 가장 작은 수정 방향을
+적는다. `UNSOURCED_OPINION`은 P3를 넘지 않는다. 심각도는 판정과 라우팅을 바꾸지 않는다.
 
 ## 8. Artifact
 
-레포가 위치를 정하지 않았다면 기존 Oracle 아래에 새 run 디렉터리를 만든다.
+레포가 위치를 정하지 않았다면 `frontend-oracle-design` run 아래(없으면 `.ai/visual-qa/<run-id>/`)에 새
+run 디렉터리를 만든다.
 
 ```text
-.ai/oracles/<oracle-id>/visual-qa/<run-id>/
+.ai/oracles/<id>/visual-qa/<run-id>/
   report.md
-  evidence.json      # Oracle evidence manifest가 인용하는 기계 판독 결과
+  evidence.json      # 기계 판독 결과
   actual.png        # Screenshot 모드일 때
   diff.png          # mismatch가 있을 때
   trace/            # Direct browser 도구가 제공할 때
@@ -234,12 +234,12 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
 기존 run을 덮어쓰지 않는다. `report.md`에는 다음을 기록한다.
 
 ```text
-상태: VISUAL_VERIFIED | VISUAL_FAILED | BROWSER_VERIFIED | BROWSER_FAILED | NEEDS_DECISION | FAIL | pending
+상태: VISUAL_VERIFIED | VISUAL_FAILED | BROWSER_VERIFIED | BROWSER_FAILED | QUESTION | FAIL | pending
 모드: screenshot | direct-browser
-Oracle: revision 또는 N/A
+명세: <id>와 승인 spec digest 또는 N/A
 baseline: source·revision 또는 N/A
 환경: driver(playwright|agent-browser|mcp:<name>), tool/version, browser/version, viewport, theme, motion, locale/TZ, fixture
-행: D1/O1 → PASS|FAIL|N/A + 실제 관찰
+항목: R1 또는 화면 항목 → PASS|FAIL|N/A + 실제 관찰
 발견: P0~P3 · 위치 · 검증 상태 · 기준 출처 · 사용자 영향 · 최소 수정 방향, 없으면 없음
 artifact: actual/diff/trace 경로와 digest
 network: 요청 횟수·payload·실패 또는 N/A
@@ -248,47 +248,46 @@ console: uncaught error·console error 또는 없음
 남은 것: 미검증 항목과 이유
 ```
 
-`evidence.json`은 schema v3로 잠긴 Oracle bytes SHA-256, producer ledger binding, 행별
-판정과 browser journey receipt를 기록한다. certifiable PASS producer run은 성공한 trusted
-`oracle-run --adapter node-test` ledger entry와 같은 `runId`, `adapter: "node-test"`, locked test,
-worktree SHA를 써야 하며 그 locked test provenance가 Playwright 사용을 보여야 한다.
-모든 artifact는 이 evidence 파일 기준 상대 경로의 regular non-symlink,
+`evidence.json`은 승인된 spec digest, producer run, 항목별 판정과 browser journey receipt를
+기록한다. certifiable PASS producer는 `run.jsonl`의 통과한 green 기록과 같은 `at`·`command`를 쓰고,
+그 명령이 Playwright test를 실행해야 한다. 모든 artifact는 이 evidence 파일 기준 상대 경로의 regular non-symlink,
 single-link 파일이어야 하고 실제 bytes SHA-256과 media type을 함께 기록한다. screenshot은
 `image/png`와 PNG magic bytes를 사용한다.
 
 ```json
 {
-  "schemaVersion": 3,
-  "oracleSha256": "<64-hex-digest>",
+  "schemaVersion": 4,
+  "specSha256": "<64-hex-digest>",
   "producerRun": {
-    "runId": "r-visual-001",
-    "adapter": "node-test",
-    "lockedTest": "visual relation contract",
+    "fodRun": "<id>",
+    "phase": "green",
+    "at": "<run.jsonl의 at>",
+    "command": "<run.jsonl의 command>",
+    "test": "[R1] visual relation contract",
     "tool": "playwright",
-    "status": "passed",
-    "worktreeSha256": "<64-hex-digest>"
+    "status": "passed"
   },
-  "rows": {
-    "D1": {
+  "items": {
+    "R1": {
       "status": "passed",
       "journey": {
         "status": "passed",
         "tool": "playwright",
         "scenario": "approved visual relation journey",
-        "checks": ["D1 relation is preserved"],
+        "checks": ["R1 relation is preserved"],
         "artifacts": [
           { "path": "actual.png", "sha256": "<64-hex-digest>", "mediaType": "image/png" },
           { "path": "trace/index.html", "sha256": "<64-hex-digest>", "mediaType": "text/html" }
         ]
       }
     },
-    "D2": {
+    "R2": {
       "status": "passed",
-      "checks": ["D2 approved static relation is preserved"],
+      "checks": ["R2 approved static relation is preserved"],
       "artifacts": [{ "path": "not-applicable.md", "sha256": "<64-hex-digest>", "mediaType": "text/markdown" }],
       "journey": {
         "status": "not-applicable",
-        "reason": "no browser surface for this approved row",
+        "reason": "no browser surface for this approved rule",
         "source": "S1"
       }
     }
@@ -296,32 +295,18 @@ single-link 파일이어야 하고 실제 bytes SHA-256과 media type을 함께 
 }
 ```
 
-Oracle의 전체 evidence manifest에서는 이 artifact를 Oracle 디렉터리 상대 경로로
-인용한다.
-
-```json
-{
-  "kind": "visual",
-  "artifact": "visual-qa/<run-id>/evidence.json",
-  "sha256": "<evidence.json 64-hex-digest>"
-}
-```
-
-artifact 경로만 쓰지 말고 `report.md`에 Oracle revision, 행, 판정과 실제 관찰을
-함께 남긴다.
-
-Oracle의 `Visual QA authorization: declined`이면 visual PASS를 만들지 않는다. GREEN에서는
-`pending`만 남기거나, 승인 Source Registry 근거를 가진 `not-applicable` receipt만 기록한다.
+artifact 경로만 쓰지 말고 `report.md`에 spec digest, 항목, 판정과 실제 관찰을 함께 남긴다.
+리뷰나 보고에서 인용할 때는 `visual-qa/<run-id>/evidence.json` 경로와 그 파일의 SHA-256을 함께 쓴다.
 
 ## 금지
 
 - 사용자 요청 없이 screenshot이나 직접 브라우저 실행
-- `Exploration authorization: approved` 없이 탐색 phase 실행, time-box 초과 탐색
+- 사용자 요청 없이 탐색 phase 실행, time-box 초과 탐색
 - 탐색 관찰로 `VERIFIED` 발급·정책 판단·baseline 변경 — 탐색의 출력은 후보뿐이다
 - 현재 화면을 자동 golden baseline으로 승인
 - mismatch를 없애려고 tolerance 또는 baseline 자동 갱신
 - production/live에서 파괴적 journey 실행
-- visual QA 안에서 정책·Oracle·production 코드 수정
+- visual QA 안에서 정책·명세·production 코드 수정
 - screenshot 한 장으로 focus·network·console·부작용까지 통과 처리
 - 모든 viewport·theme·state의 불필요한 곱집합 생성
 - artifact 없이 `VERIFIED` 주장

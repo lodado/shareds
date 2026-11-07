@@ -778,13 +778,13 @@ export function conformanceClaim(space, runs, seed = null) {
 
 const ROUTES = {
   'outside-space':
-    'the environment does not allow this event, so the model missed it too — reopen the problem definition (POLICY_GAP or DIMENSION_MISSING); never force it into the nearest event',
+    'the environment does not allow this event, so the model missed it too — back to step 1: add the missing axis or rule to the SPEC; never force it into the nearest event',
   'implementation-defect':
-    'the model predicts a different observation — a product defect candidate: reproduce it as a failing test (VALID_RED)',
+    'the model predicts a different observation — a product defect candidate: put the trace in BUGS.json so step 4 sees it fail (RED)',
   'model-agrees':
-    'the model predicts exactly this behavior — if it is still a bug, the specification is wrong: POLICY_GAP',
+    'the model predicts exactly this behavior — if it is still a bug, the specification is wrong: back to step 1',
   'in-space': 'the trace is inside the space; expected observations are listed for a regression test',
-  'adapter-error': 'the adapter could not observe the product — a harness problem, not a verdict (HARNESS_DEFECT)',
+  'adapter-error': 'the adapter could not observe the product — a harness problem, not a verdict: fix the adapter',
 }
 
 /**
@@ -980,7 +980,7 @@ function allowedByNext(plan, exported, raw) {
 const REACH_GENERATOR = 1
 const REACH_HINTS = {
   reached:
-    'a trace from init reaches a state that breaks the safety def: the model or the requirement is wrong — check the source, then fix the model or ask a POLICY_GAP question; never weaken the def to obtain a proof',
+    'a trace from init reaches a state that breaks the safety def: the model or the requirement is wrong — check the source, then fix the model or ask the user whether the rule holds; never weaken the def to obtain a proof',
   outside:
     'the model next does not allow this trace, so the environment cannot produce it: export enabled(state) so only allowed events count, or make step keep the state on an event the environment does not allow',
 }

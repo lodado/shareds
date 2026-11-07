@@ -22,8 +22,8 @@
     },
     {
       "name": "frontend-oracle-design",
-      "description": "Shared formal Oracle and finite Contract frontend design, TDD, evidence gates, and independent review.",
-      "version": "0.130.1",
+      "description": "Six-step frontend behavior work: a 7-axis spec, a Bend proof, generated fast-check conformance tests, RED, GREEN and one review.",
+      "version": "1.0.0",
       "author": {
         "name": "lodado"
       },
@@ -46,8 +46,8 @@
     },
     {
       "name": "frontend-system-design",
-      "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
-      "version": "0.3.0",
+      "description": "Frontend architecture (FSD, code structure, changeability, types) and verified implementation guides for well-known features. Behavior-risk rules belong to frontend-oracle-design.",
+      "version": "0.4.0",
       "author": {
         "name": "lodado"
       },
@@ -58,8 +58,8 @@
     },
     {
       "name": "test",
-      "description": "Oracle-driven deterministic frontend behavior testing.",
-      "version": "0.10.1",
+      "description": "Deterministic frontend behavior tests from approved spec rules.",
+      "version": "0.11.0",
       "author": {
         "name": "lodado"
       },
@@ -71,7 +71,7 @@
     {
       "name": "frontend-visual-qa",
       "description": "Screenshot comparison and direct-browser frontend QA against approved visual sources.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "lodado"
       },
@@ -107,7 +107,7 @@
     {
       "name": "game-interface-design",
       "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, lint-gated pixel sprite animation, and lifelike cat behavior with a trace check.",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "author": {
         "name": "lodado"
       },
@@ -143,7 +143,7 @@
     {
       "name": "developer-agents",
       "description": "Frontend and backend developer subagents that place code by FSD, separate UI from business logic, and build backends in three layers with Clean Architecture and DDD.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "lodado"
       },

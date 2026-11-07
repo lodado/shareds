@@ -133,9 +133,10 @@ jscpd는 `packages/`의 JS/TS 코드에서 50토큰·5줄 이상인 복제를 �
 | `prefer-immediate-return`            | 중간 변수가 결과를 바꾸지 않는데 남아 데이터 흐름을 길게 만든 지점을 찾는다. |
 | `too-many-break-or-continue-in-loop` | loop 탈출 경로가 많아 원소 처리 여부를 예측하기 어려운 코드를 찾는다.        |
 
-## frontend-oracle-design과의 관계
+## 비결정 소스
 
-이 레포의 `frontend-oracle-design`은 production diff에서 아래 토큰을 별도로 스캔한다.
+렌더 중 아래 토큰은 lint error다. `Date.now`·`Math.random`은 `react-hooks/purity`가, 나머지는 `local-rules`
+preset의 `@lodado/local-rules/no-nondeterministic-render`가 잡는다.
 
 ```text
 Date.now
@@ -148,19 +149,15 @@ new Date()
 
 SonarJS의 `pseudo-random`은 **보안 문맥에서 PRNG를 쓰는 문제만** 찾는다. 시각, seed,
 UUID, locale, timezone 때문에 테스트나 렌더 결과가 실행마다 달라지는 일반적인 비결정성은
-잡지 못한다. 따라서 medium/high-risk Oracle delivery에서는 다음 검사를 함께 유지한다.
-
-```bash
-node packages/frontend-oracle-design/skills/frontend-oracle-design/scripts/oracle-verify.mjs scan \
-  --path <changed-source-file>
-```
+잡지 못한다. 따라서 렌더 결과를 검증하는 코드에서는 이 두 rule을 함께 켠다.
 
 검출된 소스는 clock/random/locale을 인자로 주입하는 seam으로 바꾸는 것이 우선이다.
-의도된 비결정성이면 해당 줄 또는 바로 윗줄에
+`no-nondeterministic-render`가 잡은 의도된 비결정성이면 해당 줄 또는 바로 윗줄에
 `oracle:nondeterminism <구체적인 사유>`를 기록한다.
 
-정리하면 SonarJS는 소스 구조와 알려진 결함 패턴을 결정적으로 검사하고, Oracle은 고정된
-요구사항·테스트 증거·실행 환경과 비결정 소스를 검증한다. 둘 다 실제 제품 정책의 정답,
+정리하면 SonarJS는 소스 구조와 알려진 결함 패턴을 결정적으로 검사하고,
+`no-nondeterministic-render`는 렌더의 비결정 소스를 검사한다. `frontend-oracle-design`은 명세 규칙을
+Bend로 증명하고 그 모델에서 테스트를 만든다. 셋 다 실제 제품 정책의 정답,
 브라우저 시각 결과, race condition의 모든 interleaving을 증명하지는 않는다.
 
 ## 도입과 예외 원칙

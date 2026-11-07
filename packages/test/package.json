@@ -1,7 +1,7 @@
 {
   "name": "@lodado/test-plugin",
-  "version": "0.10.1",
-  "description": "Claude Code / Codex plugin for Oracle-driven frontend behavior testing.",
+  "version": "0.11.0",
+  "description": "Claude Code / Codex plugin for deterministic frontend behavior testing from approved spec rules.",
   "private": true,
   "scripts": {
     "test": "node --test scripts/*.test.mjs"

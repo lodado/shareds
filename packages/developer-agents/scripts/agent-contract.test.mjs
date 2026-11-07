@@ -7,10 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const repositoryDirectory = dirname(dirname(packageDirectory))
-const oracleReferences = join(
-  repositoryDirectory,
-  'packages/frontend-oracle-design/skills/frontend-oracle-design/references',
-)
+const canonicalReferences = join(repositoryDirectory, 'packages/frontend-system-design/skills/references/architecture')
 const sharedReferences = ['fsd.md', 'changeability.md', 'backend.md']
 const agents = ['frontend-developer', 'backend-developer']
 
@@ -27,13 +24,13 @@ const headings = async () => {
   return texts.flatMap((text) => [...text.matchAll(/^#{1,4} (.+)$/gm)].map(([, heading]) => heading))
 }
 
-test('ships byte-identical copies of the frontend-oracle-design references', async () => {
+test('ships byte-identical copies of the frontend-system-design architecture references', async () => {
   for (const name of sharedReferences) {
     const [bundled, canonical] = await Promise.all([
       read(`references/${name}`),
-      readFile(join(oracleReferences, name), 'utf8'),
+      readFile(join(canonicalReferences, name), 'utf8'),
     ])
-    assert.equal(bundled, canonical, `${name} must stay byte-identical with frontend-oracle-design`)
+    assert.equal(bundled, canonical, `${name} must stay byte-identical with frontend-system-design`)
   }
 })
 

@@ -18,7 +18,7 @@ test('ships the frontend test contract with its required BVA reference', async (
 
   assert.match(skill, /name: test/)
   assert.match(skill, /references\/bva\.md/)
-  assert.match(skill, /VALID_RED predicates/)
+  assert.match(skill, /RED predicates/)
   assert.match(skill, /If a usable existing test exists, reuse it/)
   assert.match(skill, /describe `as`, it `to be` pattern/)
   assert.equal(bundledBva, oracleBva)
@@ -39,15 +39,18 @@ test('writes type witnesses on the shared boundary axes without a fixed quota', 
   assert.match(skill, /case count is a complexity signal, not a fixed quota/)
 })
 
-test('O31: records runs through the oracle ledger and blocks weakened tests', async () => {
+test('records judging runs through fod.mjs and leaves model-covered rules to the generated tests', async () => {
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
 
-  assert.match(skill, /oracle-run\.mjs exec/)
-  assert.match(skill, /runId/)
-  assert.match(skill, /--report/)
-  assert.match(skill, /budget --spend harness/)
+  assert.match(skill, /fod\.mjs run red <id>/)
+  assert.match(skill, /fod\.mjs run green <id>/)
+  assert.match(skill, /GREEN_TESTS_CHANGED/)
+  assert.match(skill, /fod\.mjs gen <id>/)
+  assert.match(skill, /only\s+for the rules the spec marks `모델 밖`/)
+  assert.match(skill, /is a weakened test, and the review rejects it/)
   assert.doesNotMatch(skill, /maxDiffPixels/)
-  assert.match(skill, /TEST_WEAKENED/)
+  // the retired card workflow is gone from the test contract
+  assert.doesNotMatch(skill, /\b(?:Oracle Card|ORACLE_READY|VALID_RED|NEEDS_DECISION|oracle-run|evidence\.json|TEST_WEAKENED)\b/)
 })
 
 test('keeps behavior tests here and delegates screenshot or direct-browser QA', async () => {

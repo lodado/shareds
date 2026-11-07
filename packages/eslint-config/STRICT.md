@@ -154,8 +154,6 @@ pnpm --filter @lodado/eslint-config test
 pnpm --filter @lodado/eslint-config lint
 pnpm check:architecture
 pnpm --filter @lodado/frontend-oracle-design-plugin test
-pnpm --filter @lodado/frontend-oracle-design-plugin bundles:check
-pnpm --filter @lodado/frontend-oracle-design-plugin workflow-docs:check
 ```
 
 The two lint packages and their strict fixtures passed locally, including plugin example typechecking. Oracle tests passed 476/476; bundle/workflow/eval generation checks passed. Broad workspace lint completed with 0 errors and advisory warnings only (257 in Oracle, 46 in UX flow, 6 in the ESLint config package). Root Knip and jscpd passed; the existing clone baseline was unchanged.

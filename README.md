@@ -29,12 +29,12 @@
 
 ## 뭐가 들어 있어요
 
-| 영역      | 들어 있는 것                                                                  | 배포              |
-| --------- | ----------------------------------------------------------------------------- | ----------------- |
-| 코드 품질 | 조합형 ESLint 프리셋, 직접 만든 규칙                                          | npm               |
-| 검증      | Oracle 계약, TDD, 행동 테스트, 브라우저·스크린샷                              | 에이전트 플러그인 |
-| 설계      | 프론트엔드 시스템 패턴, Figma 제품·랜딩 디자인, 모바일 웹게임 기획·프로토타입 | 에이전트 플러그인 |
-| 에이전트  | 워크플로 그래프 설계랑 실행, 5인 하네스팀 작업 방식                           | 에이전트 플러그인 |
+| 영역      | 들어 있는 것                                                                 | 배포              |
+| --------- | ---------------------------------------------------------------------------- | ----------------- |
+| 코드 품질 | 조합형 ESLint 프리셋, 직접 만든 규칙                                         | npm               |
+| 검증      | Oracle 명세·Bend 증명·생성 테스트, 행동 테스트, 브라우저·스크린샷            | 에이전트 플러그인 |
+| 설계      | 프론트엔드 아키텍처·시스템 패턴, Figma 디자인, 모바일 웹게임 기획·프로토타입 | 에이전트 플러그인 |
+| 에이전트  | 워크플로 그래프 설계랑 실행, 5인 하네스팀 작업 방식                          | 에이전트 플러그인 |
 
 ## 스킬 한눈에 보기
 
@@ -43,10 +43,9 @@
 | 스킬                                                                                                                    | 하는 일                                                                                          |
 | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                                               |
-| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | Bend 모델·증명까지 필수인 동작 계약과 테스트·구현·리뷰를 조율해요.                               |
-| [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md)                  | Bend 없이 유한 Space를 정의하고 실제 테스트·타입·속성 증거로 검수해요.                           |
-| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                                              | 요구사항을 Bend 모델·법칙·증명으로 옮기는 Formal 전용 도우미예요.                                |
-| [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.                       |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | 7축 명세 → Bend 증명 → 생성 테스트 → RED → GREEN → 리뷰 6단계로 위험한 동작을 고쳐요.            |
+| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                                              | 요구사항을 Bend 모델·법칙·증명으로 옮겨요. 증명 단계(2단계)에서 쓰여요.                          |
+| [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | 프론트엔드 아키텍처(FSD)·코드 구조·타입과 검색·채팅·결제 같은 기능의 구현 선택지를 다뤄요.       |
 | [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.                            |
 | [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.                             |
 | [`reference-driven-figma-design`](packages/frontend-interface-design/skills/reference-driven-figma-design/SKILL.md)     | 레퍼런스와 디자인 시스템을 바탕으로 편집 가능한 Figma 화면을 만들어요.                           |
@@ -179,128 +178,54 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 
 ## Oracle Design 자세히
 
-[`frontend-oracle-design`](packages/frontend-oracle-design)은 동작 계약과 검증 흐름을 조율하는 플러그인이에요.
-한 줄로 말하면 **구현 생성기가 아니라 검증 하네스**예요.
+[`frontend-oracle-design`](packages/frontend-oracle-design)은 상태·순서·횟수·권한·돈이 걸린 프론트엔드 동작을
+명세하고 증명한 뒤 테스트부터 만드는 플러그인이에요. 한 줄로 말하면 **구현 생성기가 아니라 검증 하네스**예요.
 
 에이전트한테 기능을 시키면 보통 이래요. 애매한 부분을 자기 마음대로 정해요.
 테스트는 통과했다고 하는데 뭘 통과했는지 몰라요. 나중에 보면 요구사항이 슬쩍 바뀌어 있어요.
 
-Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진행 안 해요**.
-승인된 계약은 파일로 잠그고, 실행 결과는 전부 원장에 남겨요.
-
-### 역할별 스킬
-
-두 진입 스킬 중 검증 방식에 맞는 것을 명시적으로 선택해요.
-
-- `$frontend-oracle-design`은 `formal-bend/v1`입니다. Bend 모델·증명·Adequacy와 모델에서 투영된 카드를 유지해요.
-- `$frontend-contract-design`은 `contract/v1`입니다. Bend 없이 출처가 있는 `oracle.md`에 유한 `full-product` Space를 정의하고, 선언된 조합 전체의 처분과 실제 실행 증거를 확인해요.
-
-Contract도 승인·lock·VALID_RED·Medium 연속 통과·독립 리뷰를 생략하지 않아요. 타입 경계가 있으면 실제 TypeScript/type-fest 증거를, 활성 Async/Order가 있으면 실제 fast-check 증거를 요구해요. 유한 Space의 완전한 검수는 모든 제품 동작에 대한 형식 증명이 아니에요. Formal 검증을 요구하는 출처가 있다면 Contract 선택으로 우회할 수 없어요.
-
-두 컨트롤러는 현재 단계에 필요한 전문 스킬만 명시적으로 호출해요. 플러그인은 하나이고
-중립 Space 검수, runtime, lock과 ledger도 하나예요. 프로필은 승인된 카드에 고정되고 실행·worker·review 입력까지 일치해야 해요. Bend가 없다고 Formal 실행을 Contract로 자동 전환하지 않아요.
-
-| 스킬                                                                                                   | 맡는 일                                                      |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)     | Formal 흐름 조율, 사용자 승인, lock, 상태 전이와 최종 보고   |
-| [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md) | Contract 흐름 조율, 사용자 승인, lock, 상태 전이와 최종 보고 |
-| [`oracle-intake`](packages/frontend-oracle-design/skills/oracle-intake/SKILL.md)                       | 출처·위험 조사, capability 확인, discovery 축 질문           |
-| [`oracle-author`](packages/frontend-oracle-design/skills/oracle-author/SKILL.md)                       | Formal 모델·투영 Draft 또는 Contract Space·카드 작성         |
-| [`oracle-implement`](packages/frontend-oracle-design/skills/oracle-implement/SKILL.md)                 | lock과 VALID_RED 이후 허용된 제품 코드 구현                  |
-| [`oracle-review`](packages/frontend-oracle-design/skills/oracle-review/SKILL.md)                       | 독립 컨텍스트의 계약·구현·근거 리뷰                          |
-| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                             | Formal author가 쓰는 Bend 모델·법칙·증명 도우미(Formal 전용) |
-
-테스트 작성은 기존 `$test`를 재사용해요. 전문 스킬을 직접 호출해도 승인이나 선행 검증을
-건너뛸 수 없어요. 선행조건이 없으면 컨트롤러로 돌아와요.
+Oracle은 그걸 막아요. 정하지 않은 정책은 질문으로 남기고, 규칙은 Bend로 증명하고, 테스트는 그 모델에서 만들어요.
 
 ### 어떻게 도나요
 
 ```text
   요청
    │
-   ├─ 모델화할 동작 없음 ──▶ OUT_OF_SCOPE: $test / 시각 검증 / 단순 수정
+   ├─ 동작 위험 없음 ──▶ 범위 밖: $test / $frontend-visual-qa / $frontend-system-design / 단순 수정
    │
-   └─ 모델화할 동작 있음 (Low / Medium / High)
-          │
-          ▼
-      ① DEFINE     Outcome Brief·Source Registry·계약 행 작성 + 사용자 확인
-          │
-          ▼
-      ② LOCK       승인한 카드와 정책 출처의 내용 지문 고정
-          │
-          ▼
-      ③ PROVE      VALID_RED로 기능 부족 때문에 실패하는지 증명
-          │
-          ▼
-      ④ BUILD      최소 구현, GREEN, 실행 증거와 ledger 기록
-          │
-          ▼
-      ⑤ REVIEW     표준은 독립 리뷰 1명, High-risk는 독립 리뷰 2명과 join
-          │
-          ▼
-      ⑥ CERTIFY    lock·증거·review receipt를 재검사해 REVIEW_VERIFIED
-
-  옆 출구
-  POLICY_GAP                   ──▶ 사람의 정책 결정 대기
-  PRODUCT_DEFECT               ──▶ BUILD
-  EVIDENCE_GAP/HARNESS_DEFECT  ──▶ 증거만 보정한 뒤 BUILD
-  FAIL                         ──▶ 장부 전/후를 구분해 정지
+   ▼
+  ① 명세      SPEC.md: 출처, 규칙 R*, 7축(Data·Value·Async·Order·Entry·Environment·Platform), 질문 Q*
+  ② 증명      MODEL.bend·LAWS.bend·PROOF.bend를 커널로 증명 → 사용자 승인 한 번
+  ③ 테스트    모델에서 적합성 테스트 생성(최소 커버·W-method·순서 조합·fast-check 표본)
+  ④ RED       고치기 전 제품에서 생성 테스트가 실패하는지 기록
+  ⑤ GREEN     구현하고 같은 테스트를 통과시켜 기록
+  ⑥ 리뷰      새 컨텍스트 리뷰어 한 명, 최대 2라운드
 ```
 
-이건 사람이 읽는 6단계 운영 화면이에요. 실제 Controller는 사용자 승인, 실패 증명과 구현,
-시각 증거 대기, 표준/High-risk 리뷰, 장부 전후 정지를 별도 Node로 유지해요. 정확한
-Node·Edge·fallback·terminal 수와 전체 그래프는
-[패키지 README](packages/frontend-oracle-design/skills/frontend-oracle-design/README.md)가 원본 JSON에서 자동으로
-생성합니다.
+모든 단계는 `fod.mjs` 한 스크립트로 돌아요. 기록(`proof.json`·`approval.json`·`gen.json`·`run.jsonl`)은
+스크립트만 쓰고, 내용 지문(sha256)으로 앞 단계가 바뀌었는지 판단해요.
+
+```bash
+fod.mjs init <id>                 # .ai/oracles/<id>/SPEC.md 만들기
+fod.mjs check <id>                # 명세 검사 — 문제를 한 번에 다 보여줘요
+fod.mjs prove <id>                # Bend 증명
+fod.mjs approve <id> --by <이름>  # 증명 뒤 승인 한 번
+fod.mjs gen <id>                  # 모델에서 테스트 생성
+fod.mjs run red|green <id>        # RED·GREEN 기록
+fod.mjs status <id>               # 지금 단계와 다음 할 일
+```
 
 ### 핵심 규칙 몇 개
 
-- 정책 출처는 승인된 문서예요. 기존 코드나 현재 브라우저 동작은 증거일 뿐 근거가 아니에요
-- 카드 승인 전에는 production 코드를 못 건드려요
-- 정책이 바뀌면 잠긴 파일을 고치는 게 아니라 새 revision을 만들어요
+- 정책 출처는 승인된 문서와 사용자 답이에요. 기존 코드나 현재 브라우저 동작은 증거일 뿐 근거가 아니에요
+- 승인 뒤 RED 기록 전에는 hook이 제품 파일 수정을 막아요
+- 테스트는 모델이 지나가는 길만 확인해요. 시작 조건(빈 목록, 꽉 찬 목록, 딥링크)도 모델의 첫 사건으로 넣어야 테스트돼요
 - assertion 약화, `test.skip`, 임의 sleep은 금지예요
-- 보고할 때 말로 풀지 않고 runId를 인용해요
+- 문제 코드마다 고치는 방법이 단계 문서에 있어요
 
-### 끝나는 상태
-
-| 상태                | 뜻                                                                                           |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| `ORACLE_READY`      | 승인한 카드를 잠갔어요. Design-only는 여기서 멈추고, Delivery 구현은 VALID_RED 이후에만 해요 |
-| `IMPLEMENTED_GREEN` | 구현 검증은 통과했지만 시각 증거 대기면 여기서 재개해요. 최종 완료는 아니에요                |
-| `REVIEW_VERIFIED`   | 리뷰 finding까지 반영하고 재통과했어요                                                       |
-| `NEEDS_DECISION`    | 결과를 바꾸는 정책이 미결이에요. 질문을 뱉어요                                               |
-| `FAIL`              | 환경·하네스 문제나 예산 소진으로 판정 불가예요                                               |
-
-### 무한 루프 방지
-
-피드백은 원인별로 나눠서 예산을 써요. 예산 다 쓰면 `BUDGET_EXHAUSTED`로 멈춰요.
-
-| 분류                 | 예산 | 처리                           |
-| -------------------- | ---- | ------------------------------ |
-| `POLICY_GAP`         | 2    | 질문 출력하고 `NEEDS_DECISION` |
-| `HARNESS_DEFECT`     | 2    | 테스트 하네스만 보정해요       |
-| `PRODUCT_DEFECT`     | 3    | `VALID_RED` 뒤에 구현을 고쳐요 |
-| `EVIDENCE_GAP`       | -    | 잠긴 범위 안에서 매핑을 채워요 |
-| `ENVIRONMENT_DEFECT` | -    | production 안 건드리고 `FAIL`  |
-| `NON_ORACLE_OPINION` | -    | 기록만 하고 완료를 막지 않아요 |
-
-### 딸린 스크립트
-
-판정은 말이 아니라 스크립트가 해요.
-
-```bash
-oracle-verify.mjs   card | red | evidence | findings | review | scan
-oracle-lock.mjs     create | verify
-oracle-run.mjs      init | status | exec | transition | budget | review-packet | review-brief
-generate-workflow-docs.mjs       README 그래프 요약 생성 | --check
-```
-
-`review-brief`는 현재 리뷰 근거에서 사용자 목표·차단 항목·미완료 증거·비차단 의견을 모은
-읽기 전용 요약입니다. 원본 카드·리뷰 입력이나 승인 절차를 대체하지 않습니다.
-
-혼자 다 하지는 않아요. 테스트 작성·판정은 [`test`](packages/test),
+혼자 다 하지는 않아요. 손으로 쓰는 테스트는 [`test`](packages/test),
 스크린샷이랑 브라우저는 [`frontend-visual-qa`](packages/frontend-visual-qa),
-기능별 구현 선택지는 [`frontend-system-design`](packages/frontend-system-design)이 가져가요.
+아키텍처·코드 구조·기능별 구현 선택지는 [`frontend-system-design`](packages/frontend-system-design)이 가져가요.
 
 자세한 건 [스킬 문서](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)에 있어요.
 
@@ -318,10 +243,10 @@ npm으로 나갈 것들이에요.
 | 플러그인                                                                  | 설명                                                                                                                                               |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                                                                        |
-| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, Formal 전용 `bend-proof`, TDD·근거·리뷰                                          |
+| [`frontend-oracle-design`](packages/frontend-oracle-design)               | 7축 명세·Bend 증명·생성 적합성 테스트·RED·GREEN·리뷰 6단계와 `bend-proof`                                                                          |
 | [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                                                               |
-| [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                                                              |
-| [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                                                                   |
+| [`frontend-system-design`](packages/frontend-system-design)               | 프론트엔드 아키텍처와 잘 알려진 문제의 설계 패턴                                                                                                   |
+| [`test`](packages/test)                                                   | 승인된 명세 규칙 기반 결정론적 행동 테스트                                                                                                         |
 | [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                                                                   |
 | [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인                                              |
 | [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                       |

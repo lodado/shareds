@@ -24,12 +24,12 @@ Short entrypoint loads references progressively.
 
 ## 0.2.0 additions
 
-| Source                                                  | Use here                                                                                                                                 |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| frontend-oracle-design `skills/references/fsd.md`       | Adapted, not copied, into `threejs-game-wireframe/references/fsd-game.md` (pages-first, public API, Next.js layer names, checker choice) |
-| frontend-oracle-design delivery states and final report | Status words `PASS`/`FAIL`/`NOT_RUN`/`BLOCKED`; no Oracle lock, ledger or hook is ported                                                 |
-| v0.1.0 `technical-handoff.md` "No automatic ECS" line   | Replaced: a playable greybox now follows the headless ECS contract of the new skill                                                      |
-| v0.1.0 Python validators                                | Ported to Node; same checks, registration helper dropped                                                                                 |
+| Source                                                                                             | Use here                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| frontend-system-design `skills/references/architecture/fsd.md` (moved from frontend-oracle-design) | Adapted, not copied, into `threejs-game-wireframe/references/fsd-game.md` (pages-first, public API, Next.js layer names, checker choice) |
+| frontend-oracle-design delivery states and final report                                            | Status words `PASS`/`FAIL`/`NOT_RUN`/`BLOCKED`; no Oracle lock, ledger or hook is ported                                                 |
+| v0.1.0 `technical-handoff.md` "No automatic ECS" line                                              | Replaced: a playable greybox now follows the headless ECS contract of the new skill                                                      |
+| v0.1.0 Python validators                                                                           | Ported to Node; same checks, registration helper dropped                                                                                 |
 
 The implementation skill ships a Stack greybox starter and a scaffold script. It does not deploy,
 publish, install Figma, enforce hooks or certify fun.

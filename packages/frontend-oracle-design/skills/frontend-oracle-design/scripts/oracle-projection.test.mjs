@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -16,7 +16,7 @@ import {
   projectionResidue,
   proveLaws,
 } from './oracle-model.mjs'
-import { auditAdapterSource, emitState, emitSweep, emitTrace, emitWorld, replay } from './oracle-projection.mjs'
+import { auditAdapterSource, emitState, emitTrace, replay } from './oracle-projection.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import {
   arbitraryOf,
@@ -53,7 +53,7 @@ async function workspace(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   await mkdir(join(root, 'node_modules'))
   await symlink(join(PACKAGE, 'node_modules', 'fast-check'), join(root, 'node_modules', 'fast-check'))
-  for (const name of ['stale-search', 'toggle', 'doc-save', 'pagination', 'session-expiry', 'reorder'])
+  for (const name of ['stale-search', 'toggle', 'pagination', 'session-expiry', 'reorder'])
     await cp(join(FIXTURES, name), join(root, name), { recursive: true })
   return root
 }
@@ -98,20 +98,18 @@ function verifyOutput(file) {
     'verify-generated', '--file', file], { encoding: 'utf8' })
 }
 
-for (const mode of ['trace', 'world', 'state', 'sweep']) {
+for (const mode of ['trace', 'state']) {
   test(`[bend] public generated verification: ${mode} is read-only and rejects rehashed edits`, async (t) => {
     const bin = await installedBend(t)
     if (!bin) return
     const root = await workspace(t)
-    const fixture = { world: 'doc-save', state: 'toggle', trace: 'stale-search', sweep: 'stale-search' }[mode]
+    const fixture = { state: 'toggle', trace: 'stale-search' }[mode]
     const dir = join(root, fixture)
     const base = { out: join(dir, 'generated'), row: 'O1', bin, regenerate: 'test' }
     const search = { ...base, model: join(dir, 'MODEL.bend'), prefix: 'Search',
       adapter: join(dir, 'search.adapter.mjs'), bound: 4, runs: 10 }
     const emissions = {
       trace: () => emitTrace(search),
-      sweep: () => emitSweep({ ...search, walks: 2, steps: 3 }),
-      world: () => emitWorld({ ...base, card: join(dir, 'oracle.md'), cwd: dir, adapter: join(dir, 'doc-save.adapter.mjs') }),
       state: () => emitState({ ...base, model: join(dir, 'MODEL.bend'), prefix: 'Toggle',
         adapter: join(dir, 'toggle.adapter.mjs'), stateType: 'Toggle', commandType: 'Cmd',
         relations: ['R_blocked_keeps', 'R_free_applies'], runs: 10 }),
@@ -274,7 +272,7 @@ test('replay classification: an event the environment forbids is outside the spa
   const outside = classifyTrace(model, [{ $: 'Respond', id: 1 }])
   assert.equal(outside.verdict, 'outside-space')
   assert.deepEqual(outside.allowed, [{ $: 'Issue' }])
-  assert.match(outside.route, /reopen the problem definition/)
+  assert.match(outside.route, /back to step 1: add the missing axis or rule to the SPEC/)
 
   const late = [{ $: 'Issue' }, { $: 'Issue' }, { $: 'Respond', id: 2 }, { $: 'Respond', id: 1 }]
   const defect = classifyTrace(model, late, [0, 0, 0, 2, 1])
@@ -443,93 +441,6 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
   }
 })
 
-test('[bend] emit-sweep: one run lists every kind of divergence, stays skipped without SWEEP=1, and the shortest trace replays', async (t) => {
-  const bin = await installedBend(t)
-  if (!bin) return
-  const root = await workspace(t)
-  const dir = join(root, 'stale-search')
-  const emitted = await emitSweep({
-    model: join(dir, 'MODEL.bend'),
-    prefix: 'Search',
-    adapter: join(dir, 'search.adapter.mjs'),
-    out: join(dir, 'sweep'),
-    row: 'O4',
-    walks: 60,
-    steps: 12,
-    seed: 3,
-    bin,
-    regenerate: 'test',
-  })
-  assert.deepEqual(emitted.verification, { level: 'report-only', strategy: 'random-walks', walks: 60, steps: 12, seed: 3 })
-  assert.match(emitted.run, /^SWEEP=1 node --test .*search\.sweep\.oracle\.test\.mjs$/)
-  const testFile = join(dir, 'sweep', 'search.sweep.oracle.test.mjs')
-  const text = await readFile(testFile, 'utf8')
-  assert.match(text, /^\/\/ AUTO-GENERATED .* DO NOT EDIT\./)
-  assert.match(text, /triage input for one batch of fixes, not conformance evidence/)
-  assert.doesNotMatch(text, /from 'fast-check'/)
-
-  // left alone in a product's test glob it costs nothing: the sweep is skipped unless asked for
-  const skipped = runGenerated(testFile)
-  assert.equal(skipped.status, 0, skipped.output)
-  assert.match(skipped.output, /ℹ skipped 1/)
-
-  const sweepOf = (file, env = {}) => {
-    const { NODE_TEST_CONTEXT: _parent, ...clean } = process.env
-    const done = spawnSync(process.execPath, ['--test', '--test-reporter=spec', file], { encoding: 'utf8', env: { ...clean, SWEEP: '1', ...env } })
-    const output = `${done.stdout}${done.stderr}`
-    return { ...done, output, report: JSON.parse(output.match(/\{"sweep":.*\}/)[0]).sweep }
-  }
-  const clean = sweepOf(testFile)
-  assert.equal(clean.status, 0, clean.output)
-  assert.deepEqual([clean.report.row, clean.report.walks, clean.report.steps, clean.report.seed, clean.report.clusters], ['O4', 60, 12, 3, []])
-  assert.ok(clean.report.stepsRun > 60)
-  assert.ok(clean.report.events.Respond > 0)
-  // the environment overrides keep the generated file one artifact for any size of sweep
-  assert.equal(sweepOf(testFile, { SWEEP_WALKS: '7', SWEEP_STEPS: '4', SWEEP_SEED: '9' }).report.walks, 7)
-
-  // the reducer that shows a stale response: the stale answer is one group, with the shortest trace that reaches it
-  await writeFile(
-    join(dir, 'mutant.adapter.mjs'),
-    "import { adapterFor } from './search.adapter.mjs'\nimport { initialSearch } from './search-reducer.mts'\nimport { reduceWithoutStaleCheck } from './search-reducer.mutants.mts'\nexport const { init, step, observe } = adapterFor(reduceWithoutStaleCheck, initialSearch)\n",
-  )
-  await emitSweep({
-    model: join(dir, 'MODEL.bend'),
-    prefix: 'Search',
-    adapter: join(dir, 'mutant.adapter.mjs'),
-    out: join(dir, 'mutant'),
-    row: 'O4',
-    walks: 200,
-    steps: 12,
-    bin,
-    regenerate: 'test',
-  })
-  const mutant = sweepOf(join(dir, 'mutant', 'search.sweep.oracle.test.mjs'))
-  assert.equal(mutant.status, 1)
-  assert.match(mutant.output, /SWEEP_DIVERGENCES: \d+ kinds in 200 walks of up to 12 events \(seed 1\)/)
-  assert.ok(mutant.report.clusters.length >= 1)
-  const [first] = mutant.report.clusters
-  assert.match(first.key, /^Respond → /)
-  assert.ok(first.count >= 1 && first.walks.length >= 1)
-
-  // the shortest trace of a group is replay's input: the model judges it a product defect
-  const replayed = await replay({
-    model: join(dir, 'MODEL.bend'),
-    prefix: 'Search',
-    trace: first.shortest.trace,
-    adapter: await import(join(dir, 'mutant.adapter.mjs')),
-    bin,
-  })
-  assert.equal(replayed.verdict, 'implementation-defect')
-
-  // a stale model is caught as for every generated file, and a sweep without walks is a usage error
-  await writeFile(join(dir, 'MODEL.bend'), `${await readFile(join(dir, 'MODEL.bend'), 'utf8')}\n# edited after generation\n`)
-  assert.match(sweepOf(testFile).output, /STALE_GENERATED_TESTS: \.\.\/MODEL\.bend changed since generation/)
-  await assert.rejects(
-    emitSweep({ model: join(dir, 'MODEL.bend'), prefix: 'Search', adapter: join(dir, 'search.adapter.mjs'), out: join(dir, 'x'), row: 'O4', walks: 0, bin, regenerate: 'test' }),
-    /walks must be a positive integer/,
-  )
-})
-
 test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the && mutant fails exhaustively and sampled', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
@@ -617,23 +528,16 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
   }
 })
 
-test('[bend] time as an event: the miner finds the clock, Bend proves the expiry laws, and the projected test kills the off-by-one', async (t) => {
+test('[bend] time as an event: Bend proves the expiry laws, and the projected test kills the off-by-one', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
   const root = await workspace(t)
   const dir = join(root, 'session-expiry')
-  // 1. the miner sees the clock in the product and names its family — the gate does not stop on time
-  const { mineDimensions } = await import('./oracle-dimensions.mjs')
-  const product = await readFile(join(dir, 'session.mts'), 'utf8')
-  assert.deepEqual(
-    mineDimensions('session.mts', product).map(({ family, dimension }) => [family, dimension]),
-    [['Async', 'timer / clock']],
-  )
-  // 2. the kernel proves both laws over every state and command
+  // 1. the kernel proves both laws over every state and command
   const { proveLaws } = await import('./oracle-model.mjs')
   const proof = await proveLaws({ dir, bin, require: ['expired_blocks', 'live_sends'] })
   assert.equal(proof.status, 'proven', `${proof.stdout}${proof.stderr}`)
-  // 3. the proven relations judge the product through the adapter's fake clock
+  // 2. the proven relations judge the product through the adapter's fake clock
   const base = {
     model: join(dir, 'MODEL.bend'),
     prefix: 'Session',
@@ -652,7 +556,7 @@ test('[bend] time as an event: the miner finds the clock, Bend proves the expiry
   assert.equal(clean.status, 0, clean.output)
   assert.equal(clean.fail, 0)
   assert.ok(clean.tests >= 8, clean.output)
-  // 4. a submit at exactly SESSION_MS that still pays is caught at the boundary the adapter concretizes
+  // 3. a submit at exactly SESSION_MS that still pays is caught at the boundary the adapter concretizes
   await writeFile(
     join(dir, 'mutant.adapter.mjs'),
     "import { mutants } from './session.adapter.mjs'\nexport const { concretize, step, project } = mutants.offByOne\n",
@@ -1112,124 +1016,6 @@ test('[bend] JSX adapters and the environment pragma are vitest-only; the pragma
   assert.match(text, /import \* as adapter from "\.\.\/feed\.adapter\.tsx"/)
 })
 
-// ── emit-world: one product test per possible coordinate setting, for a card without a behavior model ──────────
-
-test('[bend] emit-world: every possible setting runs once with the outcomes the world allows; a wrong store fails its row; a changed world is stale', async (t) => {
-  const bin = await installedBend(t)
-  if (!bin) return
-  const root = await workspace(t)
-  const dir = join(root, 'doc-save')
-  const emitted = await emitWorld({
-    card: join(dir, 'oracle.md'),
-    cwd: dir,
-    adapter: join(dir, 'doc-save.adapter.mjs'),
-    out: join(dir, 'generated'),
-    row: 'O1',
-    bin,
-    regenerate: 'test',
-  })
-  // start × held = 4 settings; the assumption that permission is never regained in flight excludes one
-  assert.deepEqual(
-    { strategy: emitted.verification.strategy, settings: emitted.verification.settings, excluded: emitted.verification.excluded },
-    { strategy: 'exhaustive', settings: 3, excluded: 1 },
-  )
-  const testFile = join(dir, 'generated', 'save.world.test.mjs')
-  const text = await readFile(testFile, 'utf8')
-  assert.match(text, /^\/\/ AUTO-GENERATED .* DO NOT EDIT\./)
-  assert.doesNotMatch(text, /from 'fast-check'/)
-  const clean = runGenerated(testFile)
-  assert.equal(clean.status, 0, clean.output)
-  // 3 settings + sources unchanged + adapter audit
-  assert.deepEqual([clean.tests, clean.fail], [5, 0])
-
-  // a store that still commits after the permission was revoked in flight violates O2 at exactly that setting
-  await writeFile(
-    join(dir, 'submit-check.adapter.mjs'),
-    "import { adapterFor } from './doc-save.adapter.mjs'\nimport { saveCheckingAtSubmit } from './doc-store.mutants.mts'\nexport const { run } = adapterFor({ saveWith: saveCheckingAtSubmit })\n",
-  )
-  await emitWorld({
-    card: join(dir, 'oracle.md'),
-    cwd: dir,
-    adapter: join(dir, 'submit-check.adapter.mjs'),
-    out: join(dir, 'mutant'),
-    row: 'O1',
-    bin,
-    regenerate: 'test',
-  })
-  const mutant = runGenerated(join(dir, 'mutant', 'save.world.test.mjs'))
-  assert.equal(mutant.status, 1)
-  assert.equal(mutant.fail, 1, mutant.output)
-  assert.match(mutant.output, /violates O2 at start !held/)
-
-  await writeFile(join(dir, 'World.bend'), `${await readFile(join(dir, 'World.bend'), 'utf8')}\n# edited after generation\n`)
-  const stale = runGenerated(testFile)
-  assert.equal(stale.status, 1)
-  assert.match(stale.output, /STALE_GENERATED_TESTS: \.\.\/World\.bend changed since generation/)
-})
-
-test('[bend] a generated test never reads a file under .ai/ while it runs, yet regeneration still sees the file change', async (t) => {
-  const bin = await installedBend(t)
-  if (!bin) return
-  const root = await workspace(t)
-  const dir = join(root, 'doc-save')
-  const record = join(dir, '.ai', 'oracles', 'save', 'oracle.md')
-  await mkdir(dirname(record), { recursive: true })
-  await writeFile(record, await readFile(join(dir, 'oracle.md'), 'utf8'))
-  const emit = (options) =>
-    emitWorld({ card: record, cwd: dir, adapter: join(dir, 'doc-save.adapter.mjs'), out: join(dir, 'generated'), row: 'O1', bin, regenerate: 'test', ...options })
-  await emit({})
-  const testFile = join(dir, 'generated', 'save.world.test.mjs')
-  const text = await readFile(testFile, 'utf8')
-  const sourcesLine = text.split('\n').find((line) => line.startsWith('const SOURCES = '))
-  assert.doesNotMatch(sourcesLine, /\.ai/)
-  assert.match(text, /^\/\/ Run record [a-f0-9]{64} \S*\.ai\/oracles\/save\/oracle\.md \(checked when regenerated, never read here\)$/m)
-  // the run record is not part of the product: the test passes without it
-  await rm(join(dir, '.ai'), { recursive: true, force: true })
-  const clean = runGenerated(testFile)
-  assert.equal(clean.status, 0, clean.output)
-  // regenerating against the record is what notices a change to it
-  const original = await readFile(join(dir, 'oracle.md'), 'utf8')
-  await mkdir(dirname(record), { recursive: true })
-  await writeFile(record, original)
-  assert.equal(verifyOutput(testFile).status, 0)
-  await writeFile(record, `${original}\n<!-- edited after generation -->\n`)
-  const drifted = verifyOutput(testFile)
-  assert.equal(drifted.status, 1)
-  assert.match(drifted.stderr, /GENERATED_TESTS_DRIFT/)
-})
-
-test('[bend] emit-world refuses a setting no product can pass instead of writing a test that cannot go green', async (t) => {
-  const bin = await installedBend(t)
-  if (!bin) return
-  const root = await workspace(t)
-  const dir = join(root, 'doc-save')
-  // O3 now also forbids a save whose permission was gone, so every observation at `start !held` violates a row
-  const world = join(dir, 'World.bend')
-  const text = await readFile(world, 'utf8')
-  const forbidding = text.replace('Save.imp(a, c)\n\n# O4', 'Bool.and(Save.imp(a, c), Bool.not(Bool.and(s, Bool.not(h))))\n\n# O4')
-  assert.notEqual(forbidding, text)
-  await writeFile(world, forbidding)
-  const options = {
-    card: join(dir, 'oracle.md'),
-    cwd: dir,
-    adapter: join(dir, 'doc-save.adapter.mjs'),
-    out: join(dir, 'generated'),
-    row: 'O1',
-    bin,
-    regenerate: 'test',
-  }
-  await assert.rejects(emitWorld(options), {
-    code: 'WORLD_SETTING_UNSATISFIABLE',
-    message: /^1 of 3 coordinate settings allow no observation that satisfies every row, so no product can pass them: start !held \[O3 false in every world\].* before the lock$/,
-  })
-  await assert.rejects(readFile(join(dir, 'generated', 'save.world.test.mjs')), { code: 'ENOENT' })
-
-  // the same world with the row restored writes the test again: the refusal is about the dead setting, nothing else
-  await writeFile(world, text)
-  const emitted = await emitWorld(options)
-  assert.equal(emitted.verification.settings, 3)
-})
-
 // ── order changes: a law proved by induction holds for every length; fast-check carries it to the product ───────
 
 test('[bend] reorder: length and permutation are proven for every list by induction, and a drag that drops or overwrites an item is refused', async (t) => {
@@ -1298,7 +1084,7 @@ test('[bend] emit-trace adds the characterizing and event-order cases by default
   if (!bin) return
   const root = await workspace(t)
   const dir = join(root, 'pagination')
-  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, bin, regenerate: 'test' }
+  const base = { model: join(dir, 'MODEL.bend'), prefix: 'Grid', bound: 3, row: 'O1', runs: 50, bin, regenerate: 'test' }
   const bare = await emitTrace({ ...base, wSet: false, orderWays: false, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'bare') })
   assert.equal(bare.verification.wSet, undefined)
   assert.equal(bare.verification.orderWays, undefined)
@@ -1351,7 +1137,7 @@ function reduce(state, event) {
 export const { init, step, observe } = adapterFor(reduce)
 `,
   )
-  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 1, bin, regenerate: 'test', adapter: join(dir, 'double.adapter.mjs') }
+  const base = { model: join(dir, 'MODEL.bend'), prefix: 'Grid', bound: 3, row: 'O1', runs: 1, bin, regenerate: 'test', adapter: join(dir, 'double.adapter.mjs') }
   await emitTrace({ ...base, wSet: false, orderWays: false, out: join(dir, 'bare') })
   await emitTrace({ ...base, out: join(dir, 'dense') })
   // no cover case fails: judge by case ids, because the random sample can find the defect by luck
@@ -1398,8 +1184,12 @@ test('[bend] emit-trace CLI: --no-w-set and --no-order-ways turn the suites off;
       [
         fileURLToPath(new URL('./oracle-projection.mjs', import.meta.url)),
         'emit-trace',
-        '--package',
-        'oracle.package.json',
+        '--model',
+        join(dir, 'MODEL.bend'),
+        '--prefix',
+        'Grid',
+        '--bound',
+        '3',
         '--adapter',
         join(dir, 'pager.adapter.mjs'),
         '--out',
@@ -1418,56 +1208,13 @@ test('[bend] emit-trace CLI: --no-w-set and --no-order-ways turn the suites off;
   const off = run('off', '--no-w-set', '--no-order-ways')
   assert.equal(off.wSet, undefined)
   assert.equal(off.orderWays, undefined)
-  const packageGenerated = verifyOutput(join(dir, 'off', 'grid.oracle.test.mjs'))
-  assert.equal(packageGenerated.status, 0, packageGenerated.stderr || packageGenerated.stdout)
-  assert.equal(JSON.parse(packageGenerated.stdout).status, 'verified')
+  const generated = verifyOutput(join(dir, 'off', 'grid.oracle.test.mjs'))
+  assert.equal(generated.status, 0, generated.stderr || generated.stdout)
+  assert.equal(JSON.parse(generated.stdout).status, 'verified')
   const on = run('on')
   assert.ok(on.wSet.cases > 0)
   assert.equal(on.orderWays.t, 3)
   const asked = run('asked', '--w-set', '--order-ways', '2')
   assert.ok(asked.wSet.cases > 0)
   assert.equal(asked.orderWays.t, 2)
-})
-
-// ── emit-trace --package: the joint cases run the behavior on the world settings ───────────────────────────────
-
-test('[bend] emit-trace --package adds the joint cases; only they catch a defect that needs an empty page and a late response', async (t) => {
-  const bin = await installedBend(t)
-  if (!bin) return
-  const root = await workspace(t)
-  const dir = join(root, 'pagination')
-  // the premise is the cover plus the joint cases, so the characterizing and event-order suites (on by default) stay off
-  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, wSet: false, orderWays: false, bin, regenerate: 'test' }
-  const emitted = await emitTrace({ ...base, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'generated') })
-  // the package names the model, the prefix and the bound; the cross-check chooses 4 joint cases for 33 pairs
-  assert.deepEqual(emitted.verification.modelSpace, { cases: 51, bound: 3, complete: true })
-  assert.deepEqual(emitted.verification.joint, { required: 33, covered: 33, cases: 4 })
-  const testFile = join(dir, 'generated', 'grid.oracle.test.mjs')
-  assert.match(await readFile(testFile, 'utf8'), /"coordinates":\{"entry":/)
-  const clean = runGenerated(testFile)
-  assert.equal(clean.status, 0, clean.output)
-  // the minimum cover (not the 51 traces) + 4 joint cases + sources unchanged + adapter audit + sampled property + probes
-  assert.deepEqual([clean.tests, clean.fail], [emitted.verification.cover.cases + 4 + 4, 0])
-
-  // every trace and cover case runs on the default full page, so the mutant passes them all; the joint case on the
-  // empty page with a late response is the one that fails
-  await writeFile(
-    join(dir, 'empty.adapter.mjs'),
-    "import { adapterFor } from './pager.adapter.mjs'\nimport { reducePagerApplyingEmpty } from './pager-product.mjs'\nexport const { init, step, observe } = adapterFor(reducePagerApplyingEmpty)\n",
-  )
-  await emitTrace({ ...base, adapter: join(dir, 'empty.adapter.mjs'), out: join(dir, 'empty') })
-  const mutant = runGenerated(join(dir, 'empty', 'grid.oracle.test.mjs'))
-  assert.equal(mutant.status, 1)
-  assert.equal(mutant.fail, 1, mutant.output)
-  assert.match(mutant.output, /✖ \[O1\] \[J[a-f0-9]{12}\] [^\n]*volume=Empty/)
-
-  // an adapter whose init takes no coordinates cannot run a joint case: it fails instead of passing on the default page
-  await writeFile(
-    join(dir, 'blind.adapter.mjs'),
-    "import { adapterFor } from './pager.adapter.mjs'\nimport { initialPager, reducePager } from './pager-product.mjs'\nconst full = adapterFor(reducePager)\nexport const init = () => initialPager(20)\nexport const { step, observe } = full\n",
-  )
-  await emitTrace({ ...base, adapter: join(dir, 'blind.adapter.mjs'), out: join(dir, 'blind') })
-  const blind = runGenerated(join(dir, 'blind', 'grid.oracle.test.mjs'))
-  assert.equal(blind.fail, 4, blind.output)
-  assert.match(blind.output, /ADAPTER_JOINT_UNSUPPORTED/)
 })

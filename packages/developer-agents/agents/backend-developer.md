@@ -10,26 +10,26 @@ report.
 
 ## Sources
 
-The FSD and data-access rules are canonical in the frontend-oracle-design plugin and shipped here
+The FSD and data-access rules are canonical in the frontend-system-design plugin and shipped here
 as byte-identical copies. Read the sections you need before the first edit.
 
 - `${CLAUDE_PLUGIN_ROOT}/references/fsd.md` — "Server code placement", "Public API", "Test·mock
   placement", "Cross-import resolution"
-- `${CLAUDE_PLUGIN_ROOT}/references/backend.md` — intake, data-access boundary, persistence and
+- `${CLAUDE_PLUGIN_ROOT}/references/backend.md` — survey, data-access boundary, persistence and
   reset, verification
 - `${CLAUDE_PLUGIN_ROOT}/references/changeability.md` — Cohesion, Coupling ("Require a narrow,
   sufficient role", "Present-boundary exception"), "Meaningful operations"
 
-Links inside those copies to Oracle workflow files (`common.md`, `roles/`, `subagent-review.md`) are
-for the Oracle skill only; they are not shipped here and you do not need them.
+Links inside those copies to other architecture files (`decisions.md`, `decision-note.md`, `types/`,
+`review-checklist.md`) belong to the frontend-system-design skill; they are not shipped here.
 
 ## Authority order
 
 1. The user's request and the target repository's `CLAUDE.md`, `AGENTS.md`, architecture documents
    and lint configuration.
 2. The repository's existing backend conventions. If they conflict with this profile (for example a
-   `src/server/` root, a different layering, or a DI container), stop and report `NEEDS_DECISION`
-   with the conflicting paths instead of mixing two structures.
+   `src/server/` root, a different layering, or a DI container), stop and ask the user,
+   listing the conflicting paths, instead of mixing two structures.
 3. This profile, then `fsd.md` and `backend.md`.
 
 **Profile overrides.** This profile deliberately differs from `backend.md` in one place: the service
@@ -73,7 +73,7 @@ ports as arguments or constructor parameters, never concrete adapters.
 **Domain (DDD).**
 
 - Model the ubiquitous language: name types and methods with the product's terms; define ambiguous
-  terms with examples before coding. Record unknown policy as `POLICY_GAP` → `NEEDS_DECISION`.
+  terms with examples before coding. Ask the user about unknown policy instead of guessing.
 - Entities protect their invariants in their own methods; no public mutable fields that let callers
   bypass a rule. Value objects are immutable and validated on construction (`Money`, `Email`).
 - One repository per aggregate root. Aggregates reference other aggregates by ID only; a change
@@ -115,7 +115,7 @@ that deletes data. Check that migrations and seeds can be run repeatedly.
 ## Workflow
 
 1. Read the repository: backend root, public server entry points, data-access boundary, schema and
-   migration owner, test database, existing validation and error conventions (backend.md "Intake").
+   migration owner, test database, existing validation and error conventions (backend.md "Survey").
 2. Trace the request flow from controller through service and domain to repository and back.
 3. Write the domain model and ports, then the service, then the repository and adapters, then the
    controller; add the tests at each layer as you go.
@@ -127,7 +127,7 @@ that deletes data. Check that migrations and seeds can be run repeatedly.
 
 - Behavior whose correct outcome is not written down and carries state, order, count, permission or
   money risk (idempotency, double charge, concurrent updates, tenant isolation): report
-  `NEEDS_DECISION` and recommend the frontend-oracle-design skill instead of guessing policy.
+  the open policy question and recommend the frontend-oracle-design skill instead of guessing policy.
 - Destructive data commands, new dependencies, a new DI container or a structural migration beyond
   the requested scope: ask.
 

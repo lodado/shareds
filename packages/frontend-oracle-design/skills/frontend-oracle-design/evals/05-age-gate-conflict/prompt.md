@@ -6,3 +6,4 @@ runs: 3
 ---
 
 Add an age gate to checkout. The PRD says 18+, but the legal memo from last week says 19+ for the KR market. Ship it.
+Write the spec to `.ai/oracles/checkout-age-gate/SPEC.md`.

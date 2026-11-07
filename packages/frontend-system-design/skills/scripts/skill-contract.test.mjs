@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 // This package runs its contract suite with Node's built-in runner (see package.json).
 // eslint-disable-next-line test/no-import-node-test -- keep the package's documented test runner
 import test from 'node:test'
@@ -86,12 +86,13 @@ test('every reference opens with the core difficulty it exists to solve', async 
   }
 })
 
-test('every reference is subordinate to the active Oracle contract', async () => {
+test('every reference defers behavior rules to the spec', async () => {
   for (const { name, body } of await readReferences()) {
-    assert.match(body, /> \*\*Oracle 우선:\*\*/, `${name}: Oracle 우선 계약이 없다`)
-    assert.match(body, /frontend-oracle-design/, `${name}: 선행 스킬 이름이 없다`)
-    assert.match(body, /ORACLE_READY/, `${name}: Oracle 준비 상태를 요구하지 않는다`)
-    assert.match(body, /정책 출처가 아니다/, `${name}: 추천을 정책과 구분하지 않는다`)
+    assert.match(body, /> \*\*명세 우선:\*\*/, `${name}: 명세 우선 블록이 없다`)
+    assert.match(body, /frontend-oracle-design/, `${name}: 동작 규칙을 소유하는 스킬 이름이 없다`)
+    assert.match(body, /`SPEC\.md`/, `${name}: SPEC.md가 우선한다는 말이 없다`)
+    assert.doesNotMatch(body, /Oracle 우선/, `${name}: 폐기된 Oracle 우선 블록이 남았다`)
+    assert.match(body, /정책 출처가 아니/, `${name}: 추천을 정책과 구분하지 않는다`)
     assert.match(body, /구현 선택지/, `${name}: 예제 코드의 권한이 불명확하다`)
     assert.doesNotMatch(body, /기본값이 있지만/, `${name}: 추천안을 기본 정책처럼 표현한다`)
   }
@@ -175,7 +176,9 @@ test('every reference keeps citable verification and pitfall IDs unique', async 
     )
     assert.equal(new Set(labels).size, labels.length, `${name}: 검증 ID가 겹친다`)
 
-    const symptoms = tableRows(sectionOf(body, '## 5. 함정', name), PITFALL_HEADER, name, '함정').map(([symptom]) => symptom)
+    const symptoms = tableRows(sectionOf(body, '## 5. 함정', name), PITFALL_HEADER, name, '함정').map(
+      ([symptom]) => symptom,
+    )
     assert.equal(new Set(symptoms).size, symptoms.length, `${name}: 함정 ID(증상)가 겹친다`)
   }
 })
@@ -184,7 +187,7 @@ test('SKILL.md cites existing names as IDs and lists the problems it does not co
   const skill = await read('SKILL.md')
   const reference = await readFile(join(referenceDirectory, 'infinite-scroll.md'), 'utf8')
 
-  assert.match(skill, /Oracle 증거 매핑: <검증 ID·함정 ID → 카드 행>/)
+  assert.match(skill, /검증 매핑: <검증 ID·함정 ID → SPEC 규칙 R\* 또는 테스트>/)
   assert.match(skill, /`infinite-scroll\/중복 요청 차단`/)
   assert.match(skill, /`infinite-scroll\/함정: 같은 항목이 두 번 보임`/)
   // The worked examples must name a real item, or the ID rule teaches a format nothing follows.
@@ -227,24 +230,21 @@ test('the routing table and the reference directory stay in sync', async () => {
   }
 })
 
-test('SKILL.md is an Oracle-dependent companion and defers to the target repo', async () => {
+test('SKILL.md is a standalone architecture and feature-design skill that defers to the target repo', async () => {
   const skill = await read('SKILL.md')
 
   assert.match(skill, /검증된 구현 방법/)
   assert.match(skill, /레포가 우선이다/)
   assert.match(skill, /설치된\s*버전의 문서로 확인/)
   assert.match(skill, /그대로 붙여 넣는 스니펫이\s*아니라/)
-  assert.match(skill, /frontend-oracle-design/)
-  assert.match(skill, /frontend-oracle-design.*먼저/s)
-  assert.match(skill, /ORACLE_READY/)
-  assert.match(skill, /NEEDS_DECISION/)
-  assert.match(skill, /VALID_RED/)
-  assert.match(skill, /단독으로 실행하지 않는다/)
-  assert.doesNotMatch(skill, /단독으로 써도 된다/)
-  assert.doesNotMatch(skill, /나머지는 기본값대로 진행/)
-  assert.match(skill, /Oracle이 정책을 소유한다/)
-  assert.match(skill, /레포가 우선이다/)
-  assert.match(skill, /reference.*앞설 수 없다/)
+  assert.match(skill, /직접\s*호출해/)
+  assert.match(skill, /## 명세 우선[\s\S]*frontend-oracle-design[\s\S]*`SPEC\.md`[\s\S]*## 아키텍처/)
+  assert.match(skill, /`SPEC\.md`가 있으면\s*그 규칙이 이 스킬의 권장안보다 앞선다/)
+  assert.match(skill, /제품 정책을 만들어 내지 않는다/)
+  assert.match(skill, /명세가 정책을 소유한다/)
+  assert.doesNotMatch(skill, /Oracle 우선|단독으로 실행하지 않는다|먼저 로드한다/)
+  assert.match(skill, /^description: .*architecture.*FSD/ms)
+  assert.match(skill, /^description: .*belongs to frontend-oracle-design/ms)
 
   for (const section of REQUIRED_SECTIONS) {
     assert.match(skill, new RegExp(section.replace('## ', '').replace(/\./g, '\\.')))
@@ -284,29 +284,70 @@ test('map and upload references keep nullable and validated boundaries explicit'
 test('SKILL.md defines the compact result returned after a reference is loaded', async () => {
   const skill = await read('SKILL.md')
 
-  for (const label of ['로드한 reference', '필수 정책 질문', '구현 불변식', '버전 확인', 'Oracle 증거 매핑', '근거']) {
+  for (const label of ['로드한 reference', '필수 정책 질문', '구현 불변식', '버전 확인', '검증 매핑', '근거']) {
     assert.match(skill, new RegExp(label), `SKILL.md에 '${label}' 로드 결과 항목이 없다`)
   }
 })
 
-test('the Oracle remains the orchestrator when it loads system-design references', async () => {
-  const oracleSkill = await readFile(
-    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/controller-entry-formal.md'),
-    'utf8',
-  )
-  const intake = await readFile(
-    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/roles/intake-formal.md'),
-    'utf8',
-  )
+async function markdownFiles(directory) {
+  const names = await readdir(directory, { recursive: true })
+  return names.filter((name) => name.endsWith('.md')).map((name) => join(directory, name))
+}
 
-  assert.match(oracleSkill, /frontend-system-design/)
-  assert.match(intake, /policy candidate/)
-  assert.match(intake, /Oracle\s+intake and control|Oracle's orchestration/)
-  assert.doesNotMatch(oracleSkill, /기본 추천과 다를 항목만/)
-  assert.doesNotMatch(intake, /기본 추천과 다를 항목만/)
+function headingSlugs(body) {
+  return new Set(
+    [...body.matchAll(/^#+ (.+)$/gm)].map(([, heading]) =>
+      heading
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replaceAll(' ', '-'),
+    ),
+  )
+}
+
+test('SKILL.md routes every architecture reference and every relative link resolves', async () => {
+  const skill = await read('SKILL.md')
+  const architectureDirectory = join(referenceDirectory, 'architecture')
+  const architecture = (await markdownFiles(architectureDirectory)).map((file) => relative(skillDirectory, file)).sort()
+
+  assert.ok(architecture.length > 0, 'references/architecture에 문서가 없다')
+  assert.match(skill, /## 아키텍처\n/)
+
+  for (const file of architecture) {
+    assert.ok(skill.includes(`](${file})`), `SKILL.md 아키텍처 라우팅에 ${file}이 없다`)
+  }
+
+  for (const file of await markdownFiles(skillDirectory)) {
+    const body = await readFile(file, 'utf8')
+
+    for (const [, target] of body.matchAll(/\]\(([^)\s]+)\)/g)) {
+      if (/^(?:https?:|mailto:|#)/.test(target)) continue
+
+      const [path, anchor] = target.split('#')
+      const resolved = join(dirname(file), path)
+      const label = `${relative(skillDirectory, file)}: ${target}`
+      const linked = await readFile(resolved, 'utf8').catch(() => null)
+
+      assert.notEqual(linked, null, `${label} 링크가 가리키는 파일이 없다`)
+      if (anchor && resolved.endsWith('.md')) {
+        assert.ok(headingSlugs(linked).has(anchor), `${label} 앵커에 해당하는 제목이 없다`)
+      }
+    }
+  }
 })
 
-test('plugin metadata publishes the Oracle-first contract under a new cache identity', async () => {
+test('no file in the skill keeps the retired Oracle workflow vocabulary', async () => {
+  const retired =
+    /\b(?:Oracle Card|ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|POLICY_GAP|NEEDS_DECISION|oracle-run|Delivery mode)\b/
+
+  for (const file of await markdownFiles(skillDirectory)) {
+    const body = await readFile(file, 'utf8')
+    assert.doesNotMatch(body, retired, `${relative(skillDirectory, file)}: 폐기된 Oracle 워크플로 용어가 남았다`)
+  }
+})
+
+test('plugin metadata publishes the standalone architecture contract under a new cache identity', async () => {
   const packageJson = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
   const codexPlugin = JSON.parse(await readFile(join(packageDirectory, '.codex-plugin/plugin.json'), 'utf8'))
   const claudePlugin = JSON.parse(await readFile(join(packageDirectory, '.claude-plugin/plugin.json'), 'utf8'))
@@ -324,7 +365,8 @@ test('plugin metadata publishes the Oracle-first contract under a new cache iden
     claudePlugin.description,
     listing?.description,
   ]) {
-    assert.match(description, /Oracle/i)
+    assert.match(description, /architecture/i)
+    assert.doesNotMatch(description, /Oracle-dependent|companion/i)
   }
 })
 

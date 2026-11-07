@@ -1,7 +1,0 @@
-{
-  "name": "oracle-supported-runner-fixture",
-  "private": true,
-  "scripts": {
-    "test": "node --test verify.test.mjs"
-  }
-}

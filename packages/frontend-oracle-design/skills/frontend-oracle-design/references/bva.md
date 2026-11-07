@@ -1,6 +1,6 @@
 # BVA 5 Axes & Shared Reference
 
-A reference shared by the frontend-oracle-design and test skills. Read all of it before writing a card.
+A reference shared by the frontend-oracle-design and test skills. Read all of it before writing a spec's boundary values or its tests.
 
 ## 1. Value boundaries
 
@@ -69,7 +69,7 @@ Do not invent retry·cancel·race behavior that does not exist for the sake of t
 
 | Premise                       | TC                                                                          |
 | ----------------------------- | --------------------------------------------------------------------------- |
-| Action with a side effect     | Duplicate click — UI blocking row + actual request count row, **each**      |
+| Action with a side effect     | Duplicate click — UI blocking test + actual request count test, **each**    |
 | Network request               | Error — error shown + loading cleared + no success side effect              |
 | Failure possible              | Retry recovery — resubmit possible, new request exactly once                |
 | List·query                    | Empty data / 0-item state                                                   |
@@ -96,8 +96,8 @@ validation / business rule / 401·permission / network disconnection / timeout /
 
 **definitive vs outcome-unknown**: A failure where it is unknown whether the server processed it (timeout
 after sending, lost response) is a separate type. Retrying unconditionally produces a duplicate side effect — for a High risk
-write, raise the retry·idempotency policy as a grill question and record "duplicate side effect
-occurs on retry" in Never.
+write, raise the retry·idempotency policy as a spec question and record "duplicate side effect
+occurs on retry" as a forbidden result.
 
 ## Deferred pending barrier (determinism)
 
@@ -132,4 +132,4 @@ barrier inside the `page.route` handler.
 
 TC: "Verify the button is disabled while saving."
 Counterexample: it passes even when 2 requests have already occurred before disabled applies.
-Reinforcement: put the disabled check + `expect(requestCount).toBe(1)` together on the same row.
+Reinforcement: put the disabled check + `expect(requestCount).toBe(1)` together in the same test.

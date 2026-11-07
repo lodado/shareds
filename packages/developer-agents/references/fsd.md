@@ -4,9 +4,8 @@ Apply this only when the target repo is already FSD or the adoption of FSD in a 
 approved. This document does not force FSD — it becomes the criterion for those structural decisions
 when an architecture document that passed the approval gate of `architecture-contract.md` adopted
 FSD. If the repo's explicit convention differs from this document, follow the repo convention and
-record the reason. FSD supplies the layer/slice rules; the domain-design method below adapts
-Matt Pocock's domain-modeling and deep-module heuristics, not additional official FSD rules.
-Neither source approves product policy or a migration. See the pinned sources at the end.
+record the reason. FSD supplies the layer/slice rules; the domain-design method below is a
+heuristic, not an additional FSD rule. Neither approves product policy or a migration.
 
 ## Domain boundary before folder structure
 
@@ -27,7 +26,7 @@ Before choosing paths for an affected FSD boundary:
 
 1. Start from the user capability and approved rules. Define ambiguous terms with examples: a
    shipping address and a billing address may share fields but have different invariants and
-   lifecycles. Record unknown policy as `POLICY_GAP` → `NEEDS_DECISION`, not a guessed domain rule.
+   lifecycles. Ask the user about unknown policy; do not guess a domain rule.
 2. Trace the actual owner of each invariant, mutable state, query/cache, and effect through current
    callers. Distinguish observed coupling from approved ownership. Keep query/router/form state
    with its existing owner; do not introduce another store to make a slice look self-contained.
@@ -38,20 +37,20 @@ Before choosing paths for an affected FSD boundary:
    then map that responsibility to the smallest existing layer/slice/segment that can own it.
 
 Record only material decisions in the existing `__docs__/architecture.md`, not a second domain
-card or repository-wide glossary. Reuse the architecture gate; implementation refinements after
-`VALID_RED` belong in the existing Implementation Decision. A compact boundary record can contain:
+document or repository-wide glossary. Reuse the architecture gate; implementation refinements belong
+in the existing Implementation Decision. A compact boundary record can contain:
 
 | Item                    | Evidence to record                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Capability and language | Product goal, domain terms, included responsibilities and explicit non-goals                                             |
-| Invariants and owners   | Approved source/card rows; state, policy, cache, effects and lifecycle owner                                             |
+| Invariants and owners   | Approved spec rules; state, policy, cache, effects and lifecycle owner                                                   |
 | Public seam             | Actual consumers and exports; inputs, results/errors, visible side effects; hidden knowledge                             |
 | Dependencies            | Directed caller → owner edges, layer mapping, external seam and any approved exception                                   |
 | Change and verification | One evidenced change/removal path, consumers that stay unchanged, public behavioral test boundary and structural command |
 | Rejected alternative    | Why a merge/split/extraction/wrapper costs more or violates ownership                                                    |
 
 This is design evidence, not a new schema, numeric cohesion score, approval gate, or instruction to
-fill every cell. Keep policy definitions in their existing approved source and cite them here.
+fill every cell. Keep policy definitions in their existing approved source and refer to them here.
 
 ### Deep public seam, not a barrel over internals
 
@@ -260,12 +259,12 @@ this reference does not authorize relaxing lint. Keep the normal same-layer proh
   ```
 
   Record `pnpm exec steiger ./src` as the structural verification command.
-  After user approval, add it as a devDependency and include it in the GREEN gate's structural
+  After user approval, add it as a devDependency and include it in the structural
   verification command. Do not add it without approval.
 
 - If the user's global rules or the repo instructions recommend a different folder structure (for
   example a `components/`, `hooks/`, `lib/` organization) and conflict with FSD, do not compromise
-  arbitrarily. Ask the priority with `NEEDS_DECISION`, record the approved decision in the
+  arbitrarily. Ask the user which takes priority, record the approved decision in the
   architecture document, and then proceed.
 
 ## Example — full-stack Next.js list + likes
@@ -327,19 +326,4 @@ and script form.
 The profile's FSD checks still require normal layer direction, same-slice isolation, and a narrow
 public entry. It does not declare that FSD bans `useState` in all UI, settle whether a slice is a
 good domain boundary, prove transitive client/server safety, or replace a repository's build and
-server-boundary checks. Keep `hook-encapsulation` as the approval and `oracle-run.mjs` label; the
-approved config source and `lodado-check-architecture ./strict-policy.mjs` are the recorded gate.
-
-## Sources — rules versus adapted heuristics
-
-Consulted 2026-09-11; pinned commits are source snapshots, not release versions.
-
-- Official FSD: [slices — zero coupling, high cohesion](https://github.com/feature-sliced/documentation/blob/bfeacbb99289e391c746812328af6c2f507f6910/src/content/docs/docs/reference/slices-segments.mdx#L9-L42),
-  [public API](https://github.com/feature-sliced/documentation/blob/bfeacbb99289e391c746812328af6c2f507f6910/src/content/docs/docs/reference/public-api.mdx#L19-L63),
-  and [cross-import trade-offs](https://github.com/feature-sliced/documentation/blob/bfeacbb99289e391c746812328af6c2f507f6910/src/content/docs/docs/guides/issues/cross-imports.mdx).
-- Matt Pocock's [domain-modeling](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/domain-modeling/SKILL.md#L42-L64)
-  informs domain language and scenario stress-testing. Its separate artifact layout is not required here.
-- [codebase-design](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/codebase-design/SKILL.md#L8-L65)
-  and [DEEPENING](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/engineering/codebase-design/DEEPENING.md#L5-L37)
-  inform caller knowledge, locality, the deletion thought experiment, and boundary testing. They do
-  not mandate ports/adapters, deleting internal tests, multiple agents, or a new Oracle workflow.
+server-boundary checks. The approved config source and `lodado-check-architecture ./strict-policy.mjs` are the recorded gate.

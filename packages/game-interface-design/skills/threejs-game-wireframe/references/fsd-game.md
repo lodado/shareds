@@ -1,8 +1,7 @@
 # FSD for games
 
-Adapted from `frontend-oracle-design/skills/references/fsd.md` and the official
-[layers](https://feature-sliced.design/docs/reference/layers), [slices and segments](https://feature-sliced.design/docs/reference/slices-segments)
-and [public API](https://feature-sliced.design/docs/reference/public-api) references.
+General FSD rules (layers, slices, segments, public API) live in the `frontend-system-design` skill's
+`architecture/fsd.md`. This page covers only what changes for a game.
 
 ## Placement
 

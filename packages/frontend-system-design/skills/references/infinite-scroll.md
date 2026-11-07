@@ -4,8 +4,9 @@
 동안 1페이지 내용이 바뀌므로 중복·누락이 구조적으로 발생한다. 여기에 스크롤이라는
 연속 신호가 트리거로 붙어서 중복 요청과 응답 순서 역전이 기본값으로 따라온다.
 
-> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
-> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+> **명세 우선:** 이 문서는 구조와 구현 선택지를 주는 참고서다. 상태·순서·횟수·권한·금액 위험이 있는
+> 동작 규칙은 `frontend-oracle-design`의 `SPEC.md`가 소유하고, 그 작업의 `SPEC.md`가 있으면 규칙이 이
+> 문서의 권장안보다 앞선다. 추천과 코드는 정책 출처가 아니므로 제품 정책을 여기서 만들어 내지 않는다.
 
 ## 1. 언제 읽는가
 
@@ -40,10 +41,10 @@ cursor·페이지 파라미터와 observer 동작은 실제 설치된 query 라�
 
 ## 3. 구현
 
-먼저 Oracle이 async/error boundary를 정한다. 첫 조회가 무조건 실행되고 취소가 제품
+먼저 async/error boundary를 정한다. 첫 조회가 무조건 실행되고 취소가 제품
 계약이 아니면 `useSuspenseInfiniteQuery`와 가까운 Suspense·Error Boundary를 쓰고,
 재시도는 `QueryErrorResetBoundary`로 같은 query 범위만 reset한다. `enabled`,
-placeholder 또는 실제 취소 계약이 있으면 Oracle 근거와 함께 일반 `useInfiniteQuery`와
+placeholder 또는 실제 취소 계약이 있으면 그 명세와 함께 일반 `useInfiniteQuery`와
 명시적 초기 상태 UI를 쓴다. 아래는 기본 Suspense 경로다.
 
 데이터 계층. cursor 기반이고 초기 pending/error는 가까운 boundary에 맡긴다.

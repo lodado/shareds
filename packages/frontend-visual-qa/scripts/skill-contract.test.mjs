@@ -58,9 +58,9 @@ test('stresses content length without inventing a truncation policy', async () =
   }
   assert.match(environment, /RTL: 앱이 RTL을 지원할 때만/)
   assert.match(environment, /잘림·말줄임·줄바꿈 중 무엇이 맞는지는\s+정책이다/)
-  assert.match(environment, /나머지는\s+`POLICY_GAP`\s+후보로 남긴다/)
+  assert.match(environment, /나머지는\s+`QUESTION`\s+후보로 남긴다/)
   // Stress rows widen scope only when the request or approval names them.
-  assert.match(environment, /authorization에 들어 있는 조건만 실행하고,\s+빠진 조건은 `남은 것`에 미검증으로 적는다/)
+  assert.match(environment, /승인된 SPEC에 들어 있는 조건만 실행하고,\s+빠진 조건은 `남은 것`에 미검증으로 적는다/)
   assert.match(environment, /맞는 fixture가 없으면 값을 지어내지 않고 미검증으로 남긴다/)
 })
 
@@ -72,7 +72,7 @@ test('ranks findings P0–P3 without letting severity change the verdict', async
   assert.ok(skill.indexOf('## 7. 판정과 라우팅') < position && position < skill.indexOf('## 8. Artifact'), 'severity sits under ## 7')
 
   for (const level of ['P0', 'P1', 'P2', 'P3']) assert.match(severity, new RegExp(`^- \\*\\*${level}\\*\\* — \\S`, 'm'))
-  assert.match(severity, /`NON_ORACLE_OPINION`은 P3를 넘지 않는다/)
+  assert.match(severity, /`UNSOURCED_OPINION`은 P3를 넘지 않는다/)
   assert.match(severity, /심각도는 판정과 라우팅을 바꾸지 않는다/)
   assert.match(skill, /^발견: P0~P3 · 위치 · 검증 상태 · 기준 출처 · 사용자 영향/m)
   assert.match(skill, /expected\/actual·심각도\(§7\)/)
@@ -82,13 +82,13 @@ test('allows agent-browser observations without changing trusted PASS producers'
   const skill = await read('SKILL.md')
 
   assert.match(skill, /Playwright, agent-browser 또는 이미 연결된 browser MCP/)
-  assert.match(skill, /모두 없으면 `NEEDS_DECISION`/)
+  assert.match(skill, /모두 없으면 `QUESTION`/)
   assert.match(skill, /driver\(playwright\|agent-browser\|mcp:<name>\)/)
-  assert.match(skill, /certifiable visual `PASS` producer.*oracle-run --adapter node-test/s)
-  assert.match(skill, /locked test가 Playwright를 호출하고 schema-v3 artifact를 발행/)
-  assert.match(skill, /standalone Playwright adapter는\s*지원하지 않는다/)
+  assert.match(skill, /certifiable visual `PASS` producer는 `fod\.mjs run green <id>`가 기록한 통과 run뿐이다/)
+  assert.match(skill, /`command`\)이 그 Playwright test를 실행하는 명령이어야 한다/)
+  assert.match(skill, /기록 없이 따로\s+돌린 Playwright 실행은 관찰이다/)
   assert.match(skill, /agent-browser와 Browser MCP.*pending.*non-verifying/s)
-  assert.match(skill, /agent-browser.*Playwright.*provenance로 바꾸지 않는다/s)
+  assert.match(skill, /agent-browser.*Playwright test 실행 기록으로 바꾸지 않는다/s)
   assert.match(skill, /snapshot -i/)
   assert.match(skill, /ref.*다시.*snapshot/s)
 })
@@ -97,11 +97,11 @@ test('reuses bounded exploration for dogfood with reproducible, non-verifying fi
   const skill = await read('SKILL.md')
 
   assert.match(skill, /## 6\. 탐색 phase — bounded exploration \(dogfood\)/)
-  assert.match(skill, /`Exploration authorization: approved`가 있을 때만/)
+  assert.match(skill, /사용자가 탐색을 명시적으로 요청했을 때만/)
   assert.match(skill, /상호작용 30회 또는 10분/)
   assert.match(skill, /핵심 journey 1~3개/)
   assert.match(skill, /재현 단계.*expected\/actual.*스크린샷/s)
-  assert.match(skill, /`NON_ORACLE_OPINION`/)
+  assert.match(skill, /`UNSOURCED_OPINION`/)
   assert.match(skill, /`VERIFIED` 판정에 영향을 주지 않는다/)
   assert.match(skill, /토큰.*개인정보.*마스킹/s)
   assert.match(skill, /dogfood.*자동 설치하지 않는다/s)
@@ -133,17 +133,18 @@ test('exposes its contract checks through the package lint task', async () => {
   assert.match(packageJson.scripts.lint, /(?:eslint|node --test)/)
 })
 
-test('returns append-only artifacts compatible with Oracle evidence', async () => {
+test('returns append-only artifacts bound to the approved spec and the recorded green run', async () => {
   const skill = await read('SKILL.md')
 
-  assert.match(skill, /\.ai\/oracles\/<oracle-id>\/visual-qa\/<run-id>/)
+  assert.match(skill, /\.ai\/oracles\/<id>\/visual-qa\/<run-id>/)
+  assert.match(skill, /\.ai\/visual-qa\/<run-id>\//)
   assert.match(skill, /기존 run을 덮어쓰지 않는다/)
   assert.match(skill, /evidence\.json/)
-  assert.match(skill, /"kind": "visual"/)
-  assert.match(skill, /"schemaVersion": 3/)
-  assert.match(skill, /oracleSha256/)
+  assert.match(skill, /"schemaVersion": 4/)
+  assert.match(skill, /"specSha256"/)
   assert.match(skill, /"producerRun"/)
-  assert.match(skill, /worktreeSha256/)
+  assert.match(skill, /"phase": "green"/)
+  assert.match(skill, /"command": "<run\.jsonl의 command>"/)
   assert.match(skill, /"status": "passed"/)
   assert.match(skill, /"journey"/)
   assert.match(skill, /"tool": "playwright"/)
@@ -161,16 +162,17 @@ test('returns append-only artifacts compatible with Oracle evidence', async () =
   assert.match(skill, /BROWSER_VERIFIED/)
 })
 
-test('treats an approved Oracle visual authorization as an explicit request', async () => {
+test('runs only on an explicit user request and speaks the six-step vocabulary', async () => {
   const skill = await read('SKILL.md')
 
-  assert.match(skill, /Visual QA authorization: approved/)
-  assert.match(skill, /명시적 요청으로 인정/)
+  assert.match(skill, /다른 스킬이 필요성을 추측해 자동 실행하지 않는다/)
+  assert.doesNotMatch(skill, /authorization: approved/)
+  assert.doesNotMatch(skill, /\b(?:Oracle Card|ORACLE_READY|VALID_RED|NEEDS_DECISION|POLICY_GAP|NON_ORACLE_OPINION|oracle-run|IMPLEMENTED_GREEN|REVIEW_VERIFIED)\b/)
 })
 
 test('is referenced as a separate responsibility by Oracle and behavior test skills', async () => {
   const [oracleSkill, testSkill] = await Promise.all([
-    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/controller-entry-formal.md'), 'utf8'),
+    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md'), 'utf8'),
     readFile(join(repositoryDirectory, 'packages/test/skills/test/SKILL.md'), 'utf8'),
   ])
 

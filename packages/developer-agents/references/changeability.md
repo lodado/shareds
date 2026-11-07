@@ -4,14 +4,13 @@
 
 This is not product policy — it is a heuristic for picking an implementation with a low change cost
 without altering approved behavior. Do not use it to newly decide outcomes·copy·state·side effects
-or to modify an approved Oracle.
+or to modify approved requirements or an approved spec.
 
-For the authority order, the common priority in [`common.md`](common.md) is canonical — mandatory
-constraints and the approved Oracle, the target repo's `AGENTS.md`·`CLAUDE.md`·architecture·API·test
-contracts, the actually installed versions and existing implementation conventions, and finally this
-document's implementation heuristics and external cases. On conflict, follow the higher criterion.
-Toss material is only evidence for finding implementation candidates, not authority that forces
-anything on another repo.
+Authority order: mandatory constraints and the approved requirements/spec, the target repo's
+`AGENTS.md`·`CLAUDE.md`·architecture·API·test contracts, the actually installed versions and
+existing implementation conventions, and finally this document's implementation heuristics. On
+conflict, follow the higher criterion. The heuristics here help find implementation candidates; they
+are not authority that forces anything on another repo.
 
 ## Architecture-independent ownership
 
@@ -30,15 +29,14 @@ In a small app, an existing feature function may suffice; in feature-first, MVC/
 code, use the actual policy, coordination, read, and external-system owners rather than deciding
 from their names. For packages, start from current consumers and exports. Only an existing or
 approved FSD project needs the [FSD mapping](fsd.md#domain-boundary-before-folder-structure).
-These principles do not activate an Oracle workflow or change its approval, lock, or evidence gates.
+These principles do not change an approved spec or its approval gates.
 
 ## How to read
 
-Read all of it before modifying production after `VALID_RED`. Do not score or fill in all five axes;
-leave in the Implementation Decision only the axes that actually decided this choice and the cost
-accepted. An independent reviewer also compares the Decision and the diff against the same criteria.
-Without concrete drift, a hidden side effect, or change-propagation risk, a difference in preference
-is `NON_ORACLE_OPINION`.
+Read all of it before modifying production. Do not score or fill in all five axes; leave in the
+Implementation Decision only the axes that actually decided this choice and the cost accepted. A
+reviewer also compares the Decision and the diff against the same criteria. Without concrete drift,
+a hidden side effect, or change-propagation risk, a difference in preference is `OPINION`.
 
 Each axis's **pre-implementation question**: does this choice actually reduce the scope of
 understanding·modification·verification? Does it unnecessarily harm another axis's cost or an
@@ -50,8 +48,8 @@ For a material boundary choice, start with the current requirement, an approved 
 actual change history, or an observed dependency leak — not an imagined future platform. Trace the
 preserved contract, the owning responsibility, and the understanding·modification·verification
 path. Compare the simplest existing solution with the proposed boundary and name the cost accepted.
-Keep this reasoning in the existing Decision; its short example is owned by
-[selected-profile delivery/implementation-decision.md procedure via loader](roles/loading.md).
+Keep this reasoning in the existing Decision; its short example is in
+[`decision-note.md`](decision-note.md).
 
 Use only relevant scenarios: an API representation change, a policy change, a presentation-only
 change, or feature removal. Tests and docs changing with their owner can be healthy cohesion;
@@ -62,8 +60,8 @@ flow rather than silently hiding that change in a mapper.
 An independent reviewer should be able to follow user intent to the state·policy·effect owner,
 identify what must remain unchanged, and locate applicable error·retry·cancel·cleanup responsibilities.
 Name a concrete dependency path or hidden contract when that fails, not a preferred folder style.
-Material-only Decision writing does not remove the five-axis review output owned by
-[`subagent-review.md`](subagent-review.md).
+Material-only Decision writing does not remove the five-axis review output of
+[`review-checklist.md`](review-checklist.md).
 
 For an existing or approved FSD repo, apply the domain-boundary method in
 [`fsd.md`](fsd.md#domain-boundary-before-folder-structure) to material slice ownership, public API,
@@ -131,7 +129,7 @@ Give a domain name such as `canTransfer` only when the same policy repeats.
 
 - Record in the Decision the boundary you named or separated and the actual information gain.
 - If an unnecessary file·timing move can create a real change error, it is `FINDING`.
-- If only a nicer-looking name·function syntax or an LOC preference differs, it is `NON_ORACLE_OPINION`.
+- If only a nicer-looking name·function syntax or an LOC preference differs, it is `OPINION`.
 
 ## Predictability
 
@@ -153,7 +151,7 @@ merely call hooks with the same name.
 
 A simple input setter or generic transport PATCH remains appropriate when it is the actual
 contract. A named function can be enough; neither a command object, generic executor, nor global
-command bus is required. See [consumer-facing contracts](roles/loading.md).
+command bus is required. See [the API surface criteria](types/api-surface.md).
 
 ### Separate decisions, coordination, and connections
 
@@ -166,7 +164,7 @@ This is not a five-file design. Small operations can keep functions together; ex
 and module boundaries may already suffice. A React-independent calculation needs no hook, and a
 pure business rule still belongs to its business owner, not a global utility bucket. A current
 explicit import may express an external dependency adequately; do not create a port or DI layer
-for every call. [React application](roles/loading.md)
+for every call. [React application](decisions.md)
 adds lifecycle and presentation guidance without changing these owners.
 
 ### Core patterns
@@ -211,10 +209,10 @@ that reveals the whole responsibility and verify the failure·retry·duplicate-e
 - Record in the Decision the owner of external writes, the execution timing and the count on
   failure·retry, and the material lifecycle transitions and error propagation boundary.
 - A write the caller cannot know about, a missing cleanup, or a duplicated side effect is
-  `PRODUCT_DEFECT` when concrete evidence exists, and `EVIDENCE_GAP` when only the required
+  a `FINDING` when concrete evidence exists, and a verification gap when only the required
   verification is missing.
-- If the observed result must be newly decided it is `POLICY_GAP`, and if only an explicit handler
-  preference differs it is `NON_ORACLE_OPINION`.
+- If the observed result must be newly decided, ask the user; if only an explicit handler
+  preference differs it is `OPINION`.
 
 ## Cohesion
 
@@ -299,7 +297,7 @@ collaboration instead of copying the supplier's entire public surface. This redu
 unrelated store, Context, or SDK details. Ask: does the consumer need the whole object, or only this
 role? A single value is preferable when sufficient; handling a whole domain object is legitimate
 when that is the responsibility. Keep supplier assembly at the existing composition owner, not in
-every consumer. See [consumer-facing contracts](roles/loading.md) for
+every consumer. See [the API surface criteria](types/api-surface.md) for
 type relationships; a new interface is not mandatory.
 
 ### Provide purpose-specific reads
@@ -370,7 +368,7 @@ duplicate retry logic or mirror state already owned by query, router, or form in
   why the existing seam was insufficient, and the preserved contract.
 - If an unnecessarily wide surface, a transport leak, or a violation of an approved import boundary
   creates a concrete change-propagation risk, it is `FINDING`.
-- If only a personal preference about context·props·barrel differs, it is `NON_ORACLE_OPINION`.
+- If only a personal preference about context·props·barrel differs, it is `OPINION`.
 
 ## Simplicity
 
@@ -420,37 +418,25 @@ The five axes cannot be maximized at the same time. Write only the cost you prio
 - Simplicity ↔ Performance: a simple implementation before evidence, and after measurement optimize only the necessary scope
 
 Write only the trade-off that decided the choice; use the existing Decision rather than a separate
-five-axis checklist. Its example lives in the delivery document linked above.
+five-axis checklist. Its example lives in [`decision-note.md`](decision-note.md).
 
 ## Workflow owner
 
 This document owns only the meaning of change cost and its rationale.
 
-- The React runtime criteria are owned by [selected-profile frontend/decisions.md procedure via loader](roles/loading.md) and
-  [selected-profile frontend/authoring.md procedure via loader](roles/loading.md).
-- The Implementation Decision's path·fields·writing time are owned by
-  [selected-profile delivery/implementation-decision.md procedure via loader](roles/loading.md).
-- `PASS | FINDING | N/A`, the finding router, and the minimal fix procedure are owned by
-  [`subagent-review.md`](subagent-review.md).
-
-## Further reading — evidence, not authority
-
-- [Fowler: YAGNI](https://martinfowler.com/bliki/Yagni.html) and
-  [preparatory refactoring](https://martinfowler.com/articles/preparatory-refactoring-example.html):
-  reject speculative capability without rejecting small changes that make the current task easier.
-- [Cockburn: Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture): protect the
-  application boundary from external technology, not a mandate for a port/factory around every call.
-- [React: Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure) and
-  [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect): preserve state
-  ownership and distinguish user events from external synchronization.
+- The React runtime criteria are owned by [`decisions.md`](decisions.md) and
+  [`authoring.md`](authoring.md).
+- The Implementation Decision's fields are owned by [`decision-note.md`](decision-note.md).
+- `PASS | FINDING | N/A` and the finding procedure are owned by
+  [`review-checklist.md`](review-checklist.md).
 
 ## Universal rules not adopted
 
-- Do not turn Toss's organizational structure·internal tools or a numeric threshold into a blocker.
+- Do not turn an organization's structure·internal tools or a numeric threshold into a blocker.
 - Do not auto-adopt FSD, a monorepo, or a specific state/query library.
 - Do not unify hook returns, `type`/`interface`, exports, and function syntax.
 - Do not judge component·hook·state structure by a paradigm label alone such as functional·object-
   oriented. The criteria are the state owner, the location of external effects, and the
   input·output·error contract.
 - Do not make 100% coverage, zero dependency, or a specific React·Next version a universal rule.
-- Do not make a build-vs-buy decision merely because “Toss made it”.
+- Do not make a build-vs-buy decision merely because another company made it.

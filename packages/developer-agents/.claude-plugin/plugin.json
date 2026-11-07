@@ -1,6 +1,6 @@
 {
   "name": "developer-agents",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Frontend and backend developer subagents that place code by FSD, separate UI from business logic, and build backends in three layers with Clean Architecture and DDD.",
   "author": {
     "name": "lodado",

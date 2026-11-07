@@ -1,7 +1,7 @@
 {
   "name": "frontend-system-design",
-  "version": "0.3.0",
-  "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
+  "version": "0.4.0",
+  "description": "Frontend architecture (FSD, code structure, changeability, types) and verified implementation guides for well-known features. Behavior-risk rules belong to frontend-oracle-design.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,7 +12,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Frontend System Design",
-    "shortDescription": "Extend an active Oracle with proven frontend system patterns",
+    "shortDescription": "Frontend architecture and well-known feature system design",
     "category": "development",
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
   }
