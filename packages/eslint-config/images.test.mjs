@@ -8,7 +8,7 @@ import images from './images.mjs'
 const lint = (code, filePath) => new ESLint({ cwd: process.cwd(), overrideConfigFile: true, overrideConfig: [{ files: ['**/*.{js,jsx,ts,tsx}'], languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } } }, ...images({ appImageModules: ['@/ui/AppImage'] })] }).lintText(code, { filePath })
 
 test('images preset catches JS and JSX image bypasses but keeps the shared module and SVGs usable', async () => {
-  const [result] = await lint("import Image from 'next/image'\nimport hero from './hero.png'\nimport icon from './icon.svg'\nconst x = require('./x.webp')\nexport const View = () => <><img src={hero} className=\"bg-[url(hero.png)]\" style={{ backgroundImage: 'url(hero.png)' }} /><Image src={hero} /></>", path.join(process.cwd(), 'sample.tsx'))
+  const [result] = await lint("import Image from 'next/image'\nimport hero from './hero.png'\nimport icon from './icon.svg'\nconst x = require('./x.webp')\nexport const View = () => <><img src={hero} className=\"bg-[url(hero.png)]\" {...props} style={{ backgroundImage: 'url(hero.png)' }} /><Image src={hero} /></>", path.join(process.cwd(), 'sample.tsx'))
   assert.equal(result.errorCount, 7)
   assert.ok(result.messages.every(({ ruleId }) => ruleId === '@lodado/local-rules/no-image-bypass'))
   const [allowed] = await lint("import AppImage from '@/ui/AppImage'\nexport const View = () => <AppImage src=\"hero.png\" />", path.join(process.cwd(), 'allowed.tsx'))

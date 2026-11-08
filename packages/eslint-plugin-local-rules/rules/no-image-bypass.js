@@ -8,7 +8,7 @@ const moduleName = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/gu, '')
 
-const nameOf = (node) => (node.type === 'JSXIdentifier' ? node.name : null)
+const nameOf = (node) => (node?.type === 'JSXIdentifier' ? node.name : null)
 const literalText = (node) =>
   node?.type === 'Literal' && typeof node.value === 'string'
     ? node.value
