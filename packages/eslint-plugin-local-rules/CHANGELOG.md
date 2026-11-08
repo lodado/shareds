@@ -1,5 +1,11 @@
 # @lodado/eslint-plugin-local-rules
 
+## 0.2.1
+
+### Patch Changes
+
+- Handle JSX spread attributes without crashing the image boundary rule.
+
 ## 0.2.0
 
 ### Minor Changes
