@@ -1,5 +1,11 @@
 # @lodado/eslint-plugin-local-rules
 
+## 0.2.0
+
+### Minor Changes
+
+- e0b3b3c: Add an opt-in images preset that keeps application image references behind a configurable AppImage boundary and parses CSS image URLs while allowing font sources.
+
 ## 0.1.0
 
 ### Minor Changes
