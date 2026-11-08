@@ -27,7 +27,8 @@
     "./tailwind": "./tailwind.js",
     "./ai": "./ai.js",
     "./design": "./design.mjs",
-    "./strict": "./strict.mjs"
+    "./strict": "./strict.mjs",
+    "./images": "./images.mjs"
   },
   "main": "index.mjs",
   "bin": {
@@ -47,6 +48,7 @@
     "fsd.mjs",
     "functional.mjs",
     "hook-tiers.mjs",
+    "images.mjs",
     "index.mjs",
     "interaction.js",
     "local-rules.js",
@@ -68,8 +70,8 @@
     "node": "^22.22.2 || >=24.15.0"
   },
   "scripts": {
-    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs hook-tiers.test.mjs skill-doc.test.mjs defect-corpus.test.mjs lint-variance.test.mjs && pnpm test:strict",
-    "lint": "eslint index.mjs ai.js design.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.mjs conventions.mjs interaction.js code-files.js test.js strict-types.js tailwind.js functional.mjs hook-tiers.mjs hook-tiers.test.mjs skill-doc.test.mjs feedback.test.mjs functional.test.mjs defect-corpus.test.mjs lint-variance.test.mjs scripts/lint-variance.mjs package.json strict.mjs strict-cli.mjs strict.test.mjs strict-distribution.test.mjs strict-example.test.mjs",
+    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs hook-tiers.test.mjs skill-doc.test.mjs defect-corpus.test.mjs lint-variance.test.mjs images.test.mjs && pnpm test:strict",
+    "lint": "eslint index.mjs ai.js design.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.mjs conventions.mjs interaction.js code-files.js test.js strict-types.js tailwind.js images.mjs functional.mjs hook-tiers.mjs hook-tiers.test.mjs skill-doc.test.mjs feedback.test.mjs functional.test.mjs defect-corpus.test.mjs lint-variance.test.mjs scripts/lint-variance.mjs package.json strict.mjs strict-cli.mjs strict.test.mjs strict-distribution.test.mjs strict-example.test.mjs",
     "test:strict": "node --test strict.test.mjs strict-example.test.mjs && node strict-distribution.test.mjs"
   },
   "peerDependencies": {
@@ -96,6 +98,7 @@
   "dependencies": {
     "@antfu/eslint-config": "^9.5.1",
     "@eslint-react/eslint-plugin": "^5.20.3",
+    "@eslint/css": "^2.0.0",
     "@lodado/eslint-plugin-local-rules": "workspace:*",
     "@next/eslint-plugin-next": "^16.3.5",
     "@tanstack/eslint-plugin-query": "^5.103.1",

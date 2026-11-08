@@ -11,6 +11,8 @@ module.exports = {
   'no-arbitrary-sleep-in-tests': require('./no-arbitrary-sleep-in-tests'),
   'no-boolean-state-flags': require('./no-boolean-state-flags'),
   'no-complex-ternary': require('./no-complex-ternary'),
+  'no-image-bypass': require('./no-image-bypass'),
+  'no-css-image-url': require('./no-css-image-url'),
   'no-derived-state-member': require('./no-derived-state-member'),
   'no-fetch-in-component': require('./no-fetch-in-component'),
   'no-nested-dialog': require('./no-nested-dialog'),

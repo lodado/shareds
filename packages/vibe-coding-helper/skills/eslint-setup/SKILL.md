@@ -76,10 +76,29 @@ import and spread each required preset. No Jest preset is added.
 | New React or Next.js app, or new code in a repo with no hook-placement contract | add hook-tiers                                                              |
 | FSD repo that locks UI, model and API runtime ownership                         | add `strict(policy)`, see [`STRICT.md`](../../../eslint-config/STRICT.md)   |
 
+| App/Next app with a shared image boundary | add `images({ appImageModules })` |
+
 Order matters only where this file says so: keep `base` first, spread `ai` after `quality`,
 and spread `fsd` before `strict(policy)`. Every other preset reports the same diagnostics in
 any order - the package tests lint a defect corpus in both orders.
 The public import stays `@lodado/eslint-config/react` even though its source is ESM.
+
+### Images: one application image boundary
+
+The opt-in `images` preset reports raw `<img>`, direct `next/image`, raster imports/`require`,
+inline image URLs, Tailwind `bg-[url(...)]`, and CSS `url()`/`image-set()` references. CSS is parsed
+with ESLint's CSS language; `@font-face src` is allowed. SVG imports remain available for icons and
+favicon/OG generator files can opt out with a narrow file-scoped override. Configure only the actual
+shared boundary module:
+
+```js
+import images from '@lodado/eslint-config/images'
+
+export default [...base, ...images({ appImageModules: ['@/shared/ui/AppImage'] })]
+```
+
+Keep generated exceptions explicit and narrow in the consumer config; do not disable the preset
+globally. This preset is opt-in so existing consumers are not broken on adoption.
 
 ### Base: keep lint feedback actionable
 

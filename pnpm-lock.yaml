@@ -55,6 +55,9 @@ importers:
       '@eslint-react/eslint-plugin':
         specifier: ^5.20.3
         version: 5.20.3(eslint@10.11.0(jiti@2.7.0))(typescript@5.9.3)
+      '@eslint/css':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@lodado/eslint-plugin-local-rules':
         specifier: workspace:*
         version: link:../eslint-plugin-local-rules
