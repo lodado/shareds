@@ -14,7 +14,7 @@ document to read and the next command. Read only the current step's document.
 | Step       | Read                                       | You write                               | Command                       |
 | ---------- | ------------------------------------------ | --------------------------------------- | ----------------------------- |
 | 1 Spec     | [steps/1-spec.md](steps/1-spec.md)         | `.ai/oracles/<id>/SPEC.md`              | `init`, `check`               |
-| 2 Proof    | [steps/2-proof.md](steps/2-proof.md)       | `MODEL.bend`, `LAWS.bend`, `PROOF.bend` | `prove`, then `approve`       |
+| 2 Proof    | [steps/2-proof.md](steps/2-proof.md)       | `MODEL.bend`, `LAWS.bend`, `PROOF.bend` | `prove`, reading, `approve`   |
 | 3 Generate | [steps/3-generate.md](steps/3-generate.md) | the adapter                             | `gen`                         |
 | 4 RED      | [steps/4-red.md](steps/4-red.md)           | nothing in the product                  | `run red`                     |
 | 5 GREEN    | [steps/5-green.md](steps/5-green.md)       | the product fix                         | `run green`                   |
@@ -24,9 +24,11 @@ document to read and the next command. Read only the current step's document.
 
 - Out of scope (copy, tokens, layout, visual-only, code structure): say which path fits — a plain edit, `$test`,
   `$frontend-visual-qa` or `$frontend-system-design` — and stop.
-- The user approves once, after step 2, from one message that shows the rules, the 7 axes, what was proven and
+- The user approves once, after step 2, from one message that shows the rules, the 7 axes, what was proven and read, and
   the questions with their ★ recommendations. Run `approve` only after that answer. "Fix it" or "ship it" in
   the request is not approval of the spec.
+- Two independent readings, one pass each: a reviewer reads the model before the approval message (step 2) and
+  the delivery after GREEN (step 6).
 - Every command reports all of its problems at once, each with a fix. Fix them all, then rerun the same command.
 - Only the scripts write `proof.json`, `approval.json`, `gen.json`, `run.jsonl` and the generated tests. Never
   edit them by hand. They are plain files, so they record what happened but do not prove it: that is why the

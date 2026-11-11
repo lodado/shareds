@@ -5,7 +5,7 @@
 //
 //   fod.mjs init <id>                       1단계: .ai/oracles/<id>/SPEC.md 틀
 //   fod.mjs check <id>                      1단계: SPEC 검사
-//   fod.mjs prove <id>                      2단계: 모델 검사 → 법칙 증명 → 도달 증명 → 공간 열거
+//   fod.mjs prove <id>                      2단계: 모델 검사 → 법칙 증명 → 도달 증명 → 공간 열거 → 법칙 강도
 //   fod.mjs approve <id> --by <name>        2단계 끝: 사용자가 승인한 뒤에만
 //   fod.mjs gen <id>                        3단계: fast-check·W-method 적합성 테스트 생성
 //   fod.mjs run red|green <id> [-- <cmd>]   4·5단계: 테스트 실행 기록
@@ -131,7 +131,7 @@ export function bendText(result) {
 }
 
 /**
- * 법칙이 말하는 규칙 id. 법칙 이름 앞머리(`law r1_pending_no_post:`)이거나 바로 위 주석(`# R1, R2: ...`)이다.
+ * 법칙이 말하는 규칙 id. 법칙 이름 앞머리(`law r1_pending_no_post:`)이거나 바로 위에 이어진 주석(`# R1, R2: ...`)이다.
  */
 export function rulesWithLaws(text) {
   const lines = text.split('\n')
@@ -141,8 +141,11 @@ export function rulesWithLaws(text) {
     if (!name) continue
     const prefix = /^r(\d+)_/i.exec(name)
     if (prefix) ids.add(`R${prefix[1]}`)
-    const comment = lines[index - 1] ?? ''
-    if (comment.startsWith('#')) for (const match of comment.split(':')[0].matchAll(/\bR\d+\b/g)) ids.add(match[0])
+    // 주석이 여러 줄로 접혀도 id는 `:` 앞에 있다 — 법칙 위로 이어진 주석 줄을 모두 본다
+    for (let at = index - 1; at >= 0 && lines[at].startsWith('#'); at -= 1) {
+      const head = lines[at].includes(':') ? lines[at].split(':')[0].replaceAll(/\s/g, '') : ''
+      if (/^#R\d+(?:,R\d+)*$/.test(head)) for (const match of head.matchAll(/R\d+/g)) ids.add(match[0])
+    }
   }
   return ids
 }
@@ -222,6 +225,99 @@ export function lawFindings(lawsText, { prefix, where }) {
   return out
 }
 
+// 칸 관계 법칙의 묶음 두 줄과 식. 식은 공백을 지운 뒤 맞춘다.
+const CELL_BINDERS = /^for (\w+) ?: ?\w+\.(\w+) for (\w+) ?: ?\w+\.(\w+) (\{.+\})$/
+const CELL_EQUATION = /^\{\w+\.(\w+)\.(\w+)\((\w+),(\w+),\w+\.(\w+)\.step\((\w+),(\w+)\)\)==True\{\}:Bool\}$/
+
+/** 법칙 본문 하나가 `for s: M.State` `for c: M.Msg` `{M.P.R(s, c, M.P.step(s, c)) == True{} : Bool}` 모양이면 그 타입과 관계 이름. */
+function cellRelation(body, prefix) {
+  const binders = CELL_BINDERS.exec(body)
+  const equation = binders && CELL_EQUATION.exec(binders[5].replaceAll(/\s/g, ''))
+  if (!equation) return null
+  const [, owner, relation, before, event, stepOwner, stepBefore, stepEvent] = equation
+  if (owner !== prefix || stepOwner !== prefix) return null
+  if (before !== binders[1] || event !== binders[3] || stepBefore !== before || stepEvent !== event) return null
+  return { state: binders[2], command: binders[4], relation }
+}
+
+/**
+ * 칸 관계 법칙이 말하는 관계 이름들, State·Msg 타입 쌍마다. 다른 모양의 법칙(식 하나를 고정하는 칸 법칙, trace 법칙,
+ * witness)은 강도를 잴 대상이 아니다.
+ */
+export function cellRelations(lawsText, prefix) {
+  const groups = []
+  for (const body of lawBodies(lawsText).values()) {
+    const found = cellRelation(body, prefix)
+    if (!found) continue
+    const group = groups.find(({ state, command }) => state === found.state && command === found.command)
+    if (group) group.relations.push(found.relation)
+    else groups.push({ state: found.state, command: found.command, relations: [found.relation] })
+  }
+  return groups
+}
+
+/** 칸 관계가 아닌데 이 모델의 step을 말하는 법칙(식 하나를 고정하는 칸 법칙, trace 위의 frame law)이 있는가. */
+export function hasOtherStepLaws(lawsText, prefix) {
+  return [...lawBodies(lawsText).values()].some((body) => body.includes(`${prefix}.step(`) && !cellRelation(body, prefix))
+}
+
+/**
+ * `laws` 보고 하나에서: step은 그대로 두는데 법칙들이 열어 둔 관찰 필드. 그 필드를 바꾸는 틀린 모델도 같은 법칙으로 증명된다.
+ * step이 바꾸는 필드를 열어 둔 칸은 막지 않는다 — 일부러 느슨한 성질 관계일 수 있어 수만 proof.json에 남긴다.
+ */
+export function strengthFindings(report, { where }) {
+  const kept = Object.entries(report.strength?.keptFields ?? {}).sort(([, left], [, right]) => right - left)
+  if (kept.length === 0) return []
+  const names = kept.map(([field]) => field)
+  const counted = kept.map(([field, count]) => `${field}(${count}칸)`).join(', ')
+  const cell = report.strength.freeCells.find(({ freeFields }) => freeFields?.some((field) => field.kept))
+  const example = cell ? ` (예: ${cell.state} 에서 ${cell.command})` : ''
+  return [
+    finding('LAW_FRAME_MISSING', where,
+      `법칙이 ${counted}를 열어 둔다${example}, Nat·List 1 안에서 — step은 그 필드를 그대로 두는데 법칙은 다른 값도 허용해, 그 필드를 바꾸는 틀린 모델도 증명된다`,
+      `그 사건의 관계에 "뒤 상태의 ${names[0]}는 앞 상태와 같다"를 더하거나, 거절·유지되는 사건이 ${names.join('·')}를 지킨다는 frame law를 더한다`),
+  ]
+}
+
+// 끝없는 Nat·List는 이 상한에서 자른다. 상한 안에서 열린 칸은 상한 밖 후보가 더해져도 열려 있으니 거짓 지적이 없다.
+const STRENGTH_BOUNDS = ['--nat-max', '1', '--list-max', '1']
+
+/** `safe:`에 prefix까지 적어도(`Search.safe`) 같은 함수다. */
+export const safeName = ({ prefix, safe }) => (safe.startsWith(`${prefix}.`) ? safe.slice(prefix.length + 1) : safe)
+
+/**
+ * 칸 관계 법칙이 다음 관찰을 얼마나 고정하는가. 그런 법칙이 없으면 summary는 null이다. 계산하지 못한 이유는 skipped에 남긴다.
+ * 다른 모양의 법칙도 step을 말하면 재지 않는다 — 관계만 보면 그 법칙이 고정한 필드가 열린 것으로 보여 옳은 묶음을 거절한다.
+ */
+export function lawStrength({ root, model, lawsFile }) {
+  const lawsText = readFileSync(join(root, lawsFile), 'utf8')
+  const groups = cellRelations(lawsText, model.prefix)
+  if (groups.length === 0) return { findings: [], summary: null }
+  const findings = []
+  const summary = { relations: 0, pinned: 0, free: 0, empty: 0, bounded: false, skipped: [] }
+  if (hasOtherStepLaws(lawsText, model.prefix)) {
+    summary.relations = groups.reduce((sum, { relations }) => sum + relations.length, 0)
+    summary.skipped.push('MIXED_CELL_LAWS')
+    return { findings, summary }
+  }
+  for (const { state, command, relations } of groups) {
+    summary.relations += relations.length
+    const args = ['laws', '--model', model.model, '--prefix', model.prefix, '--state', state, '--command', command]
+    const done = oracleModel(root, [...args, ...relations.flatMap((name) => ['--relation', name]), ...STRENGTH_BOUNDS])
+    const strength = done.json?.strength
+    if (!strength) {
+      summary.skipped.push(/^([A-Z_]+):/m.exec(done.output)?.[1] ?? 'LAWS_FAILED')
+      continue
+    }
+    summary.pinned += strength.pinnedCount
+    summary.free += strength.freeCount
+    summary.empty += strength.emptyCount
+    summary.bounded ||= done.json.bounded === true
+    findings.push(...strengthFindings(done.json, { where: lawsFile }))
+  }
+  return { findings, summary }
+}
+
 /**
  * 공간이 쓰지 않는 모델 부분: 선언된 Msg 생성자 중 bound 안의 어떤 trace에도 없는 것, init과 한 번도 다르지 않은 관찰.
  * 생성 테스트는 공간의 trace만 모니 둘 다 테스트되지 않는다.
@@ -256,7 +352,7 @@ export function prove({ root, id }) {
   const proof = oracleModel(root, ['prove', '--dir', relative(root, run.modelDir)])
   if (proof.json?.status !== 'proven')
     out.push(finding('PROVE_FAILED', relative(root, join(run.modelDir, 'PROOF.bend')), '법칙 증명이 닫히지 않았다', bendText(proof)))
-  const reach = model.safe ? oracleModel(root, ['prove-reach', '--model', model.model, '--prefix', model.prefix, '--safe', model.safe]) : null
+  const reach = model.safe ? oracleModel(root, ['prove-reach', '--model', model.model, '--prefix', model.prefix, '--safe', safeName(model)]) : null
   if (reach && reach.json?.status !== 'proven')
     out.push(finding('PROVE_REACH_FAILED', model.model, `도달 가능한 모든 상태에서 ${model.safe}가 참이라는 증명이 닫히지 않았다`, bendText(reach)))
   const space = oracleModel(root, ['space', '--model', model.model, '--prefix', model.prefix, '--bound', model.bound])
@@ -265,7 +361,10 @@ export function prove({ root, id }) {
       `bound를 낮추거나 상태가 끝없이 자라지 않게 모델을 유한하게 만든다\n${space.output}`))
   if (space.json?.complete === true)
     out.push(...usageFindings(readFileSync(join(root, model.model), 'utf8'), space.json.usage, { prefix: model.prefix, bound: model.bound, where: model.model }))
-  out.push(...lawFindings(readFileSync(join(run.modelDir, 'LAWS.bend'), 'utf8'), { prefix: model.prefix, where: relative(root, join(run.modelDir, 'LAWS.bend')) }))
+  const lawsFile = relative(root, join(run.modelDir, 'LAWS.bend'))
+  out.push(...lawFindings(readFileSync(join(root, lawsFile), 'utf8'), { prefix: model.prefix, where: lawsFile }))
+  const strength = lawStrength({ root, model, lawsFile })
+  out.push(...strength.findings)
   if (out.length > 0) return { findings: out }
   const record = {
     at: new Date().toISOString(),
@@ -274,6 +373,7 @@ export function prove({ root, id }) {
     laws: proof.json.laws,
     reach: reach ? { reachable: reach.json.reachable, states: reach.json.domain?.states } : null,
     space: { cases: space.json.caseCount, bound: Number(model.bound) },
+    strength: strength.summary,
   }
   writeFileSync(join(run.dir, 'proof.json'), `${JSON.stringify(record, null, 2)}\n`)
   return { findings: [], proof: record }
@@ -611,14 +711,15 @@ export function status({ root, id }) {
   if (runs.some((entry) => entry.phase === 'dropped')) return { step: 0, read: '', next: 'dropped' }
   if (run.findings.length > 0) return { ...step(1, `SPEC.md를 고치고 fod.mjs check ${id}`), findings: run.findings }
   if (!fresh(readJson(join(run.dir, 'proof.json')), run)) return step(2, `Bend 세 파일을 쓰고 fod.mjs prove ${id}`)
-  if (!fresh(readJson(join(run.dir, 'approval.json')), run)) return step(2, `사용자에게 승인을 받고 fod.mjs approve ${id} --by <이름>`)
+  if (!fresh(readJson(join(run.dir, 'approval.json')), run))
+    return step(2, `독립 리뷰어 1명의 모델 읽기를 마쳤으면 사용자에게 승인을 받고 fod.mjs approve ${id} --by <이름>`)
   const gen = readJson(join(run.dir, 'gen.json'))
   if (!fresh(gen, run) || gen.out !== treeDigest(root, [run.model.out])) return step(3, `adapter를 쓰고 fod.mjs gen ${id}`)
   const red = latestRed(runs)
   if (!red) return step(4, `fod.mjs run red ${id}`)
   if (red.tests !== testsDigest(root, run.model)) return step(4, `adapter·생성 테스트가 RED 뒤에 바뀌었다: 제품 수정분을 치워 두고 fod.mjs run red ${id}`)
   if (!runs.slice(runs.indexOf(red) + 1).some((entry) => entry.phase === 'green')) return step(5, `제품을 고치고 fod.mjs run green ${id}`)
-  return step(6, '독립 리뷰어 1명이 fod.mjs run green을 다시 돌리고 리뷰한다')
+  return step(6, '독립 리뷰어 1명이 fod.mjs run green을 다시 돌리고 배달(adapter·제품 diff·손 테스트)을 읽는다')
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -659,6 +760,8 @@ async function main(argv) {
   }
   const count = result.findings.length
   process.stdout.write(count === 0 ? `ok ${command}\n` : `${count}건을 모두 고친 뒤 다시 실행한다\n`)
+  const skipped = result.proof?.strength?.skipped ?? []
+  if (skipped.length > 0) process.stdout.write(`strength skipped: ${skipped.join(', ')}\n`)
   if (count === 0 && command !== 'drop') process.stdout.write(`next: ${status({ root, id: command === 'run' ? args[1] : args[0] }).next}\n`)
   return count === 0 ? 0 : 1
 }

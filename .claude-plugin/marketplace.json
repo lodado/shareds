@@ -23,7 +23,7 @@
     {
       "name": "frontend-oracle-design",
       "description": "Six-step frontend behavior work: a 7-axis spec, a Bend proof, generated fast-check conformance tests, RED, GREEN and one review.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "lodado"
       },

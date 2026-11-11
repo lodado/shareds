@@ -6,12 +6,14 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { load, measure } from '../../../scripts/fod-run-stats.mjs'
 import { blockingReason, STALE_MS } from './fod-guard-hook.mjs'
 import { checkSpec } from './fod-spec.mjs'
 import {
   approve,
   axisNames,
   bendText,
+  cellRelations,
   check,
   drop,
   emitPlan,
@@ -19,15 +21,19 @@ import {
   failingTests,
   gen,
   genFix,
+  hasOtherStepLaws,
   init,
   judge,
   lawFindings,
+  lawStrength,
   missingPackages,
   prove,
   rulesWithLaws,
   runPhase,
+  safeName,
   shellQuote,
   status,
+  strengthFindings,
   usageFindings,
 } from './fod.mjs'
 import { spaceUsage } from './oracle-model.mjs'
@@ -172,6 +178,15 @@ test('the template has every section and fails only on its placeholders', async 
 test('a law says which rules it states by its name or the comment above it', () => {
   const laws = '# R1, R3: both\nlaw both:\n  x\n\nlaw r2_named:\n  y\n\n# P4: old style\nlaw other:\n  z\n'
   assert.deepEqual([...rulesWithLaws(laws)].sort(), ['R1', 'R2', 'R3'])
+  const folded = '# R1, R4: a rule that is long enough\n# to wrap, as R9 would\nlaw wrapped:\n  x\n\n# R7: apart\n\nlaw alone:\n  y\n'
+  assert.deepEqual([...rulesWithLaws(folded)].sort(), ['R1', 'R4'])
+  assert.deepEqual([...rulesWithLaws('# -- R3: a section title --\n# R5 : spaced\nlaw titled:\n  x\n')], ['R5'])
+})
+
+test('safe names the same function with or without the model prefix', () => {
+  assert.equal(safeName({ prefix: 'Search', safe: 'Search.safe' }), 'safe')
+  assert.equal(safeName({ prefix: 'Search', safe: 'safe' }), 'safe')
+  assert.equal(safeName({ prefix: 'M.Search', safe: 'M.Search.inv' }), 'inv')
 })
 
 test('failing test names come from node --test, vitest and TAP output', () => {
@@ -318,6 +333,62 @@ test('laws that repeat each other or never pin the start are reported before app
     'a comment naming init pins nothing')
 })
 
+test('a field the step keeps while the cell relations leave it open is reported before approval', async (t) => {
+  const relation = (name, body) => `law ${name}:\n  for s: M.Search\n  for c: M.Msg\n  {${body} == True{} : Bool}\n`
+  const laws = [
+    relation('r1_shown', 'M.Search.r1(s, c, M.Search.step(s, c))'),
+    relation('r2_kept', 'M.Search.r2(s,c,M.Search.step(s,c))'),
+    // a relation over a trace, a relation of another model and a fixed cell are not cell relations of this model
+    'law r5_forward:\n  for t: List<M.Msg>\n  for c: M.Msg\n  {M.Search.forward(M.Search.run(t, M.Search.init()), c, M.Search.step(M.Search.run(t, M.Search.init()), c)) == True{} : Bool}\n',
+    relation('other', 'M.Feed.r1(s, c, M.Feed.step(s, c))'),
+    'law issue_advances:\n  for latest: Nat\n  {M.Search.step(M.Search{latest, 0n}, M.Issue{}) == M.Search{1n+latest, 0n} : M.Search}\n',
+  ].join('\n')
+  assert.deepEqual(cellRelations(laws, 'Search'), [{ state: 'Search', command: 'Msg', relations: ['r1', 'r2'] }])
+  assert.deepEqual(cellRelations(relation('spaced', 'M.Search.r1(s, c, M.Search.step(s, c))').replaceAll(': M.', ' : M.'), 'Search').length, 1)
+  // another law that speaks of this model's step may pin what the relations leave open: nothing is measured, nothing refused
+  assert.equal(hasOtherStepLaws(laws, 'Search'), true)
+  assert.equal(hasOtherStepLaws(laws, 'Feed'), false)
+  const mixed = await mkdtemp(join(tmpdir(), 'fod-mixed-'))
+  t.after(() => rm(mixed, { recursive: true, force: true }))
+  await writeFile(join(mixed, 'LAWS.bend'), laws)
+  assert.deepEqual(lawStrength({ root: mixed, model: { model: 'MODEL.bend', prefix: 'Search' }, lawsFile: 'LAWS.bend' }), {
+    findings: [],
+    summary: { relations: 2, pinned: 0, free: 0, empty: 0, bounded: false, skipped: ['MIXED_CELL_LAWS'] },
+  })
+
+  const where = 'search/LAWS.bend'
+  const open = { state: 'M.Search{0n, 0n, 0n}', command: 'M.Answer{0n}', alternatives: 3 }
+  const report = (keptFields, freeFields) => ({ strength: { freeCount: 78, keptFields, freeCells: [{ ...open, freeFields }] } })
+  const [found, ...rest] = strengthFindings(report({ errors: 18, requests: 78 }, [{ field: 'requests', kept: true }, { field: 'errors', kept: true }]), { where })
+  assert.deepEqual([found.code, found.where, rest.length], ['LAW_FRAME_MISSING', where, 0])
+  assert.match(found.message, /requests\(78칸\), errors\(18칸\).*M\.Search\{0n, 0n, 0n\} 에서 M\.Answer\{0n\}\), Nat·List 1 안에서/)
+  assert.match(found.fix, /뒤 상태의 requests는 앞 상태와 같다/)
+  assert.deepEqual(strengthFindings(report({}, [{ field: 'shown', kept: false }]), { where }), [], 'a field the step changes may be left open on purpose')
+  assert.deepEqual(strengthFindings({ strength: null }, { where }), [])
+})
+
+test('[bend] law strength is measured on the cell relations LAWS.bend states, inside a small bound', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const measured = (fixture, prefix) =>
+    lawStrength({ root: PACKAGE, model: { model: `test-fixtures/${fixture}/MODEL.bend`, prefix }, lawsFile: `test-fixtures/${fixture}/LAWS.bend` })
+
+  // forward, refusal and frame laws together pin every cell
+  assert.deepEqual(measured('cells', 'Doc'), { findings: [], summary: { relations: 9, pinned: 160, free: 0, empty: 0, bounded: false, skipped: [] } })
+
+  // two property relations and no frame law: the step keeps `expired` and `sent` where the laws allow either value
+  const session = measured('session-expiry', 'Session')
+  assert.deepEqual(session.findings.map(({ code }) => code), ['LAW_FRAME_MISSING'])
+  assert.match(session.findings[0].message, /expired\(6칸\), sent\(2칸\)/)
+  assert.deepEqual(session.summary, { relations: 2, pinned: 0, free: 8, empty: 0, bounded: false, skipped: [] })
+
+  // a List state is cut at the bound; no law of another shape is measured
+  assert.equal(measured('reorder', 'Board').summary.bounded, true)
+  // one frame law pins one field: the fields it does not name still need theirs
+  assert.match(measured('toggle', 'Toggle').findings[0].message, /disabled\(40칸\), loading\(40칸\), checked\(32칸\)/)
+  assert.deepEqual(measured('stale-search', 'Search'), { findings: [], summary: null })
+})
+
 test('an event next never offers and an observation that never changes are reported before approval', () => {
   const model = 'type Msg is Data:\n  Issue{}\n  Respond{id: Nat}\n  Cancel{}\n\ntype Search is Data:\n  Search{latest: Nat}\n'
   const options = { prefix: 'Search', bound: 4, where: 'search/MODEL.bend' }
@@ -361,6 +432,43 @@ test('every code gen can pass through has a fix, and a Bend install failure poin
   assert.match(genFix('SOMETHING_NEW'), /메시지대로/)
 })
 
+test('run stats split a transcript at the fod.mjs results and place each reviewer before approval or after GREEN', () => {
+  assert.throws(() => load(''), /시각이 있는 줄이 없다/)
+  let clock = Date.parse('2026-11-11T00:00:00Z')
+  let id = 0
+  const lines = []
+  const say = (type, content, extra = {}) => lines.push(JSON.stringify({ type, timestamp: new Date(clock).toISOString(), message: { content, ...extra } }))
+  /** 도구 호출 하나: 부르고 seconds 뒤에 결과가 온다. */
+  const call = (name, input, out, seconds) => {
+    id += 1
+    say('assistant', [{ type: 'tool_use', id: `t${id}`, name, input }], { id: `m${id}`, usage: { cache_read_input_tokens: 1000 } })
+    clock += seconds * 1000
+    say('user', [{ type: 'tool_result', tool_use_id: `t${id}`, content: out }])
+  }
+  call('Bash', { command: 'node /skill/scripts/fod.mjs check pay' }, 'ok check\nnext: …', 60)
+  call('Bash', { command: 'F=/skill/scripts/fod.mjs; node "$F" prove pay' }, '✖ PROVE_FAILED …\n1건을 모두 고친 뒤 다시 실행한다', 30)
+  call('Bash', { command: 'node "$F" prove pay' }, 'ok prove', 30)
+  call('Agent', { description: 'model reading' }, 'findings', 40)
+  call('Bash', { command: 'node /skill/scripts/fod.mjs approve pay --by me && node /skill/scripts/fod.mjs gen pay' }, 'ok approve\nok gen', 20)
+  call('Bash', { command: 'node /skill/scripts/fod.mjs run red pay' }, 'ok run', 10)
+  call('Bash', { command: 'node /skill/scripts/fod.mjs run green pay' }, 'ok run', 10)
+  call('Agent', { description: 'delivery reading' }, 'findings', 100)
+
+  const run = measure(lines.join('\n'))
+  assert.deepEqual(run.counts, {
+    check: { calls: 1, failed: 0 },
+    prove: { calls: 2, failed: 1 },
+    approve: { calls: 1, failed: 0 },
+    gen: { calls: 1, failed: 0 },
+    'run red': { calls: 1, failed: 0 },
+    'run green': { calls: 1, failed: 0 },
+  })
+  assert.deepEqual(run.reviewers, { beforeApproval: 1, afterGreen: 1, between: 0 })
+  // spec 60 · model 30 · prove-repair 30 · read+approve 40+20 · adapter+gen 0 · red 10 · green 10 · after-green 100
+  assert.deepEqual(run.seconds, [60, 30, 30, 60, 0, 10, 10, 100])
+  assert.deepEqual([run.total, run.firstGreen, run.apiCalls, run.cacheRead], [300, 200 / 60, 8, 8000])
+})
+
 test('[bend] six steps on stale-search: prove, approve, generate, a RED the hook guards, GREEN, review', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
@@ -376,7 +484,9 @@ test('[bend] six steps on stale-search: prove, approve, generate, a RED the hook
   assert.deepEqual(codes(prove({ root, id })).sort(), ['AXIS_NOT_IN_MODEL', 'RULE_WITHOUT_LAW'])
   await writeFile(specFile, SPEC)
 
-  assert.deepEqual(codes(prove({ root, id })), [])
+  const proven = prove({ root, id })
+  assert.deepEqual(codes(proven), [])
+  assert.equal(proven.proof.strength, null, 'laws that fix one cell each have no relation to measure')
   assert.equal(status({ root, id }).step, 2, 'proven but not approved')
   assert.deepEqual(codes(await gen({ root, id })), ['GEN_NOT_APPROVED'])
   assert.deepEqual(codes(approve({ root, id, by: 'tester' })), [])

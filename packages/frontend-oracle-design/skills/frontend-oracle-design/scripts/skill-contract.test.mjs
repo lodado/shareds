@@ -65,6 +65,20 @@ test('starting conditions are written into the model, since only model traces ar
   assert.match(read('steps/2-proof.md'), /Entry and Data starting conditions as the first events\s+`next\(\[\]\)` offers/)
 })
 
+test('the model is read before the approval and the delivery after GREEN, one pass each', () => {
+  const proof = read('steps/2-proof.md')
+  const reading = proof.indexOf('## Have the model read before asking')
+  assert.ok(reading !== -1 && reading < proof.indexOf('## Ask once'), 'the model reading comes before the approval message')
+  assert.match(proof, /After `ok prove` start\s+one reviewer in a fresh context/)
+  assert.match(proof, /The model is read once per approval\./)
+  assert.match(proof, /독립 검토: 지적 <수>건 반영, 질문으로 넘김 <수>건/)
+  const review = read('steps/6-review.md')
+  assert.match(review, /Apply every finding and rerun the affected command; there is no further round\./)
+  assert.match(review, /a fix that\s+would edit the SPEC or the Bend files restarts approval, so only a blocker gets it/)
+  assert.doesNotMatch(review, /the three Bend files/, 'the delivery reading does not reread the model')
+  assert.match(read('SKILL.md'), /Two independent readings, one pass each/)
+})
+
 test('the bend-proof skill points at step 2 and the shared reference', () => {
   const text = readFileSync(join(skill, '..', 'bend-proof', 'SKILL.md'), 'utf8')
   assert.match(text, /\.\.\/frontend-oracle-design\/steps\/2-proof\.md/)

@@ -45,7 +45,7 @@ three-argument relations, `<Prefix>.<R>(s: State, c: Command, t: State) -> Bool`
 `{R(s, c, step(s, c)) == True{} : Bool}` for every `s` and `c` — the `emit-state --relation` form. With
 three-argument relations the frame laws are required: without "a refused or stayed event keeps the state", a
 state that moves while claiming `Refused` satisfies every other law. Write the forward, refusal and frame laws
-first; the entry laws then cross-check them. A frame law has this shape — a blocked Set command keeps `checked`:
+first; the entry laws then cross-check them. A frame law has this shape — a blocked Set command keeps `checked`; every other kept field needs its own:
 
 <!-- excerpt: test-fixtures/toggle/MODEL.bend -->
 
@@ -56,13 +56,12 @@ def Toggle.R_blocked_keeps(+s: Toggle, +c: Cmd, t: Toggle) -> Bool:
 
 ### Check the laws first
 
-Before the kernel runs, `laws` computes every relation on every cell `(s, c)` of the domain:
-`laws --model <MODEL.bend> --prefix <Prefix> --state <State> --command <Command> --relation <R>...`. Relations are
-named as for `emit-state --relation` (`R_x` for `<Prefix>.R_x`); the report uses full names and writes each
-listed cell as `M.` literals a witness can paste. A list stops at 100 entries; its count is complete. `laws`
-refuses another command's option and `--bound` without `--invariant`. With both, it enumerates the space at that
-bound only when `MODEL.bend` exports `init`, `step`, `next` and `observe`; otherwise `invariant.reach` is `null`
-and no counterexample to induction has `reached`.
+`laws` computes every relation on every cell `(s, c)` of the domain. `fod.mjs prove` runs it on the relations the
+cell laws state, with `Nat` and `List` cut at 1. By hand, before the kernel runs:
+`laws --model <MODEL.bend> --prefix <Prefix> --state <State> --command <Command> --relation <R>...` (`R_x` for
+`<Prefix>.R_x`). The report writes each listed cell as `M.` literals a witness can paste; a list stops at 100
+entries and its count is complete. With `--invariant` and `--bound` it enumerates the space at that bound when
+`MODEL.bend` exports `init`, `step`, `next` and `observe`; otherwise `invariant.reach` is `null`.
 
 - `counterexamples`: each cell and relation where `R(s, c, step(s, c))` is false, and `status: counterexample`.
   The model breaks the law or the law misstates its sentence; check the source before changing either.
@@ -80,7 +79,8 @@ and no counterexample to induction has `reached`.
   field the step keeps, a free cell, then an empty cell.
 
 Free is a report, not a failure: a property relation may leave a cell open on purpose, and `laws` exits 0 unless
-it finds a counterexample or a counterexample to induction. Without the frame laws most cells come out free.
+it finds a counterexample or a counterexample to induction. The exception is a kept field: `fod.mjs prove`
+refuses laws that leave open a field the step keeps. Without the frame laws most cells come out free.
 
 ## Proof templates
 
@@ -313,7 +313,7 @@ Failing to build a proof never shows a product defect by itself.
 `scripts/oracle-model.mjs check --file <file>` ([model-patterns](model-patterns.md#bend-check-failures) lists its
 failures and fixes), and `prove --dir <dir> --require <law>...`,
 `space --model <MODEL.bend> --prefix <Prefix> --bound <n>`, and `laws` and `prove-reach` as above (`fod.mjs prove`
-runs `check`, `prove`, `prove-reach` and `space` for you):
+runs all five for you):
 `--max-evals` (default 1,000,000) caps the evaluations of `laws`, `--max-cells` (default 100,000 states ×
 events) the domain of `prove-reach`. A `closed` `space` cover's `diameter` is the longest of the shortest
 traces to each configuration; a `capped` cover has `diameter: null`.
