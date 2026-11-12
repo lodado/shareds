@@ -194,6 +194,56 @@ class MultiRunnerHookTests(integration.PackageFixture):
         self.assertIsNone(hook.decision(event(self.root / 'orca-not'), scope))
         self.assertEqual(hook.decision(event(self.root, 'cd ' + shlex.quote(str(scoped)) + ' && jest'), scope)['hookSpecificOutput']['permissionDecision'], 'deny')
 
+    def test_quoted_heredoc_text_for_a_data_sink_is_not_a_test_run(self):
+        # PR bodies and commit messages are text: the words cargo test / vitest in them run nothing
+        for command in [
+            "gh pr create --title t --body \"$(cat <<'EOF'\n- cargo test PASS, vitest 45, `pnpm test:branch`\nEOF\n)\"",
+            "git commit -m \"$(cat <<'EOF'\nran cargo test (it's green)\nEOF\n)\"",
+            "git commit -q -F - <<'EOF'\nvitest run was green\nEOF",
+            "git commit -F - <<-'EOF'\n\tcargo test\n\tEOF",
+            "cat <<\"EOF\"\njest --watch\nEOF",
+        ]:
+            with self.subTest(command=command):
+                self.assertFalse(hook.should_deny(command, str(self.root)))
+        event = {'cwd': str(self.root), 'tool_name': 'Bash', 'tool_input': {'command': "gh pr create --body \"$(cat <<'EOF'\ncargo test\nEOF\n)\""}}
+        self.assertIsNone(hook.decision(event, self.root / 'missing-scope.json'))
+
+    def test_heredoc_text_that_a_shell_could_run_is_still_denied(self):
+        for command in [
+            "bash <<'EOF'\ncargo test\nEOF",  # the consumer runs its input
+            "cat <<'EOF' | bash\ncargo test\nEOF",  # piped on to a shell
+            "cat <<'EOF'; cargo test\nok\nEOF",  # a command on the marker line
+            "cat <<'EOF'\nok\nEOF\ncargo test",  # a test run after the heredoc
+            "cat <<EOF\n$(cargo test)\nEOF",  # unquoted: the body expands
+            "cat <<'EOF'\ncargo test\n",  # no terminator: nothing is stripped
+            "echo \"$(cargo test)\"",
+            "gh pr create --body \"$(cat <<'EOF'\nx\nEOF\n)\" && cargo test",
+        ]:
+            with self.subTest(command=command):
+                self.assertTrue(hook.should_deny(command, str(self.root)))
+
+    def test_a_variable_that_names_no_program_does_not_make_a_search_a_test_run(self):
+        # $1, $p and $? are arguments here: grep, printf and echo still run, not a runner
+        for command in [
+            "ps -eo etime,command | grep -E \"vitest|cargo\" | awk '{print $1}'",
+            'for p in vite vitest esbuild; do printf "%s: " $p; grep -cE "^  $p@" pnpm-lock.yaml; done',
+            'grep -c vitest package.json; echo "exit=$?"',
+        ]:
+            with self.subTest(command=command):
+                self.assertFalse(hook.should_deny(command, str(self.root)))
+
+    def test_a_runner_chosen_at_run_time_is_still_denied(self):
+        for command in [
+            "echo `vitest run`",
+            "echo \"$(echo x; vitest run)\"",
+            "R=vitest; $R run",
+            "for r in jest vitest; do $r; done",
+            "CMD='cargo test'; eval $CMD",
+            "CMD='cargo test'; bash -c \"$CMD\"",
+        ]:
+            with self.subTest(command=command):
+                self.assertTrue(hook.should_deny(command, str(self.root)))
+
     def test_replacement_is_shell_quoted_not_rtk_or_compound_argv(self):
         suggestion = hook._suggestion("rtk proxy vitest -t 'some test'", str(self.root))
         self.assertEqual(suggestion, "rtk proxy ~/.local/bin/agent-test run -- vitest -t 'some test'")

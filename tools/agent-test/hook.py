@@ -19,6 +19,46 @@ _OPERATORS = set(";&|<>()\n\r")
 _TEST_LOOKING = re.compile(r"\b(?:vitest|playwright|jest|pytest|unittest)\b|\b(?:cargo|go|bun)\s+test\b|\bnode(?:js)?\b[^\n;&|]*--test\b|\b(?:npm|pnpm|bun)\b[^\n;&|]*\btest(?:\b|:)", re.I)
 
 
+_HEREDOC = re.compile(r"<<(-?)[ \t]*(['\"])([A-Za-z_][A-Za-z_0-9]*)\2")
+_COMMAND_START = re.compile(r"(?:^|\$\(|[;&|(`])[ \t]*")
+# Programs that only read a heredoc as text: a PR body or a commit message says cargo test, it does not run it.
+_DATA_SINKS = {"cat", "git", "gh"}
+
+
+def _strip_data_heredocs(command):
+    """Drop the body of a quoted heredoc that a text-only program reads.
+
+    A quoted delimiter (<<'EOF') makes the body literal: nothing in it expands or runs. It is removed from the analysis only
+    when its reader is a data sink and nothing else follows the marker on its line (a pipe to a shell, a second command);
+    a missing terminator or any other reader (bash, python, ...) leaves the command as it was, so those stay denied."""
+    pos = 0
+    while True:
+        marker = _HEREDOC.search(command, pos)
+        if not marker:
+            return command
+        line_start = command.rfind("\n", 0, marker.start()) + 1
+        line_end = command.find("\n", marker.end())
+        if line_end == -1:
+            return command
+        pos = marker.end()
+        if command[marker.end():line_end].strip(" \t)\"'"):
+            continue
+        before = command[line_start:marker.start()]
+        starts = list(_COMMAND_START.finditer(before))
+        word = re.match(r"[A-Za-z0-9_./~-]+", before[starts[-1].end():]) if starts else None
+        if not word or Path(word.group()).name not in _DATA_SINKS:
+            continue
+        body_start = line_end + 1
+        offset = body_start
+        for line in command[body_start:].split("\n"):
+            if (line.strip("\t") if marker.group(1) else line) == marker.group(3):
+                command = command[:body_start] + command[offset:]
+                pos = body_start + len(line)
+                break
+            offset += len(line) + 1
+        # no terminator line: leave the command unchanged and keep looking after the marker
+
+
 def _tokens(command):
     lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()\n\r")
     lexer.whitespace = " \t"
@@ -112,6 +152,34 @@ def _routes(tokens, cwd, seen=()):
     return False
 
 
+_STRING_RUNNERS = {"sh", "bash", "zsh", "eval", "xargs", "nohup", "timeout", "nice", "sudo"}
+
+
+def _substitutions(command):
+    """Text inside each $(...) and `...`; an unclosed one runs to the end of the command."""
+    found = []
+    for opening in re.finditer(r"\$\(", command):
+        depth, end = 1, opening.end()
+        while end < len(command) and depth:
+            depth += {"(": 1, ")": -1}.get(command[end], 0)
+            end += 1
+        found.append(command[opening.end():end])
+    found.extend(command.split("`")[1::2])
+    return found
+
+
+def _dynamic_program(tokens):
+    """True when a segment's program, or the string a shell/eval runs, comes from a variable."""
+    tokens = _strip_prefix(tokens)
+    while tokens and tokens[0] in {"if", "then", "elif", "do", "!", "time"}:
+        tokens.pop(0)
+    if not tokens:
+        return False
+    if "$" in tokens[0]:
+        return True
+    return Path(tokens[0]).name in _STRING_RUNNERS and any("$" in token for token in tokens[1:])
+
+
 def _scan(command, cwd, seen=()):
     """Classify a Bash string without executing it or its package scripts."""
     if not isinstance(command, str):
@@ -122,11 +190,16 @@ def _scan(command, cwd, seen=()):
             return False
         # Substitution can execute even in echo/grep arguments. Quoted literal
         # substitutions are conservatively denied when they mention tests.
-        if any(c in command for c in "$`") and _TEST_LOOKING.search(command):
+        if any(_TEST_LOOKING.search(inner) for inner in _substitutions(command)):
             return True
+        # A program chosen at run time ($R run, eval $CMD) cannot be read here:
+        # it is denied whenever the command mentions a test runner anywhere.
+        mentions_tests = bool(_TEST_LOOKING.search(command))
         segment = []
         for token in [*tokens, ";"]:
             if _operator(token):
+                if mentions_tests and _dynamic_program(segment):
+                    return True
                 if _routes(segment, cwd, seen):
                     return True
                 target = _cd_target(segment, cwd)
@@ -144,7 +217,7 @@ def _scan(command, cwd, seen=()):
 
 def should_deny(command, cwd):
     """Public classifier. Exceptions fail closed only for test-looking input."""
-    return _scan(command, cwd)
+    return _scan(_strip_data_heredocs(command), cwd)
 
 
 def _cd_target(tokens, cwd):
@@ -206,7 +279,7 @@ def _suggestion(command, cwd):
 def decision(event, scope_config=None):
     if event.get("tool_name", "Bash") != "Bash":
         return None
-    command = event.get("tool_input", {}).get("command", "")
+    command = _strip_data_heredocs(event.get("tool_input", {}).get("command", ""))
     cwd = event.get("cwd") or str(Path.cwd())
     if not _scoped_command(command, cwd, scope_config):
         return None

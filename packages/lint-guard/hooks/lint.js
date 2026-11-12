@@ -34,8 +34,40 @@ export function diagnosticsInRanges(stdout, ranges) {
     return null
   }
   if (!Array.isArray(report)) return null
-  return report.flatMap((file) => file.messages ?? []).filter((message) => message.fatal || overlaps(message, ranges))
+  return report
+    .flatMap((file) => file.messages ?? [])
+    .filter((message) => !ignoredNotice(message))
+    .filter((message) => message.fatal || overlaps(message, ranges))
 }
+
+// ESLint 8 has no --no-warn-ignored; it reports an explicitly passed ignored file as this rule-less warning.
+const ignoredNotice = (message) => message.ruleId == null && !message.fatal && /^File ignored\b/.test(message.message ?? '')
+
+// ESLint 8 reads a flat config only from the folder it starts in, so a monorepo session at the root lints a package
+// file with the root eslintrc instead of the package's own config. Start where the package lint script would: the
+// nearest folder above the file with a flat config, else the session folder.
+const FROM_NEAREST_FLAT_CONFIG = `file=$2
+case $file in /*) ;; *) file=$PWD/$file ;; esac
+dir=\${file%/*}
+while [ -n "$dir" ]; do
+  for name in eslint.config.js eslint.config.mjs eslint.config.cjs eslint.config.ts eslint.config.mts eslint.config.cts; do
+    if [ -f "$dir/$name" ]; then cd "$dir" && exec npx --no-install eslint --format json $1 "$file"; fi
+  done
+  dir=\${dir%/*}
+done
+exec npx --no-install eslint --format json $1 "$file"`
+
+// --no-warn-ignored exists only in flat-config ESLint; eslintrc mode (ESLint 8) rejects it as an invalid option.
+export const eslintArgs = (path, { legacy = false } = {}) => [
+  'sh',
+  '-c',
+  FROM_NEAREST_FLAT_CONFIG,
+  'lint-guard',
+  legacy ? '' : '--no-warn-ignored',
+  path,
+]
+
+export const rejectsWarnIgnored = (stderr) => /Invalid option '--(?:no-)?warn-ignored'/.test(stderr)
 
 export function formatDiagnostics(path, messages) {
   const rows = messages.slice(0, MAX_LINES).map((message) => {
