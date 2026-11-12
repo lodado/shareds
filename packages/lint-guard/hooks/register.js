@@ -8,7 +8,14 @@ import {
   slowTestReason,
   stagesInSameCommand,
 } from './detect.js'
-import { diagnosticsInRanges, eslintUnavailable, formatDiagnostics, writtenRanges } from './lint.js'
+import {
+  diagnosticsInRanges,
+  eslintArgs,
+  eslintUnavailable,
+  formatDiagnostics,
+  rejectsWarnIgnored,
+  writtenRanges,
+} from './lint.js'
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit'])
 const LINT_TIMEOUT_MS = 45_000
@@ -91,9 +98,8 @@ async function withLintFeedback($, e, result) {
     const content = await $.fs.read(path)
     const ranges = writtenRanges(e, content)
     if (!ranges) return result
-    const run = await $.process.run(['npx', '--no-install', 'eslint', '--format', 'json', '--no-warn-ignored', path], {
-      timeoutMs: LINT_TIMEOUT_MS,
-    })
+    let run = await $.process.run(eslintArgs(path), { timeoutMs: LINT_TIMEOUT_MS })
+    if (rejectsWarnIgnored(run.stderr)) run = await $.process.run(eslintArgs(path, { legacy: true }), { timeoutMs: LINT_TIMEOUT_MS })
     const messages = diagnosticsInRanges(run.stdout, ranges)
     if (!messages) {
       if (!eslintUnavailable(run.stderr)) addNote($, e, `lint-guard: ESLint did not run (${firstLine(run.stderr)})`)
