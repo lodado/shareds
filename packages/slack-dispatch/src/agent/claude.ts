@@ -34,6 +34,8 @@ export interface AgentCall {
   signal?: AbortSignal
   // Run with the owner's own claude setup: their CLAUDE.md, skills, plugins, hooks and MCP servers, and the repository's.
   ownSetup?: boolean
+  // More environment for claude and the programs it starts.
+  env?: Readonly<Record<string, string>>
 }
 
 export interface AgentResult {
@@ -202,6 +204,7 @@ export function createClaudeAgent(run: Run): Agent {
         timeoutMs: call.timeoutMs,
         signal: call.signal,
         inheritEnv: programEnv,
+        env: call.env ?? {},
       })
       const result = parseAgentOutput(stdout)
       if (result === null) return { ok: false, text: 'claude printed no result', costUsd: 0, subtype: 'no_result' }

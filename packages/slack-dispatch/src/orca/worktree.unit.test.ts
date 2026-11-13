@@ -302,6 +302,19 @@ describe('installDependencies as the packages a new worktree lacks', () => {
     },
   )
 
+  it.each(['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock'])(
+    "to run none of the packages' scripts from %s when asked, as for somebody else's pull request",
+    async (lock) => {
+      const seen: (readonly string[])[] = []
+      const run: Run = (_command, commandArgs) => {
+        seen.push(commandArgs)
+        return Promise.resolve({ stdout: '', stderr: '' })
+      }
+      await installDependencies(run, '/work/wt', undefined, lockedBy(lock), { ignoreScripts: true })
+      expect(seen.map((args) => args.at(-1))).toStrictEqual(['--ignore-scripts'])
+    },
+  )
+
   it('to be left alone when the packages are there already', async () => {
     const { run, calls } = scripted([])
     expect(await installDependencies(run, '/work/wt', undefined, lockedBy('node_modules', 'pnpm-lock.yaml'))).toBe(

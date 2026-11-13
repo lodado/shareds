@@ -3,9 +3,11 @@
 // automatic change. Both are bounded, and what they return is checked by the caller.
 
 import type { Agent } from '../agent/claude.ts'
+import type { ReviewIntent } from '../review/review.ts'
 import type { ItemRow } from '../store/store.ts'
 import type { Analysis } from '../triage/analysis.ts'
-import { extractJson, splitPrompt, triagePrompt } from '../agent/prompts.ts'
+import { extractJson, reviewIntentPrompt, splitPrompt, triagePrompt } from '../agent/prompts.ts'
+import { parseReviewIntent } from '../review/review.ts'
 import { clip } from '../slack/blocks.ts'
 import { parseAnalysis } from '../triage/analysis.ts'
 
@@ -13,6 +15,10 @@ const SPLIT_BUDGET_USD = 0.3
 const SPLIT_TIMEOUT_MS = 90_000
 const TRIAGE_BUDGET_USD = 0.15
 const TRIAGE_TIMEOUT_MS = 120_000
+// A one-line answer: measured at about $0.0003 a call.
+const INTENT_BUDGET_USD = 0.05
+const INTENT_TIMEOUT_MS = 60_000
+const INTENT_TEXT_CHARS = 4000
 const UNROUTED = 'unrouted'
 const FALLBACK_THREAD_CHARS = 600
 
@@ -20,7 +26,30 @@ export interface SmallAgentDeps {
   agent: Agent
   newSessionId: () => string
   // Told what a call cost, whether or not it worked: these runs are not the worker's, so nothing else records them.
-  onCost: (what: 'split' | 'triage', costUsd: number) => void
+  onCost: (what: 'split' | 'triage' | 'review_intent', costUsd: number) => void
+}
+
+// Whether a message asks the owner to review a pull request. Runs in an empty folder with no tools; an answer that is
+// not "review" (or no answer) counts as not.
+export function createReviewClassifier(
+  deps: SmallAgentDeps,
+  scratchDir: string,
+): (text: string) => Promise<ReviewIntent> {
+  return async (text) => {
+    const result = await deps.agent({
+      cwd: scratchDir,
+      prompt: reviewIntentPrompt(clip(text, INTENT_TEXT_CHARS)),
+      sessionId: deps.newSessionId(),
+      resume: false,
+      mode: 'text',
+      model: 'haiku',
+      maxBudgetUsd: INTENT_BUDGET_USD,
+      timeoutMs: INTENT_TIMEOUT_MS,
+    })
+    deps.onCost('review_intent', result.costUsd)
+    if (!result.ok) throw new Error(`the review classifier stopped (${result.subtype})`)
+    return parseReviewIntent(extractJson(result.text))
+  }
 }
 
 // Runs in an empty folder: the request is about other repos, so no repo's files or rules are loaded.

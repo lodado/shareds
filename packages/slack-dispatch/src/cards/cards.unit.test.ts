@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { escapeMrkdwn } from '../slack/blocks'
-import { buildFailedCard, buildPlanCard, buildPrCard, parseItemAction, shownPlan, shownReport } from './cards'
+import {
+  buildFailedCard,
+  buildPlanCard,
+  buildPrCard,
+  buildRetagCard,
+  buildReviewReport,
+  parseItemAction,
+  shownPlan,
+  shownReport,
+} from './cards'
 
 const KEY = 'slack:C1:1730000000.000100#web-app'
 
@@ -232,5 +241,59 @@ describe('parseItemAction as a click on an item card', () => {
     ['a value that is too long', 'k'.repeat(151)],
   ])('to be refused for %s', (_name, value) => {
     expect(parseItemAction(click('item.reject:1', value))).toStrictEqual({ ok: false, error: 'the button has no item' })
+  })
+})
+
+describe('buildRetagCard as a notice of a later tag', () => {
+  it('to have one review button for the open item when the tag links a pull request', () => {
+    const card = buildRetagCard({ itemKey: KEY, text: '다시 태그됐어요', canReview: true })
+    expect(buttonsOf(card)).toStrictEqual([{ action_id: 'item.review:0', value: KEY, style: 'primary' }])
+    expect(parseItemAction(click('item.review:0', KEY))).toStrictEqual({
+      ok: true,
+      action: 'review',
+      cardId: 0,
+      itemKey: KEY,
+    })
+  })
+
+  it('to have no button when it does not', () => {
+    expect(buttonsOf(buildRetagCard({ itemKey: KEY, text: '다시 태그됐어요', canReview: false }))).toStrictEqual([])
+  })
+})
+
+describe('buildReviewReport as the one message about a finished review', () => {
+  const input = {
+    repo: 'web-app',
+    prUrl: 'https://github.com/acme/web-app/pull/7',
+    title: 'Add <login>',
+    threadUrl: 'https://example.slack.com/archives/C1/p1',
+    merged: true,
+    reason: '',
+    summary: '검증이 빠졌어요',
+    findings: [
+      { id: 1, severity: 'major', file: 'a.ts', line: 3, issue: '빈 비밀번호', fixed: true },
+      { id: 2, severity: 'nit', file: 'b.ts', line: null, issue: '이름', fixed: false },
+    ],
+  }
+
+  it('to say it was merged, link the pull request and the Slack thread, with the title escaped', () => {
+    const text = JSON.stringify(buildReviewReport(input))
+    expect(buildReviewReport(input).text).toBe('리뷰하고 머지했어요: web-app')
+    expect(text).toContain('<https://github.com/acme/web-app/pull/7|Add &lt;login&gt;>')
+    expect(text).toContain('<https://example.slack.com/archives/C1/p1|Slack 쓰레드로 가기>')
+    expect(text).not.toContain('멈춘 이유')
+  })
+
+  it('to give the reason when it was not merged, and say there is no thread for a DM request', () => {
+    const report = buildReviewReport({ ...input, merged: false, reason: 'CI가 실패했어요', threadUrl: '' })
+    expect(report.text).toBe('리뷰했지만 머지하지 않았어요: web-app')
+    expect(JSON.stringify(report)).toContain('멈춘 이유: CI가 실패했어요')
+    expect(JSON.stringify(report)).toContain('Slack 위치: 없음 (DM으로 요청)')
+  })
+
+  it('to give a note on a merge as a note, not as the reason it stopped', () => {
+    const text = JSON.stringify(buildReviewReport({ ...input, merged: true, reason: 'GitHub에서 직접 머지됐어요' }))
+    expect(text).toContain('참고: GitHub에서 직접 머지됐어요')
+    expect(text).not.toContain('멈춘 이유')
   })
 })

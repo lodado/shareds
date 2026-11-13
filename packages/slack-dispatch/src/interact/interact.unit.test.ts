@@ -1,4 +1,5 @@
 import type { ItemEvent } from '../machine/machine'
+import type { ReviewMeta } from '../review/review'
 import type { Store } from '../store/store'
 import type { InteractDeps } from './interact'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -47,6 +48,8 @@ interface Harness {
   merged: string[]
   // The commit each merge was pinned to, in order.
   pinned: string[]
+  // The pull requests the owner asked to have reviewed, as the detector was asked about them.
+  detected: { links: readonly string[]; manual: boolean }[]
 }
 
 interface Overrides {
@@ -56,6 +59,18 @@ interface Overrides {
   mergePr?: InteractDeps['mergePr']
   retries?: boolean
   catchUp?: InteractDeps['catchUp']
+  detect?: InteractDeps['detectReview']
+}
+
+const REVIEW_PR = 'https://github.com/acme/web-app/pull/7'
+const REVIEW: ReviewMeta = {
+  prUrl: REVIEW_PR,
+  slug: 'acme/web-app',
+  number: 7,
+  head: 'feature/login',
+  base: 'develop',
+  title: 'Add login',
+  manual: true,
 }
 
 function harness(overrides: Overrides = {}): Harness {
@@ -65,6 +80,7 @@ function harness(overrides: Overrides = {}): Harness {
   const aborted: string[] = []
   const merged: string[] = []
   const pinned: string[] = []
+  const detected: Harness['detected'] = []
   const deps: InteractDeps = {
     store,
     ownerId: OWNER,
@@ -76,6 +92,10 @@ function harness(overrides: Overrides = {}): Harness {
     },
     knownRepos: () => ['web-app', 'api-server'],
     splitPrompt: overrides.split ?? (() => Promise.resolve({ tasks: [] })),
+    detectReview: (input) => {
+      detected.push({ links: input.links, manual: input.manual })
+      return (overrides.detect ?? (() => Promise.resolve({ kind: 'review', repo: 'web-app', review: REVIEW })))(input)
+    },
     checkGate:
       overrides.checkGate ??
       (() => Promise.resolve({ ...(overrides.gate ?? { ci: true, review: true }), headOid: HEAD })),
@@ -94,7 +114,7 @@ function harness(overrides: Overrides = {}): Harness {
     locks: new Set(),
     now: () => clock.now,
   }
-  return { deps, store, posted, aborted, merged, pinned }
+  return { deps, store, posted, aborted, merged, pinned, detected }
 }
 
 const thread = (n: number): string => `slack:C1:1730000000.00000${n}`
@@ -676,6 +696,7 @@ const summaryOf = (overrides: Partial<Awaited<ReturnType<InteractDeps['catchUp']
   skippedBots: 0,
   skippedUnreadable: 0,
   retagged: 0,
+  reviewed: 0,
   failedThreads: 0,
   cutThreads: 0,
   skipped: [],
@@ -995,5 +1016,123 @@ describe('handleMessage as the 대기 command with a long history', () => {
     expect(describeQueue(item ? [item] : [])).toBe(
       '열려 있는 항목 1개\n• [승인 대기] web-app — &lt;!channel&gt; look &amp; see',
     )
+  })
+})
+
+// A mention waiting in a digest whose thread linked a pull request.
+function waitingWithPr(store: Store, repo: string, n = 1): string {
+  createItems(store, thread(n), [repo], {
+    meta: {
+      [repo]: { summary: `summary ${repo} ${n}`, prLink: { url: REVIEW_PR, from: `https://x.slack.com/p${n}` } },
+    },
+  })
+  advance(store, key(repo, n), TO_NOTIFIED)
+  return key(repo, n)
+}
+
+const REVIEW_ITEM = itemKeyOf('pr:acme/web-app/7', 'web-app')
+
+describe('handleInteractive as the digest review button', () => {
+  it("to send the ticked item to review in the pull request's repo, asking GitHub once", async () => {
+    const { deps, store, posted, detected } = harness()
+    const a = waitingWithPr(store, 'unrouted', 1)
+    const b = waitingWithPr(store, 'api-server', 2)
+    const id = createDigest(store, [a, b])
+    await handleInteractive(deps, digestClick('review_selected', id, [a]))
+    const moved = key('web-app', 1)
+    expect(getItem(store, moved)).toMatchObject({ stage: 'planning', meta: { review: REVIEW, model: 'sonnet' } })
+    expect(stageOf(store, b)).toBe('notified')
+    expect(detected).toStrictEqual([{ links: [REVIEW_PR], manual: true }])
+    expect(posted.map((post) => post.text)).toStrictEqual(['리뷰 시작 1개 (끝나면 결과를 DM으로 알려드려요)'])
+  })
+
+  it('to leave an item whose thread has no pull request link waiting, without asking GitHub', async () => {
+    const { deps, store, posted, detected } = harness()
+    const a = waiting(store, 'web-app', 1)
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('review_selected', id, [a]))
+    expect(stageOf(store, a)).toBe('notified')
+    expect(detected).toHaveLength(0)
+    expect(posted[0]?.text).toBe('리뷰 시작 0개\n• summary web-app 1: 쓰레드에 PR 링크가 없어요')
+  })
+
+  it('to leave the item waiting with the reason when GitHub refuses the pull request', async () => {
+    const { deps, store, posted } = harness({
+      detect: () => Promise.resolve({ kind: 'refused', prUrl: REVIEW_PR, reason: '초안(draft) PR이에요' }),
+    })
+    const a = waitingWithPr(store, 'web-app', 1)
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('review_selected', id, [a]))
+    expect(stageOf(store, a)).toBe('notified')
+    expect(posted[0]?.text).toBe('리뷰 시작 0개\n• summary web-app 1: 리뷰할 수 없는 PR이에요: 초안(draft) PR이에요')
+  })
+
+  it('to answer with the failure when GitHub cannot be asked', async () => {
+    const { deps, store, posted } = harness({ detect: () => Promise.reject(new Error('gh is not signed in')) })
+    const a = waitingWithPr(store, 'web-app', 1)
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('review_selected', id, [a]))
+    expect(stageOf(store, a)).toBe('notified')
+    expect(posted[0]?.text).toContain('PR을 읽지 못했어요 (gh is not signed in)')
+  })
+})
+
+describe('handleInteractive as the review button of a retag notice', () => {
+  it('to start one review item for the linked pull request, keeping the item under way, and only one on a second click', async () => {
+    const { deps, store, posted } = harness()
+    const open = waitingWithPr(store, 'web-app', 1)
+    await handleInteractive(deps, itemClick('review', 0, open))
+    await handleInteractive(deps, itemClick('review', 0, open))
+    expect(getItem(store, REVIEW_ITEM)).toMatchObject({ stage: 'planning', meta: { url: 'https://x.slack.com/p1' } })
+    expect(stageOf(store, open)).toBe('notified')
+    expect(posted.map((post) => post.text)).toStrictEqual([
+      '리뷰를 시작했어요. 끝나면 결과를 DM으로 알려드릴게요.',
+      '이 PR은 이미 리뷰하고 있어요.',
+    ])
+  })
+
+  it('to start nothing for an item with no pull request link', async () => {
+    const { deps, store, posted, detected } = harness()
+    const open = waiting(store, 'web-app', 1)
+    await handleInteractive(deps, itemClick('review', 0, open))
+    expect(getItem(store, REVIEW_ITEM)).toBeUndefined()
+    expect(detected).toHaveLength(0)
+    expect(posted[0]?.text).toBe('PR 링크를 찾지 못했어요.')
+  })
+})
+
+describe('handleMessage as the review command', () => {
+  it('to start the review with the Slack message the owner named', async () => {
+    const { deps, store, posted, detected } = harness()
+    await handleMessage(deps, dm(`리뷰 <${REVIEW_PR}> <https://x.slack.com/archives/C1/p9>`))
+    expect(getItem(store, REVIEW_ITEM)).toMatchObject({
+      stage: 'planning',
+      source: 'dm',
+      meta: { url: 'https://x.slack.com/archives/C1/p9', review: REVIEW },
+    })
+    expect(detected).toStrictEqual([{ links: [REVIEW_PR], manual: true }])
+    expect(posted[0]?.text).toBe('리뷰를 시작했어요. 끝나면 결과를 DM으로 알려드릴게요.')
+  })
+
+  it('to ask for the link, without asking GitHub, when none is given', async () => {
+    const { deps, posted, detected } = harness()
+    await handleMessage(deps, dm('리뷰'))
+    expect(detected).toHaveLength(0)
+    expect(posted[0]?.text).toContain('리뷰할 PR 링크를 같이 보내주세요')
+  })
+
+  it('to start nothing and say why when GitHub refuses the pull request', async () => {
+    const { deps, store, posted } = harness({
+      detect: () => Promise.resolve({ kind: 'refused', prUrl: REVIEW_PR, reason: '내가 올린 PR이에요' }),
+    })
+    await handleMessage(deps, dm(`리뷰 ${REVIEW_PR}`))
+    expect(getItem(store, REVIEW_ITEM)).toBeUndefined()
+    expect(posted[0]?.text).toBe('리뷰할 수 없는 PR이에요: 내가 올린 PR이에요')
+  })
+
+  it('to be an ordinary request when the word only starts a longer one', async () => {
+    const { deps, detected } = harness()
+    await handleMessage(deps, dm('리뷰페이지 버튼 고쳐줘'))
+    expect(detected).toHaveLength(0)
   })
 })

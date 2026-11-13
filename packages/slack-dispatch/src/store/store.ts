@@ -1,10 +1,12 @@
 import type { AgentModel } from '../agent/claude.ts'
 import type { Card, ItemEvent, Outcome, Stage } from '../machine/machine.ts'
+import type { ReviewMeta } from '../review/review.ts'
 import type { Analysis } from '../triage/analysis.ts'
 import type { EventKind, ItemSource } from './schema.ts'
 import { DatabaseSync } from 'node:sqlite'
 import { isAgentModel } from '../agent/claude.ts'
 import { decide, INITIAL_STAGE, isStage, nextStage, STAGES } from '../machine/machine.ts'
+import { parsePrUrl, readReviewMeta } from '../review/review.ts'
 import { readAnalysis } from '../triage/analysis.ts'
 import { redact } from './redact.ts'
 import { isEventKind, isItemSource, SCHEMA, SCHEMA_VERSION } from './schema.ts'
@@ -51,6 +53,17 @@ export interface ItemMeta {
   // The Slack ts of the newest tag in the thread the owner was already told about while this item was under way, so
   // the same tag is not told again at the next poll.
   seenUntil?: string
+  // Set when the item reviews somebody else's pull request instead of building a change of its own.
+  review?: ReviewMeta
+  // The newest pull request link found in the item's thread and the Slack message it was in, for the owner's "리뷰"
+  // button. A link only: whether it may be reviewed is checked when the button is pressed.
+  prLink?: PrLink
+}
+
+export interface PrLink {
+  url: string
+  // The Slack message the link was found in; empty when unknown.
+  from: string
 }
 
 export interface NewItemOptions {
@@ -337,6 +350,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== ''
 
+const SLACK_LINK = /^https:\/\/[^\s<>|]+$/
+
+const isSlackLink = (value: unknown): value is string => typeof value === 'string' && SLACK_LINK.test(value)
+
+function readPrLink(value: unknown): PrLink | undefined {
+  if (!isRecord(value)) return undefined
+  const ref = parsePrUrl(typeof value.url === 'string' ? value.url : '')
+  if (ref === null) return undefined
+  return { url: ref.url, from: isSlackLink(value.from) ? value.from : '' }
+}
+
 // Only the known fields with the right type are kept, so a damaged or hand-edited row cannot put anything else into
 // a message.
 function parseMeta(json: string): ItemMeta {
@@ -349,6 +373,8 @@ function parseMeta(json: string): ItemMeta {
   if (!isRecord(parsed)) return {}
   const { summary, url, route, urgent, analysis, model, direct, ownPlan, seenUntil } = parsed
   const read = readAnalysis(analysis)
+  const review = readReviewMeta(parsed.review)
+  const prLink = readPrLink(parsed.prLink)
   return {
     ...(typeof summary === 'string' ? { summary } : {}),
     ...(typeof url === 'string' ? { url } : {}),
@@ -359,6 +385,8 @@ function parseMeta(json: string): ItemMeta {
     ...(typeof direct === 'boolean' ? { direct } : {}),
     ...(isText(ownPlan) ? { ownPlan } : {}),
     ...(isText(seenUntil) ? { seenUntil } : {}),
+    ...(review === undefined ? {} : { review }),
+    ...(prLink === undefined ? {} : { prLink }),
   }
 }
 
@@ -395,6 +423,27 @@ function mergeMeta(store: Store, itemKey: string, patch: Readonly<Record<string,
   store.db
     .prepare('UPDATE items SET meta = ?, updated_at = ? WHERE key = ?')
     .run(serialize(meta), timestamp(store), itemKey)
+}
+
+// Makes the item a review of the pull request, or records how the review went. The fields given replace the ones
+// stored; the rest stay.
+export function setReview(store: Store, itemKey: string, review: ReviewMeta): void {
+  inTransaction(store, () => {
+    mergeMeta(store, itemKey, { review })
+    logEvent(store, {
+      itemKey,
+      kind: 'system',
+      type: 'review_saved',
+      payload: { prUrl: review.prUrl, manual: review.manual, pushedOid: review.pushedOid ?? '' },
+    })
+  })
+}
+
+export function setPrLink(store: Store, itemKey: string, prLink: PrLink): void {
+  inTransaction(store, () => {
+    mergeMeta(store, itemKey, { prLink })
+    logEvent(store, { itemKey, kind: 'system', type: 'pr_link_saved', payload: { url: prLink.url } })
+  })
 }
 
 // Keeps what the cheapest model made of an item next to its other digest fields.

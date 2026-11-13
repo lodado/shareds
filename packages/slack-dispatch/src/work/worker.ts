@@ -13,6 +13,7 @@ import type { QaOutcome, RunQa } from '../qa/qa.ts'
 import type { SlackClient } from '../slack/client.ts'
 import type { ItemRow, Store } from '../store/store.ts'
 import type { WorkspaceRow } from '../store/work.ts'
+import type { ReviewGithub, ReviewKit } from './review-work.ts'
 import { AgentAborted, DEFAULT_MODEL } from '../agent/claude.ts'
 import {
   buildPrompt,
@@ -63,6 +64,7 @@ import {
   spentOnItem,
   STOPPED_DETAIL,
 } from '../store/work.ts'
+import { checkReviewMerge, fixJob, REVIEW_CHECK_MS, reviewJob } from './review-work.ts'
 
 export interface WorkerConfig {
   maxTotal: number
@@ -104,6 +106,10 @@ export interface WorkerDeps {
   now: () => number
   // Where a pull request stands on the host; it can be merged or closed there without this service.
   prState: (prUrl: string) => Promise<PrState>
+  // What a review of somebody else's pull request reads and changes there.
+  github: ReviewGithub
+  // The merges in progress, the same set the buttons hold, so a merge and a decline never cross.
+  mergeLocks?: Set<string>
 }
 
 export interface Worker {
@@ -131,7 +137,7 @@ const REASON_LENGTH = 500
 type Kind = 'plan' | 'build'
 
 // Everything a running job needs to know about itself.
-interface RunInfo {
+export interface RunInfo {
   item: ItemRow
   kind: Kind
   runId: number
@@ -202,6 +208,7 @@ interface Ctx {
   cleanupRetryAt: Map<string, number>
   // When an item with an open pull request may be asked about next.
   prCheckAt: Map<string, number>
+  mergeLocks: Set<string>
 }
 
 async function post(ctx: Ctx, message: DigestMessage): Promise<string> {
@@ -370,9 +377,29 @@ async function announceDirectStart(ctx: Ctx, item: ItemRow, workspace: Workspace
   }
 }
 
+// What the review jobs share with the rest of the worker.
+const kitOf = (ctx: Ctx): ReviewKit => ({
+  deps: ctx.deps,
+  post: (message) => post(ctx, message),
+  notifyOwner: (item, text) => notifyOwner(ctx, item, text),
+  failRun: (info, result, reason) => failRun(ctx, info, result, reason),
+  syncBoard: (itemKey) => syncBoard(ctx, itemKey),
+  checkVisually: (info, workspace, result, asked) => checkVisually(ctx, info, workspace, result, asked),
+  showLive: (itemKey, path) => showLive(ctx, itemKey, path),
+  hideLive: (itemKey, handle) => hideLive(ctx, itemKey, handle),
+  assertActive: (info) => {
+    assertActive(ctx, info)
+  },
+  locks: ctx.mergeLocks,
+})
+
 async function planJob(ctx: Ctx, info: RunInfo): Promise<void> {
   const { store, agent, config } = ctx.deps
   const { item } = info
+  if (item.meta.review !== undefined) {
+    await reviewJob(kitOf(ctx), info, item.meta.review)
+    return
+  }
   const digestPlan = digestPlanOf(item)
   if (digestPlan !== undefined) {
     await directPlanJob(ctx, info, digestPlan)
@@ -690,6 +717,10 @@ async function buildAndDeliver(ctx: Ctx, info: RunInfo, workspace: WorkspaceRow)
 async function buildJob(ctx: Ctx, info: RunInfo): Promise<void> {
   const { store, run } = ctx.deps
   const { item } = info
+  if (item.meta.review !== undefined) {
+    await fixJob(kitOf(ctx), info, item.meta.review)
+    return
+  }
   const workspace = getWorkspace(store, item.key)
   if (workspace === undefined) throw new Error(`item ${item.key} has no workspace`)
   // The worktree has the repository's files but not its installed packages; the build and the QA both need them.
@@ -791,9 +822,10 @@ async function syncPullRequests(ctx: Ctx): Promise<void> {
   for (const item of listItems(store, { stage: 'pr_open' })) {
     const prUrl = getWorkspace(store, item.key)?.prUrl ?? null
     // A build that was only committed locally has no pull request to ask about.
-    if (prUrl === null || (ctx.prCheckAt.get(item.key) ?? 0) > now) continue
-    ctx.prCheckAt.set(item.key, now + PR_CHECK_MS)
-    await checkPullRequest(ctx, item, prUrl)
+    if (prUrl === null || ctx.jobs.has(item.key) || (ctx.prCheckAt.get(item.key) ?? 0) > now) continue
+    const review = item.meta.review
+    ctx.prCheckAt.set(item.key, now + (review === undefined ? PR_CHECK_MS : REVIEW_CHECK_MS))
+    await (review === undefined ? checkPullRequest(ctx, item, prUrl) : checkReviewMerge(kitOf(ctx), item, review))
   }
 }
 
@@ -841,7 +873,14 @@ export function createWorker(deps: WorkerDeps): Worker {
     })
     return dm
   }
-  const ctx: Ctx = { deps, jobs: new Map(), channel, cleanupRetryAt: new Map(), prCheckAt: new Map() }
+  const ctx: Ctx = {
+    deps,
+    jobs: new Map(),
+    channel,
+    cleanupRetryAt: new Map(),
+    prCheckAt: new Map(),
+    mergeLocks: deps.mergeLocks ?? new Set(),
+  }
   return {
     async tick() {
       await startReady(ctx, 'planning')

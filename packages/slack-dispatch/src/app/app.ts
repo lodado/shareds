@@ -14,17 +14,27 @@ import type { Connect } from '../socket/socket.ts'
 import type { Store } from '../store/store.ts'
 import type { WorkerConfig } from '../work/worker.ts'
 import type { StatusServer, StatusSnapshot } from './status.ts'
-import { mergePr, readGate, readPrState } from '../github/github.ts'
+import {
+  approvePr,
+  mergePr,
+  pushToPrBranch,
+  readGate,
+  readLogin,
+  readPrInfo,
+  readPrState,
+  readReviewGate,
+} from '../github/github.ts'
 import { createSqliteItemRepository } from '../infra/sqlite-item-repository.ts'
 import { catchUp } from '../ingest/catch-up.ts'
 import { ingestMentions } from '../ingest/ingest.ts'
 import { listRepos } from '../orca/repos.ts'
+import { createReviewDetector } from '../review/detect.ts'
 import { startSocket } from '../socket/socket.ts'
 import { lastSystemEventAt, logEvent, stageCounts } from '../store/store.ts'
 import { cancelOrphanRuns, countActiveRuns, getWorkspace } from '../store/work.ts'
 import { ingestIssues, loadIssueText, parseIssueSourceKey } from '../usecases/ingest-issues.ts'
 import { createWorker, retriesLeft } from '../work/worker.ts'
-import { createSplitAgent, createTriageAgent } from './agents.ts'
+import { createReviewClassifier, createSplitAgent, createTriageAgent } from './agents.ts'
 import { dispatchEnvelope } from './dispatch.ts'
 import { createSerial, every } from './loop.ts'
 import { describeError, startStatusServer } from './status.ts'
@@ -174,6 +184,17 @@ export async function createApp(deps: AppDeps): Promise<App> {
     if (tracker === undefined || parseIssueSourceKey(item.threadKey) === null) return loadThreadText(slack, item)
     return loadIssueText(tracker, item.threadKey)
   }
+  // The owner's GitHub login, asked once: reviews are refused for the owner's own pull requests and run under this account.
+  let login: Promise<string> | null = null
+  const ownerLogin = (): Promise<string> => {
+    login ??= readLogin(run).catch((error: unknown) => {
+      login = null
+      throw error
+    })
+    return login
+  }
+  // The merges in progress: a button and the worker's own merge of a review hold the same locks.
+  const mergeLocks = new Set<string>()
   const worker = createWorker({
     store,
     run,
@@ -187,17 +208,32 @@ export async function createApp(deps: AppDeps): Promise<App> {
     qa: deps.qa,
     now: () => deps.now().getTime(),
     prState: (prUrl) => readPrState(run, prUrl),
+    github: {
+      readPr: (prUrl) => readPrInfo(run, prUrl),
+      readGate: (prUrl) => readReviewGate(run, prUrl),
+      approve: (review, headOid) => approvePr(run, review.slug, review.number, headOid),
+      merge: (prUrl, headOid) => mergePr(run, prUrl, headOid),
+      push: (worktreePath, head) => pushToPrBranch(run, worktreePath, head),
+      ownerLogin,
+    },
+    mergeLocks,
   })
 
   const prOf = (itemKey: string): string | null => getWorkspace(store, itemKey)?.prUrl ?? null
   const small = {
     agent: deps.agent,
     newSessionId: deps.newSessionId,
-    onCost: (what: 'split' | 'triage', costUsd: number) => {
+    onCost: (what: 'split' | 'triage' | 'review_intent', costUsd: number) => {
       logEvent(store, { kind: 'run', type: `${what}_agent`, payload: { costUsd } })
     },
   }
   const analyze = createTriageAgent(small, deps.scratchDir, repoPath, loadThread)
+  const detectReview = createReviewDetector({
+    readPr: (prUrl) => readPrInfo(run, prUrl),
+    classify: createReviewClassifier(small, deps.scratchDir),
+    ownerLogin,
+    knownRepos: () => repos.map((repo) => repo.name),
+  })
   // One pass over Slack at a time: the regular poll and a look at a past day would otherwise list the same new items twice.
   const serial = createSerial()
   const ingestDeps = (): IngestDeps => ({
@@ -206,6 +242,8 @@ export async function createApp(deps: AppDeps): Promise<App> {
     ownerId,
     route: { knownRepos: repos.map((repo) => repo.name), channelRepos: deps.channelRepos() },
     analyze,
+    review: detectReview,
+    retriesLeft: (itemKey) => retriesLeft(store, itemKey, settings),
   })
   const interact: InteractDeps = {
     store,
@@ -213,6 +251,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
     ownerId,
     knownRepos: () => repos.map((repo) => repo.name),
     splitPrompt: createSplitAgent(small, deps.scratchDir),
+    detectReview,
     checkGate: async (item) => {
       const url = prOf(item.key)
       return url === null ? { ci: false, review: false, headOid: '' } : readGate(run, url)
@@ -227,7 +266,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
       worker.abort(itemKey)
     },
     catchUp: (daysAgo) => serial(() => catchUp(ingestDeps(), startOfDay(deps.now(), daysAgo))),
-    locks: new Set(),
+    locks: mergeLocks,
     now: () => deps.now().getTime(),
   }
 

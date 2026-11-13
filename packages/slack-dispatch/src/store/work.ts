@@ -196,6 +196,15 @@ export function saveWorkspace(store: Store, itemKey: string, workspace: NewWorks
   })
 }
 
+// A review starts again from the pull request's newest commit at every try, so what the fixes are compared with moves.
+export function setBaseRef(store: Store, itemKey: string, baseRef: string): void {
+  inTransaction(store, () => {
+    const result = store.db.prepare('UPDATE workspaces SET base_ref = ? WHERE item_key = ?').run(baseRef, itemKey)
+    if (Number(result.changes) !== 1) throw new Error(`item ${itemKey} has no workspace`)
+    logEvent(store, { itemKey, kind: 'system', type: 'base_ref_saved', payload: { baseRef } })
+  })
+}
+
 export function setPlan(store: Store, itemKey: string, plan: string): void {
   inTransaction(store, () => {
     const result = store.db.prepare('UPDATE workspaces SET plan = ? WHERE item_key = ?').run(plan, itemKey)

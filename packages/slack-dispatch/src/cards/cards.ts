@@ -4,7 +4,7 @@
 import type { ActionElement, Block, DigestMessage } from '../digest/digest.ts'
 import { clip, escapeMrkdwn, firstAction, fitText, matchAction, sourceLink } from '../slack/blocks.ts'
 
-type ItemAction = 'approve_plan' | 'reject' | 'merge' | 'retry' | 'cancel'
+type ItemAction = 'approve_plan' | 'reject' | 'merge' | 'retry' | 'cancel' | 'review'
 
 // Slack limits: 3000 characters per section, 150 per button value.
 const SECTION_TEXT_LIMIT = 3000
@@ -17,9 +17,9 @@ const REPORT_LIMIT = 2500
 const REVISE_HINT =
   '*✏️ 플랜을 고치고 싶으면* 이 메시지의 *스레드에 답글*로 지시를 적어 주세요. 같은 세션이 플랜을 고쳐서 새 카드로 다시 보내요.'
 
-const ITEM_ACTIONS: ReadonlySet<string> = new Set(['approve_plan', 'reject', 'merge', 'retry', 'cancel'])
+const ITEM_ACTIONS: ReadonlySet<string> = new Set(['approve_plan', 'reject', 'merge', 'retry', 'cancel', 'review'])
 
-const ACTION_PATTERN = /^item\.(approve_plan|reject|merge|retry|cancel):(\d+)$/
+const ACTION_PATTERN = /^item\.(approve_plan|reject|merge|retry|cancel|review):(\d+)$/
 
 const section = (text: string): Block => ({ type: 'section', text: { type: 'mrkdwn', text } })
 
@@ -186,6 +186,97 @@ export function buildFailedCard(input: FailedCardInput): DigestMessage {
   } else {
     blocks.push(context('다시 시도할 수 없어요: 재시도 횟수나 비용 한도를 다 썼어요.'))
   }
+  return { text: title, blocks }
+}
+
+export interface RetagCardInput {
+  // The item under way in the thread: the button names it, and the pull request link is kept with it.
+  itemKey: string
+  // The words of the notice, already escaped where they came from Slack.
+  text: string
+  // Whether the new tag carries a pull request link the owner could have reviewed.
+  canReview: boolean
+}
+
+// The notice that the owner was tagged again in a thread whose item is under way. With a pull request link in the new
+// tag, it has a button that sends that pull request to the review flow.
+export function buildRetagCard(input: RetagCardInput): DigestMessage {
+  if (!input.canReview) return { text: input.text, blocks: [section(input.text)] }
+  return {
+    text: input.text,
+    blocks: [
+      section(input.text),
+      {
+        type: 'actions',
+        block_id: `retag:${input.itemKey}`.slice(0, 255),
+        elements: [button('review', 0, input.itemKey, 'PR 리뷰하고 머지', 'primary')],
+      },
+      context('리뷰하고 지적한 점을 고쳐 올린 뒤, 조건이 맞으면 머지하고 결과를 DM으로 알려드려요.'),
+    ],
+  }
+}
+
+interface ReviewReportFinding {
+  id: number
+  severity: string
+  file: string
+  line: number | null
+  issue: string
+  fixed: boolean
+}
+
+export interface ReviewReportInput {
+  repo: string
+  prUrl: string
+  title: string
+  // The Slack message the request came from; empty for a request typed to the bot.
+  threadUrl: string
+  merged: boolean
+  // Why it was not merged; empty when it was.
+  reason: string
+  summary: string
+  findings: readonly ReviewReportFinding[]
+}
+
+const MAX_SHOWN_FINDINGS = 15
+const FINDING_TEXT_LIMIT = 160
+const SEVERITY_LABEL: Readonly<Record<string, string>> = { blocker: '🔴', major: '🟠', minor: '🟡', nit: '⚪' }
+
+function findingLine(finding: ReviewReportFinding): string {
+  const where = finding.line === null ? finding.file : `${finding.file}:${finding.line}`
+  const mark = finding.fixed ? '고침' : '안 고침'
+  const label = SEVERITY_LABEL[finding.severity] ?? '🟠'
+  return `${label} ${finding.id}. [${mark}] \`${clip(where, 80).replaceAll('`', "'")}\` ${clip(
+    finding.issue,
+    FINDING_TEXT_LIMIT,
+  )}`
+}
+
+function findingsText(findings: readonly ReviewReportFinding[]): string {
+  if (findings.length === 0) return '지적한 점 없음'
+  const shown = findings.slice(0, MAX_SHOWN_FINDINGS).map(findingLine)
+  const more = findings.length > MAX_SHOWN_FINDINGS ? [`… 외 ${findings.length - MAX_SHOWN_FINDINGS}개`] : []
+  return [`지적 ${findings.length}개 (고침 ${findings.filter((f) => f.fixed).length}개)`, ...shown, ...more].join('\n')
+}
+
+// What the owner reads when a review is over: merged or stopped and why, what the review found and what was fixed,
+// the pull request and where in Slack it was asked for. Everything from GitHub, the agent or Slack is escaped.
+export function buildReviewReport(input: ReviewReportInput): DigestMessage {
+  const verdict = input.merged ? '리뷰하고 머지했어요' : '리뷰했지만 머지하지 않았어요'
+  const title = `${verdict}: ${clip(input.repo, TITLE_LIMIT)}`
+  const label = input.merged ? '참고' : '멈춘 이유'
+  const reason = input.reason === '' ? '' : `\n${label}: ${escapeMrkdwn(clip(input.reason, 300))}`
+  const head = `<${input.prUrl}|${escapeMrkdwn(
+    clip(input.title === '' ? 'PR 열기' : input.title, TITLE_LIMIT),
+  )}>${reason}`
+  const summary = input.summary === '' ? '' : `\n${escapeMrkdwn(clip(input.summary, 600))}`
+  const where = input.threadUrl === '' ? 'Slack 위치: 없음 (DM으로 요청)' : `<${input.threadUrl}|Slack 쓰레드로 가기>`
+  const blocks: Block[] = [
+    { type: 'header', text: { type: 'plain_text', text: clip(title, 150) } },
+    section(`${head}${summary}`),
+    section(escapeMrkdwn(fitEscaped(findingsText(input.findings), SECTION_TEXT_LIMIT))),
+    context(where),
+  ]
   return { text: title, blocks }
 }
 

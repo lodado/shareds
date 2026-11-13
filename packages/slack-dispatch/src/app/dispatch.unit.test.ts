@@ -29,6 +29,7 @@ function deps(): { deps: InteractDeps; store: Store; posted: string[] } {
       },
       knownRepos: () => ['web-app'],
       splitPrompt: () => Promise.resolve({ tasks: [] }),
+      detectReview: () => Promise.resolve({ kind: 'none' }),
       checkGate: () => Promise.resolve({ ci: false, review: false, headOid: '' }),
       mergePr: () => Promise.resolve(),
       retriesLeft: () => true,

@@ -1,6 +1,13 @@
 import type { ActionElement, Block, DigestEntry } from './digest'
 import { describe, expect, it } from 'vitest'
-import { buildDigest, isSelectionClick, MAX_ENTRIES_PER_DIGEST, OWN_PLAN_LIMIT, parseDigestAction, splitDigest } from './digest'
+import {
+  buildDigest,
+  isSelectionClick,
+  MAX_ENTRIES_PER_DIGEST,
+  OWN_PLAN_LIMIT,
+  parseDigestAction,
+  splitDigest,
+} from './digest'
 
 const analysis = {
   request: '푸터 링크 클릭해도 이동 안 함\n모바일과 데스크톱 모두 발생',
@@ -92,7 +99,9 @@ describe('buildDigest as three new items, two of them recommended', () => {
         '• 링크 이동 테스트 추가',
         '*구현 추천:* X — 제품 결정이 필요해요',
       ].join('\n'),
-      expect.stringContaining('*3. web-app* :rotating_light:  <https://example.slack.com/archives/C1/p3|원본: Slack 쓰레드>'),
+      expect.stringContaining(
+        '*3. web-app* :rotating_light:  <https://example.slack.com/archives/C1/p3|원본: Slack 쓰레드>',
+      ),
     ])
   })
 
@@ -125,10 +134,11 @@ describe('buildDigest as three new items, two of them recommended', () => {
     ])
   })
 
-  it('to be four buttons that name the digest, then a note about the boxes that arrived checked', () => {
+  it('to be five buttons that name the digest, then a note about the boxes that arrived checked', () => {
     expect(buttonsOf(message.blocks)).toStrictEqual([
       { action_id: 'digest.plan_selected:4', style: 'primary', label: '선택한 항목 플랜 시작' },
       { action_id: 'digest.build_selected:4', style: null, label: '선택한 항목 바로 구현' },
+      { action_id: 'digest.review_selected:4', style: null, label: '선택한 항목 PR 리뷰' },
       { action_id: 'digest.plan_all:4', style: null, label: '전체 플랜 시작' },
       { action_id: 'digest.reject_rest:4', style: 'danger', label: '선택 안 한 항목 기각' },
     ])
@@ -341,6 +351,13 @@ describe('parseDigestAction as the click on a digest button', () => {
     })
   })
 
+  it('to be the review button with the ticked items', () => {
+    const payload = clickPayload('digest.review_selected:7', {
+      'digest:7:pick:0': picks('digest.pick:7:0', 'T1#web-app'),
+    })
+    expect(parseDigestAction(payload)).toMatchObject({ ok: true, action: 'review_selected', selected: ['T1#web-app'] })
+  })
+
   it('to be refused for the rough plan button, which the digest no longer has', () => {
     expect(parseDigestAction(clickPayload('digest.rough_plan:9'))).toEqual({
       ok: false,
@@ -391,7 +408,10 @@ describe('parseDigestAction as the click on a digest button', () => {
         'digest:7:ownplan': { 'digest.ownplan:7': { type: 'plain_text_input', value } },
         'digest:6:ownplan': { 'digest.ownplan:6': { type: 'plain_text_input', value: 'old digest' } },
       })
-    expect(parseDigestAction(typed('  탭 추가\n팝업 재사용  '))).toMatchObject({ ok: true, ownPlan: '탭 추가\n팝업 재사용' })
+    expect(parseDigestAction(typed('  탭 추가\n팝업 재사용  '))).toMatchObject({
+      ok: true,
+      ownPlan: '탭 추가\n팝업 재사용',
+    })
     expect(parseDigestAction(typed(null))).toMatchObject({ ok: true, ownPlan: '' })
     expect(parseDigestAction(typed('x'.repeat(OWN_PLAN_LIMIT + 10)))).toMatchObject({
       ok: true,
@@ -404,7 +424,10 @@ describe('parseDigestAction as the click on a digest button', () => {
       clickPayload('digest.plan_selected:7', {
         'digest:7:repotext': { 'digest.repotext:7': { type: 'plain_text_input', value: typedRepo } },
         'digest:7:repo': {
-          'digest.repo:7': { type: 'static_select', selected_option: menuRepo === undefined ? null : { value: menuRepo } },
+          'digest.repo:7': {
+            type: 'static_select',
+            selected_option: menuRepo === undefined ? null : { value: menuRepo },
+          },
         },
       })
     expect(parseDigestAction(chosen('  Deep-Agent ', 'web-app'))).toMatchObject({ ok: true, repo: 'Deep-Agent' })
