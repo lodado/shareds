@@ -216,7 +216,7 @@ export function buildRetagCard(input: RetagCardInput): DigestMessage {
   }
 }
 
-export interface ReviewReportFinding {
+interface ReviewReportFinding {
   id: number
   severity: string
   file: string

@@ -65,8 +65,8 @@ export interface ReviewKit {
 }
 
 // CI gets this long to show up after a push before the checks are read, and this long to finish.
-export const REVIEW_SETTLE_MS = 5 * 60_000
-export const REVIEW_MAX_WAIT_MS = 6 * 60 * 60_000
+const REVIEW_SETTLE_MS = 5 * 60_000
+const REVIEW_MAX_WAIT_MS = 6 * 60 * 60_000
 // How often an approved pull request is asked about while it waits for CI.
 export const REVIEW_CHECK_MS = 2 * 60_000
 // More diff than this is cut: the agent reads the files themselves for the rest.
@@ -399,7 +399,7 @@ export async function fixJob(kit: ReviewKit, info: RunInfo, review: ReviewMeta):
 const SAFE_LINK = /^https:\/\/[^\s<>|]+$/
 
 // The one message the owner gets about a review that is over.
-export async function tellReview(
+async function tellReview(
   kit: ReviewKit,
   itemKey: string,
   result: { merged: boolean; reason: string },

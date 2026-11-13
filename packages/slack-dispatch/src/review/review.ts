@@ -37,8 +37,7 @@ export function prLinksIn(links: readonly string[]): PrRef[] {
   })
 }
 
-export const PR_STATES = ['OPEN', 'MERGED', 'CLOSED', 'UNKNOWN'] as const
-export type PrStateName = (typeof PR_STATES)[number]
+type PrStateName = 'OPEN' | 'MERGED' | 'CLOSED' | 'UNKNOWN'
 
 const STATE_BY_NAME: Readonly<Record<string, PrStateName>> = { OPEN: 'OPEN', MERGED: 'MERGED', CLOSED: 'CLOSED' }
 
@@ -214,8 +213,8 @@ export function readReviewMeta(value: unknown): ReviewMeta | undefined {
   }
 }
 
-export const SEVERITIES = ['blocker', 'major', 'minor', 'nit'] as const
-export type Severity = (typeof SEVERITIES)[number]
+const SEVERITIES = ['blocker', 'major', 'minor', 'nit'] as const
+type Severity = (typeof SEVERITIES)[number]
 
 export interface Finding {
   id: number
@@ -315,7 +314,7 @@ export function remainingBlockers(review: Review, unfixed: number[] | null): Fin
   )
 }
 
-export type CiState = 'pass' | 'pending' | 'fail'
+type CiState = 'pass' | 'pending' | 'fail'
 
 export interface ReviewGate {
   state: PrStateName
