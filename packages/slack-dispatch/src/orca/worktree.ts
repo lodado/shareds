@@ -114,25 +114,25 @@ export async function setWorkspaceStatus(run: Run, path: string, status: string)
   await run('orca', ['worktree', 'set', '--worktree', `path:${path}`, '--workspace-status', status, '--json'])
 }
 
-// What the build changes, refreshed every few seconds; it ends by itself after 90 minutes, as long as a build may run.
-// A fixed text: nothing from Slack or from the agent is put into it.
-const LIVE_VIEW_COMMAND =
-  "for i in $(seq 1 1100); do clear; date '+%H:%M:%S'; echo '== 바뀐 파일 =='; git status --short; echo; git diff --stat | tail -8; sleep 5; done"
-
 const TERMINAL_HANDLE = /^term_[0-9a-f-]+$/
 
-// The build is a background process that Orca cannot show, so a terminal tab in its worktree shows what it is changing.
-// Resolves to the handle of the tab, to close it when the build is over, or undefined when Orca did not give one.
-export async function openLiveView(run: Run, path: string): Promise<string | undefined> {
+// A terminal tab in the worktree that runs `command`, opened in the background (never with --focus, so the owner's
+// window is left alone). Resolves to the handle of the tab, or undefined when Orca did not give one.
+export async function openTerminal(
+  run: Run,
+  path: string,
+  title: string,
+  command: string,
+): Promise<string | undefined> {
   const { stdout } = await run('orca', [
     'terminal',
     'create',
     '--worktree',
     `path:${path}`,
     '--title',
-    '구현 진행 보기',
+    title,
     '--command',
-    LIVE_VIEW_COMMAND,
+    command,
     '--json',
   ])
   return terminalHandleOf(field(field(field(JSON.parse(stdout), 'result'), 'terminal'), 'handle'))
@@ -143,7 +143,7 @@ function terminalHandleOf(value: unknown): string | undefined {
   return TERMINAL_HANDLE.test(value) ? value : undefined
 }
 
-export async function closeLiveView(run: Run, handle: string): Promise<void> {
+export async function closeTerminal(run: Run, handle: string): Promise<void> {
   if (!TERMINAL_HANDLE.test(handle)) throw new RangeError('not a terminal handle')
   await run('orca', ['terminal', 'close', '--terminal', handle, '--tab', '--json'])
 }

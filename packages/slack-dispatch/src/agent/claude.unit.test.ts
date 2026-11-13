@@ -2,7 +2,15 @@ import type { Run, RunOptions } from '../exec/exec'
 import type { AgentCall } from './claude'
 import { describe, expect, it } from 'vitest'
 import { CommandError } from '../exec/exec'
-import { AgentAborted, claudeArgs, createClaudeAgent, isAgentModel, parseAgentOutput } from './claude'
+import {
+  AgentAborted,
+  claudeArgs,
+  createClaudeAgent,
+  isAgentModel,
+  parseAgentOutput,
+  parseStreamOutput,
+  switchedSession,
+} from './claude'
 
 const SESSION = '0b6a6a50-3e51-4c93-9a0a-0d1c2a3b4c5d'
 
@@ -180,6 +188,46 @@ describe('claudeArgs as the model the owner picked', () => {
   it('to be a name from the list of models only', () => {
     expect(['opusplan', 'opus', 'sonnet', 'haiku'].every(isAgentModel)).toBe(true)
     for (const other of ['gpt-9', '', 'OPUS', 5, null, undefined]) expect(isAgentModel(other)).toBe(false)
+  })
+})
+
+describe('claudeArgs as the command line of a run that streams', () => {
+  it('to be the same call with a line per message, which claude prints only verbose', () => {
+    const streamed = claudeArgs(call(), 'stream-json')
+    expect(streamed.slice(0, 4)).toStrictEqual(['-p', '--output-format', 'stream-json', '--verbose'])
+    expect(streamed.slice(4)).toStrictEqual(claudeArgs(call()).slice(3))
+  })
+})
+
+describe('parseStreamOutput as the answer of claude -p --output-format stream-json', () => {
+  it('to be the last result of the stream, past lines that are not JSON or were cut off', () => {
+    const stream = [
+      JSON.stringify({ type: 'system', subtype: 'init' }),
+      'not json',
+      success('the plan', 0.3),
+      '{"type":"assistant","mess',
+    ].join('\n')
+    expect(parseStreamOutput(stream)).toStrictEqual({ ok: true, text: 'the plan', costUsd: 0.3, subtype: 'success' })
+  })
+
+  it('to be null for a stream that ended before its result', () => {
+    expect(parseStreamOutput(JSON.stringify({ type: 'system', subtype: 'init' }))).toBeNull()
+    expect(parseStreamOutput('')).toBeNull()
+  })
+})
+
+describe('switchedSession as what the session on disk says', () => {
+  it('to resume a new session claude says is in use, and start afresh a resumed one it does not know', () => {
+    expect(switchedSession(call(), 'Session ID is already in use')).toMatchObject({ resume: true })
+    expect(switchedSession(call({ resume: true }), 'No conversation found with session ID')).toMatchObject({
+      resume: false,
+    })
+  })
+
+  it('to be no switch for any other error, or the message that does not fit the call', () => {
+    expect(switchedSession(call(), 'No conversation found with session ID')).toBeUndefined()
+    expect(switchedSession(call({ resume: true }), 'Session ID is already in use')).toBeUndefined()
+    expect(switchedSession(call(), 'boom')).toBeUndefined()
   })
 })
 

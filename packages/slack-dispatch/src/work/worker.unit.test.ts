@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AgentAborted } from '../agent/claude'
+import { AgentAborted, AgentStoppedInTab } from '../agent/claude'
 import { CommandError } from '../exec/exec'
 import { NO_HOOKS } from '../github/github'
 import { worktreeNameFor } from '../orca/worktree'
@@ -1566,51 +1566,38 @@ describe('worker as an item the owner builds at once from the plan in the digest
   })
 })
 
-describe('worker as the live view of a build in Orca', () => {
-  it('to be a terminal tab in the worktree, opened after the packages are installed and before the agent starts', async () => {
-    const r = rig({ agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
-    approvedInWorktree(r)
+describe('worker as a run the owner stopped with Ctrl+C in its Orca tab', () => {
+  it('to end the plan as an owner stop that uses no try, and fail the item with the card that lets the bot try again', async () => {
+    const r = rig({ agent: () => Promise.reject(new AgentStoppedInTab(0.4, 'continued')) })
+    const key = item(r.store, 'web-app', TO_PLANNING)
     await settle(r)
-    const opening = r.order.findIndex((line) => line.startsWith('orca terminal create'))
-    expect(opening).toBeGreaterThanOrEqual(0)
-    expect(r.order[opening]).toContain('--worktree path:/wt/a --title 구현 진행 보기 --command for i in')
-    expect(opening).toBeLessThan(r.order.indexOf('<agent>'))
-    // The owner is working in Orca: the tab opens in the background and never takes the focus.
-    expect(r.order[opening]).not.toContain('--focus')
-    expect(r.order.filter((line) => line.startsWith('orca terminal create'))).toHaveLength(1)
+    expect(listRuns(r.store, key)).toMatchObject([{ state: 'failed', detail: STOPPED_DETAIL, costUsd: 0.4 }])
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(retriesLeft(r.store, key, { maxAttempts: 1, maxCostPerItemUsd: CONFIG.maxCostPerItemUsd })).toBe(true)
+    expect(r.posted).toHaveLength(1)
+    expect(JSON.stringify(r.posted[0]?.blocks)).toContain('Orca 탭에서 멈췄어요')
+    expect(buttonIds(r.posted[0]?.blocks)).toStrictEqual(['item.retry:0'])
   })
 
-  it('to be closed when the build is over, so it does not keep refreshing and a retry does not add a second one', async () => {
-    const r = rig({ agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
-    approvedInWorktree(r)
-    await settle(r)
-    const closing = r.order.findIndex((line) => line.startsWith('orca terminal close'))
-    expect(r.order[closing]).toBe(
-      'orca terminal close --terminal term_5b70a478-6623-408a-8919-d4eced9eb295 --tab --json',
-    )
-    expect(closing).toBeGreaterThan(r.order.indexOf('<agent>'))
-  })
-
-  it('to be closed also when the build fails, and a failure to close is only logged', async () => {
-    const failing = rig({ agent: () => Promise.resolve(ok('RESULT: FAIL tests are red')) })
-    approvedInWorktree(failing)
-    await settle(failing)
-    expect(failing.order.some((line) => line.startsWith('orca terminal close'))).toBe(true)
-    const stuck = rig({ failCommand: 'terminal close', agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
-    const key = approvedInWorktree(stuck)
-    await settle(stuck)
-    expect(stageOf(stuck.store, key)).toBe('pr_open')
-    expect(listEvents(stuck.store, { itemKey: key }).some((event) => event.type === 'live_view_close_failed')).toBe(
-      true,
-    )
-  })
-
-  it('to be only a convenience: a build still passes when the tab cannot be opened, and the failure is logged', async () => {
-    const r = rig({ failCommand: 'terminal create', agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+  it('to charge a quarter of the build budget when claude was cut off before it said what it spent', async () => {
+    const r = rig({ agent: () => Promise.reject(new AgentStoppedInTab(undefined, 'continued')) })
     const key = approvedInWorktree(r)
     await settle(r)
-    expect(stageOf(r.store, key)).toBe('pr_open')
-    expect(listEvents(r.store, { itemKey: key }).some((event) => event.type === 'live_view_failed')).toBe(true)
+    expect(listRuns(r.store, key).at(-1)).toMatchObject({
+      state: 'failed',
+      detail: STOPPED_DETAIL,
+      costUsd: CONFIG.buildBudgetUsd * 0.25,
+    })
+    expect(stageOf(r.store, key)).toBe('failed')
+  })
+
+  it('to not offer the session in the tab when the tab closed and there is none to go on with', async () => {
+    const r = rig({ agent: () => Promise.reject(new AgentStoppedInTab(undefined, 'ended')) })
+    item(r.store, 'web-app', TO_PLANNING)
+    await settle(r)
+    const card = JSON.stringify(r.posted[0]?.blocks)
+    expect(card).toContain('Orca 탭이 닫히거나 Claude가 시작하기 전에 멈춰서 run이 끝났어요')
+    expect(card).not.toContain('이어서 직접 작업할 수 있어요')
   })
 })
 
