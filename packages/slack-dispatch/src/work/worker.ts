@@ -98,7 +98,8 @@ export interface WorkerDeps {
   // Where the repo lives on this machine, or undefined when Orca does not know it.
   repoPath: (repo: string) => Promise<string | undefined>
   // The text of the thread an item came from, cleaned; empty for a DM item.
-  loadThread: (item: ItemRow) => Promise<string>
+  // The text of the item's thread; the messages in `focus` are kept and marked even when the thread is cut.
+  loadThread: (item: ItemRow, focus?: readonly string[]) => Promise<string>
   newSessionId: () => string
   // Looks at the pages a build changed before its pull request is opened.
   qa: RunQa
@@ -301,7 +302,8 @@ async function failRun(ctx: Ctx, info: RunInfo, result: AgentResult | undefined,
 function planText(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow, thread: string): string {
   const { store } = ctx.deps
   const asked = pendingInstruction(store, item.key)
-  if (asked !== undefined) return revisePrompt(asked.text, thread)
+  // A request for a plan not written yet (new tags while the first one was under way) is answered by a first plan.
+  if (asked !== undefined && workspace.plan !== '') return revisePrompt(asked.text, thread)
   if (workspace.plan !== '') return replanPrompt(thread, lastFailure(store, item.key))
   return planPrompt({
     repo: item.repo,
@@ -309,6 +311,7 @@ function planText(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow, thread: stri
     thread,
     task: item.task,
     ownPlan: item.meta.ownPlan ?? '',
+    newTags: (asked?.tags.length ?? 0) > 0,
   })
 }
 
@@ -406,8 +409,9 @@ async function planJob(ctx: Ctx, info: RunInfo): Promise<void> {
     return
   }
   const workspace = await ensureWorkspace(ctx, item)
-  const thread = await ctx.deps.loadThread(item)
-  const answeredRequest = pendingInstruction(store, item.key)?.id ?? 0
+  const asked = pendingInstruction(store, item.key)
+  const thread = await ctx.deps.loadThread(item, asked?.tags ?? [])
+  const answeredRequest = asked?.id ?? 0
   const result = await agent({
     cwd: workspace.path,
     prompt: planText(ctx, item, workspace, thread),

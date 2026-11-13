@@ -14,9 +14,10 @@ import {
   issueCard,
   itemKeyOf,
   listEvents,
+  logEvent,
   openStore,
 } from '../store/store'
-import { beginRun, endRun, saveWorkspace, setCardSlackRef } from '../store/work'
+import { beginRun, endRun, pendingInstruction, saveWorkspace, setCardSlackRef } from '../store/work'
 import { describeQueue, handleInteractive, handleMessage } from './interact'
 
 const OWNER = 'UOWNER'
@@ -503,6 +504,18 @@ describe('handleInteractive as a click on an item card', () => {
     await handleInteractive(deps, itemClick('approve_plan', old, a))
     expect(stageOf(store, a)).toBe('planned')
     expect(posted[0]?.text).toBe('오래된 카드예요. 가장 최근 플랜 카드에서 눌러주세요.')
+  })
+
+  it('to say the plan is being written again when its card is clicked after new tags asked for another', async () => {
+    const { deps, store, posted } = harness()
+    const a = key('web-app')
+    createItems(store, thread(1), ['web-app'])
+    advance(store, a, TO_PLANNED)
+    const card = issueCard(store, a, 'plan')
+    applyEvent(store, a, { type: 'revise', owner: true })
+    await handleInteractive(deps, itemClick('approve_plan', card, a))
+    expect(stageOf(store, a)).toBe('planning')
+    expect(posted[0]?.text).toBe('플랜을 다시 짜는 중이에요. 새 플랜 카드에서 승인해 주세요.')
   })
 
   it('to be declined with the agent stopped on reject', async () => {
@@ -1098,6 +1111,39 @@ describe('handleInteractive as the review button of a retag notice', () => {
     expect(getItem(store, REVIEW_ITEM)).toBeUndefined()
     expect(detected).toHaveLength(0)
     expect(posted[0]?.text).toBe('PR 링크를 찾지 못했어요.')
+  })
+})
+
+describe('handleInteractive as the plan button of a retag notice', () => {
+  it('to start the plan of an item that waits in a digest, and nothing more on a second click', async () => {
+    const { deps, store, posted } = harness()
+    const open = waiting(store, 'web-app', 1)
+    await handleInteractive(deps, itemClick('plan', 0, open))
+    await handleInteractive(deps, itemClick('plan', 0, open))
+    expect(stageOf(store, open)).toBe('planning')
+    expect(posted.map((post) => post.text)).toStrictEqual([
+      '새 태그까지 쓰레드를 다시 읽고 플랜을 짤게요. 플랜 카드가 오면 확인해 주세요.',
+      '이미 처리 중이거나 끝난 항목이에요.',
+    ])
+  })
+
+  it('to have the plan keep every new tag the owner was told about, so a long thread does not cut them', async () => {
+    const { deps, store } = harness()
+    const open = waiting(store, 'web-app', 1)
+    for (const tags of [['5.1'], ['5.2', '5.1']]) {
+      logEvent(store, { itemKey: open, kind: 'inbound', type: 'mention_retag', payload: { stage: 'notified', tags } })
+    }
+    expect(pendingInstruction(store, open)).toBeUndefined()
+    await handleInteractive(deps, itemClick('plan', 0, open))
+    expect(pendingInstruction(store, open)?.tags).toStrictEqual(['5.1', '5.2'])
+  })
+
+  it('to start nothing for an item no repo was found for', async () => {
+    const { deps, store, posted } = harness()
+    const open = waiting(store, 'unrouted', 1)
+    await handleInteractive(deps, itemClick('plan', 0, open))
+    expect(stageOf(store, open)).toBe('notified')
+    expect(posted[0]?.text).toBe('어느 레포인지 정해지지 않았어요. 다이제스트에서 레포를 정해 주세요.')
   })
 })
 

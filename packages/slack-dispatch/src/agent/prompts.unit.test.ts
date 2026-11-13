@@ -47,6 +47,12 @@ describe('planPrompt as the first words of a plan run', () => {
     expect(prompt).toContain('\n예약 탭만 추가\n')
     expect(planPrompt({ repo: 'r', base: 'b', thread: THREAD, task: '', ownPlan: '  ' })).not.toContain('Follow it')
   })
+
+  it('to say what the new-tag mark of the thread means only when the thread has new tags', () => {
+    const note = 'Messages marked [새 태그] tagged the owner after the first request.'
+    expect(planPrompt({ repo: 'r', base: 'b', thread: THREAD, task: '', newTags: true })).toContain(note)
+    expect(planPrompt({ repo: 'r', base: 'b', thread: THREAD, task: '' })).not.toContain('[새 태그]')
+  })
 })
 
 describe('revisePrompt as the change the owner asked for', () => {

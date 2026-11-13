@@ -115,7 +115,12 @@ export interface PlanInput {
   task: string
   // The plan the owner typed in the digest; empty when the agent plans on its own.
   ownPlan?: string
+  // Set when the thread marks messages that tagged the owner after the request.
+  newTags?: boolean
 }
+
+const NEW_TAGS_NOTE =
+  '\nMessages marked [새 태그] tagged the owner after the first request. Read them and cover what they ask in the plan too.'
 
 export function planPrompt(input: PlanInput): string {
   const task = input.task === '' ? '' : `The owner's own words for this repository: ${input.task}`
@@ -124,7 +129,12 @@ export function planPrompt(input: PlanInput): string {
     ownPlan === ''
       ? ''
       : `\nThe owner already wrote the plan below. Follow it: keep its approach and steps, check them against the code, fill in the files and checks, and list anything in it that does not fit the code under risks.\n${ownPlan}`
-  return renderPrompt(PLAN_TEMPLATE, { repo: input.repo, base: input.base, task: `${task}${guide}` }, input.thread)
+  const fresh = input.newTags === true ? NEW_TAGS_NOTE : ''
+  return renderPrompt(
+    PLAN_TEMPLATE,
+    { repo: input.repo, base: input.base, task: `${task}${guide}${fresh}` },
+    input.thread,
+  )
 }
 
 export function revisePrompt(instruction: string, thread: string): string {

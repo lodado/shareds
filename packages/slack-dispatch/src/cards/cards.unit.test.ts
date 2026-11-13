@@ -259,6 +259,21 @@ describe('buildRetagCard as a notice of a later tag', () => {
   it('to have no button when it does not', () => {
     expect(buttonsOf(buildRetagCard({ itemKey: KEY, text: '다시 태그됐어요', canReview: false }))).toStrictEqual([])
   })
+
+  it('to have a plan button first, as the main choice, for an item that still waits in a digest', () => {
+    const card = buildRetagCard({ itemKey: KEY, text: '다시 태그됐어요', canReview: true, canPlan: true })
+    const [plan, review] = buttonsOf(card)
+    expect(buttonsOf(card)).toHaveLength(2)
+    expect(plan).toStrictEqual({ action_id: 'item.plan:0', value: KEY, style: 'primary' })
+    expect(review?.action_id).toBe('item.review:0')
+    expect(review?.style).toBeUndefined()
+    expect(parseItemAction(click('item.plan:0', KEY))).toStrictEqual({
+      ok: true,
+      action: 'plan',
+      cardId: 0,
+      itemKey: KEY,
+    })
+  })
 })
 
 describe('buildReviewReport as the one message about a finished review', () => {

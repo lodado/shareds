@@ -5,7 +5,17 @@ import type { Store } from '../store/store'
 import type { IngestDeps, IngestSlack } from './ingest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SlackApiError } from '../slack/client'
-import { applyEvent, closeStore, getItem, listEvents, listItems, openStore } from '../store/store'
+import {
+  applyEvent,
+  closeStore,
+  getItem,
+  listEvents,
+  listItems,
+  openStore,
+  setReview,
+  setRunChoice,
+} from '../store/store'
+import { pendingInstruction, saveWorkspace, setPlan } from '../store/work'
 import { ingestMentions } from './ingest'
 
 const OWNER = 'U_OWNER'
@@ -703,6 +713,141 @@ describe('ingestMentions as the reader of a later tag in a thread it already kno
     const summary = listItems(deps.store)[0]?.meta.summary ?? ''
     expect(summary).toContain('fix the footer')
     expect(summary).not.toContain('the original post')
+  })
+})
+
+describe('ingestMentions as later tags in the thread of an item whose plan the owner has not approved', () => {
+  interface Replan {
+    deps: IngestDeps
+    fake: Fake
+    key: string
+    posts: number
+  }
+
+  // The item of the thread at offset 10, given `prepare` while it waits, moved on by `events`, with a plan written when
+  // `planned` is set; then the tags at the given offsets come in, all in one pass.
+  async function tagged(
+    events: readonly Parameters<typeof applyEvent>[2][],
+    planned: boolean,
+    offsets: number[],
+    prepare: (store: Store, key: string, deps: IngestDeps) => void = () => {},
+  ): Promise<Replan> {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const key = listItems(deps.store)[0]?.key ?? ''
+    // Run while the item still waits, where a choice of the owner is taken.
+    prepare(deps.store, key, deps)
+    for (const event of events) applyEvent(deps.store, key, event)
+    if (planned) {
+      saveWorkspace(deps.store, key, { sessionId: 's', path: '/wt/a', branch: 'dispatch-a', baseRef: 'origin/main' })
+      setPlan(deps.store, key, '1. 고친다')
+    }
+    const posts = fake.posted.length
+    for (const offset of offsets) matches.push(replyTag(offset, `이것도 해 주세요 ${offset}`))
+    clock.now = clockAt(600)
+    await ingestMentions(deps, real)
+    return { deps, fake, key, posts }
+  }
+
+  const TO_PLANNING = [{ type: 'approve', owner: true, card: 'assign', fresh: true }] as const
+  const TO_PLANNED = [...TO_PLANNING, { type: 'plan_ready', current: true }] as const
+  const replanRequests = (r: Replan) =>
+    listEvents(r.deps.store, { itemKey: r.key }).filter((event) => event.type === 'revise_text')
+
+  it('to ask for the waiting plan again once for all the tags of the pass, and say so in one DM', async () => {
+    const r = await tagged(TO_PLANNED, true, [500, 550])
+    expect(getItem(r.deps.store, r.key)?.stage).toBe('planning')
+    expect(replanRequests(r)).toHaveLength(1)
+    expect(pendingInstruction(r.deps.store, r.key)).toMatchObject({
+      text: 'The thread got 2 new messages tagging the owner since your plan, marked [새 태그]. Read them and revise the plan to answer what they ask.',
+      tags: [at(500), at(550)],
+    })
+    expect(r.fake.posted).toHaveLength(r.posts + 1)
+    expect(r.fake.posted.at(-1)?.text).toContain(
+      '쓰레드에 새 태그가 2개 달려서 반영해 플랜을 다시 짜요 (플랜 승인 대기)',
+    )
+    expect(JSON.stringify(r.fake.posted.at(-1)?.blocks)).not.toContain('item.plan')
+  })
+
+  it('to ask for a plan that is being written, without stopping it, so its answer is dropped for a newer one', async () => {
+    const r = await tagged(TO_PLANNING, false, [500])
+    expect(getItem(r.deps.store, r.key)?.stage).toBe('planning')
+    expect(pendingInstruction(r.deps.store, r.key)?.tags).toStrictEqual([at(500)])
+    expect(r.fake.posted.at(-1)?.text).toContain('쓰레드에 새 태그가 1개 달려서 반영해 플랜을 다시 짜요 (플랜 작성 중)')
+  })
+
+  it('to ask only once for the same tags when the DM about them could not be sent the first time', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = setupClocked(fake, clock)
+    await ingestMentions(deps, real)
+    const key = listItems(deps.store)[0]?.key ?? ''
+    for (const event of TO_PLANNING) applyEvent(deps.store, key, event)
+    matches.push(replyTag(500, '이것도요'))
+    clock.now = clockAt(600)
+    fake.failPost.on = true
+    await ingestMentions(deps, real)
+    fake.failPost.on = false
+    await ingestMentions(deps, real)
+    expect(listEvents(deps.store, { itemKey: key }).filter((event) => event.type === 'revise_text')).toHaveLength(1)
+    expect(fake.posted.at(-1)?.text).toContain('반영해 플랜을 다시 짜요')
+  })
+
+  it('to only tell the owner, with the plan left alone, once the plan was approved', async () => {
+    const r = await tagged([...TO_PLANNED, { type: 'approve', owner: true, card: 'plan', fresh: true }], true, [500])
+    expect(getItem(r.deps.store, r.key)?.stage).toBe('implementing')
+    expect(replanRequests(r)).toHaveLength(0)
+    expect(r.fake.posted.at(-1)?.text).toContain('진행 중인 항목의 쓰레드에서 다시 태그됐어요 (구현 중)')
+  })
+
+  it('to leave a review alone, since its plan step is the review of a pull request', async () => {
+    const review: ReviewMeta = {
+      prUrl: 'https://github.com/acme/web-app/pull/8',
+      slug: 'acme/web-app',
+      number: 8,
+      head: 'feature/x',
+      base: 'develop',
+      title: 'X',
+      manual: true,
+    }
+    const r = await tagged(TO_PLANNING, false, [500], (store, key) => {
+      setReview(store, key, review)
+    })
+    expect(replanRequests(r)).toHaveLength(0)
+    expect(r.fake.posted.at(-1)?.text).toContain('진행 중인 항목의 쓰레드에서 다시 태그됐어요 (플랜 작성 중)')
+  })
+
+  it('to leave a build from the digest plan alone, since it has no plan step to answer the tags', async () => {
+    const r = await tagged(TO_PLANNING, false, [500], (store, key) => {
+      expect(setRunChoice(store, key, { model: 'sonnet', direct: true })).toBe(true)
+    })
+    expect(replanRequests(r)).toHaveLength(0)
+    expect(r.fake.posted.at(-1)?.text).toContain('진행 중인 항목의 쓰레드에서 다시 태그됐어요 (플랜 작성 중)')
+  })
+
+  it('to keep a plan the owner can approve when the item has no money or tries left for another', async () => {
+    const asked: string[] = []
+    const r = await tagged(TO_PLANNED, true, [500], (_store, _key, deps) => {
+      deps.retriesLeft = (itemKey) => {
+        asked.push(itemKey)
+        return false
+      }
+    })
+    expect(asked).toStrictEqual([r.key])
+    expect(replanRequests(r)).toHaveLength(0)
+    expect(getItem(r.deps.store, r.key)?.stage).toBe('planned')
+    expect(r.fake.posted.at(-1)?.text).toContain('진행 중인 항목의 쓰레드에서 다시 태그됐어요')
+  })
+
+  it('to offer a button that plans from the whole thread for an item that still waits in a digest', async () => {
+    const r = await tagged([], false, [500])
+    expect(getItem(r.deps.store, r.key)?.stage).toBe('notified')
+    expect(replanRequests(r)).toHaveLength(0)
+    expect(JSON.stringify(r.fake.posted.at(-1)?.blocks)).toContain('item.plan:0')
   })
 })
 

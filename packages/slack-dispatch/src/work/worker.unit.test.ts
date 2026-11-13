@@ -88,6 +88,8 @@ interface Rig {
   openDmCalls: () => number
   // How many times the Slack thread of an item was read.
   threadReads: () => number
+  // The messages each read of a thread was asked to keep, in order.
+  threadFocus: (readonly string[])[]
   // The pull requests the worker asked the host about, in order.
   prAsks: string[]
   // What a review did on GitHub, in order: `readPr <url>`, `approve <url>`, `push <head>`, `merge <url> <oid>`, ...
@@ -241,6 +243,7 @@ function rig(options: RigOptions = {}): Rig {
   const order: string[] = []
   let openDmCalls = 0
   let threadReads = 0
+  const threadFocus: (readonly string[])[] = []
   const prAsks: string[] = []
   const github: string[] = []
   const run: Run = (file, args) => {
@@ -287,8 +290,9 @@ function rig(options: RigOptions = {}): Rig {
       },
     },
     repoPath: (repo) => Promise.resolve(repo === options.noRepo ? undefined : `/repos/${repo}`),
-    loadThread: () => {
+    loadThread: (_item, focus) => {
       threadReads += 1
+      threadFocus.push(focus ?? [])
       return Promise.resolve('thread text')
     },
     newSessionId: () => '11111111-1111-4111-8111-111111111111',
@@ -317,6 +321,7 @@ function rig(options: RigOptions = {}): Rig {
     qaInputs,
     openDmCalls: () => openDmCalls,
     threadReads: () => threadReads,
+    threadFocus,
     prAsks,
     github,
   }
@@ -816,6 +821,60 @@ function approved(r: Rig, n = 1, path = '/wt/a'): string {
 }
 
 const pass = (): Promise<AgentResult> => Promise.resolve(ok('Done.\nRESULT: PASS'))
+
+describe('worker as a plan asked for again by new tags in its thread', () => {
+  const RETAG = 'The thread got 1 new message tagging the owner since your plan, marked [새 태그].'
+  const retagRequest = (r: Rig, key: string): void => {
+    applyEvent(r.store, key, { type: 'revise', owner: true })
+    logEvent(r.store, {
+      itemKey: key,
+      kind: 'inbound',
+      type: 'revise_text',
+      payload: { text: `${RETAG} Read them and revise the plan.`, source: 'retag', tags: ['1730000500.000100'] },
+    })
+  }
+
+  it('to revise the waiting plan in the same session, reading the thread with the new tags kept', async () => {
+    const r = rig({ agent: (_call, index) => Promise.resolve(ok(index === 0 ? 'first plan' : 'second plan')) })
+    const key = item(r.store, 'web-app', TO_PLANNING)
+    await settle(r)
+    retagRequest(r, key)
+    await settle(r)
+    expect(r.calls[1]?.prompt).toContain(`asks for a change: ${RETAG}`)
+    expect(r.calls[1]).toMatchObject({ mode: 'plan', resume: true })
+    expect(r.threadFocus).toStrictEqual([[], ['1730000500.000100']])
+    expect(stageOf(r.store, key)).toBe('planned')
+    expect(r.posted).toHaveLength(2)
+  })
+
+  it('to drop the first plan under way without a card, and make a first plan again rather than a revision', async () => {
+    let release: (result: AgentResult) => void = (_result) => undefined
+    const r = rig({
+      agent: (_call, index) =>
+        index === 0
+          ? new Promise((resolve) => {
+              release = resolve
+            })
+          : Promise.resolve(ok('plan with the tags')),
+    })
+    const key = item(r.store, 'web-app', TO_PLANNING)
+    await r.worker.tick()
+    await until(() => r.calls.length === 1)
+    retagRequest(r, key)
+    release(ok('plan without the tags'))
+    // The first run has to end before the next tick can start another plan for the item.
+    await r.worker.idle()
+    await settle(r)
+    expect(listRuns(r.store, key)[0]).toMatchObject({ state: 'failed', detail: STOPPED_DETAIL, costUsd: 0.3 })
+    expect(r.calls).toHaveLength(2)
+    expect(r.calls[1]?.prompt).not.toContain('asks for a change')
+    expect(r.calls[1]?.prompt).toContain('Messages marked [새 태그] tagged the owner')
+    expect(r.calls[0]?.prompt).not.toContain('[새 태그]')
+    expect(r.threadFocus.at(-1)).toStrictEqual(['1730000500.000100'])
+    expect(getWorkspace(r.store, key)?.plan).toBe('plan with the tags')
+    expect(r.posted).toHaveLength(1)
+  })
+})
 
 describe('worker as the owner who asks for a change while the plan card is being posted', () => {
   it('to be a plan the machine refuses as stale, made again at once from the request', async () => {
