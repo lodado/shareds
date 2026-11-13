@@ -364,7 +364,7 @@ export function terminateProcess(pid: number): void {
   }
 }
 
-export interface PruneDeps {
+interface PruneDeps {
   runsDir: string
   now: () => number
   // How long a finished run's folder (it holds the prompt, so Slack text) is kept.
@@ -392,7 +392,7 @@ function runFolders(deps: PruneDeps): string[] {
 }
 
 // Removes the folders of runs over for longer than `keepMs`.
-export function pruneTabRuns(deps: PruneDeps): void {
+function pruneTabRuns(deps: PruneDeps): void {
   for (const dir of runFolders(deps)) {
     try {
       const exitPath = join(dir, 'exit')
