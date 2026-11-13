@@ -57,8 +57,6 @@ export interface ReviewKit {
     result: AgentResult,
     asked: { routes: readonly string[]; spec: string | null },
   ) => Promise<QaOutcome>
-  showLive: (itemKey: string, path: string) => Promise<string | undefined>
-  hideLive: (itemKey: string, handle: string | undefined) => Promise<void>
   assertActive: (info: RunInfo) => void
   // The merges in progress, shared with the buttons: the owner cannot call off an item while it is being merged.
   locks: Set<string>
@@ -379,12 +377,7 @@ export async function fixJob(kit: ReviewKit, info: RunInfo, review: ReviewMeta):
   } else {
     // Somebody else's package.json: its install scripts are not run.
     await installDependencies(run, workspace.path, info.signal, undefined, { ignoreScripts: true })
-    const live = await kit.showLive(item.key, workspace.path)
-    try {
-      outcome = await runFix(kit, info, workspace, found)
-    } finally {
-      await kit.hideLive(item.key, live)
-    }
+    outcome = await runFix(kit, info, workspace, found)
   }
   if (outcome === null) return
   try {
@@ -399,11 +392,7 @@ export async function fixJob(kit: ReviewKit, info: RunInfo, review: ReviewMeta):
 const SAFE_LINK = /^https:\/\/[^\s<>|]+$/
 
 // The one message the owner gets about a review that is over.
-async function tellReview(
-  kit: ReviewKit,
-  itemKey: string,
-  result: { merged: boolean; reason: string },
-): Promise<void> {
+async function tellReview(kit: ReviewKit, itemKey: string, result: { merged: boolean; reason: string }): Promise<void> {
   const { store } = kit.deps
   const item = getItem(store, itemKey)
   const review = item?.meta.review

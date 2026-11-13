@@ -6,8 +6,19 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
+import { setTimeout as sleep } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 import { createClaudeAgent } from '../agent/claude.ts'
-import { loadBaseBranches, loadChannelRepos, loadConfig, loadJiraProjectRepos, loadJiraSettings, loadTokens, parseJiraProjectRepos } from '../config/config.ts'
+import { createTabAgent, processAlive, reapTabRuns, terminateProcess } from '../agent/tab.ts'
+import {
+  loadBaseBranches,
+  loadChannelRepos,
+  loadConfig,
+  loadJiraProjectRepos,
+  loadJiraSettings,
+  loadTokens,
+  parseJiraProjectRepos,
+} from '../config/config.ts'
 import { run } from '../exec/exec.ts'
 import { createJiraIssueTracker } from '../infra/jira.ts'
 import { createDevServerStarter } from '../qa/devserver.ts'
@@ -22,6 +33,9 @@ import { acquireLock } from './lock.ts'
 type Env = Readonly<Record<string, string | undefined>>
 
 const PRIVATE_DIR_MODE = 0o700
+// A finished run's folder holds its prompt, so Slack text; it is removed after a week.
+const RUN_FOLDER_KEEP_MS = 7 * 24 * 60 * 60 * 1000
+const VIEWER_PATH = fileURLToPath(new URL('../../scripts/stream-view.mjs', import.meta.url))
 
 function logLine(event: string, detail?: unknown): void {
   const text = detail === undefined ? '' : ` ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
@@ -41,6 +55,38 @@ export async function startApp(env: Env): Promise<App> {
     const slack = createSlackClient(tokens)
     const ownerId = config.ownerId ?? (await slack.authUserId())
     const agent = createClaudeAgent(run)
+    const runsDir = join(config.stateDir, 'runs')
+    mkdirSync(runsDir, { recursive: true, mode: PRIVATE_DIR_MODE })
+    const tabProblem = (what: string, error: unknown): void => {
+      logLine(`agent_tab_${what}_failed`, error instanceof Error ? error.message : String(error))
+    }
+    // Runs the last service left in Orca tabs would go on spending: stopped before anything else starts.
+    const reaped = await reapTabRuns({
+      run,
+      runsDir,
+      now: Date.now,
+      terminate: terminateProcess,
+      keepMs: RUN_FOLDER_KEEP_MS,
+      onProblem: tabProblem,
+    })
+    if (reaped > 0) logLine('tab_runs_stopped', { count: reaped })
+    const workAgent = createTabAgent({
+      run,
+      runsDir,
+      keepMs: RUN_FOLDER_KEEP_MS,
+      nodePath: process.execPath,
+      viewerPath: VIEWER_PATH,
+      env: process.env,
+      fallback: agent,
+      newRunId: () => `${String(Date.now())}-${randomUUID().slice(0, 8)}`,
+      now: Date.now,
+      sleep: async (ms) => {
+        await sleep(ms)
+      },
+      alive: processAlive,
+      terminate: terminateProcess,
+      onTabProblem: tabProblem,
+    })
     const jira = await loadJiraSettings(env, run)
     const qaDir = join(config.stateDir, 'qa')
     mkdirSync(qaDir, { recursive: true, mode: PRIVATE_DIR_MODE })
@@ -68,6 +114,7 @@ export async function startApp(env: Env): Promise<App> {
       slack,
       run,
       agent,
+      workAgent,
       qa,
       statusPort: config.statusPort,
       store: openStore(config.dbPath),

@@ -55,6 +55,24 @@ export class AgentAborted extends Error {
   }
 }
 
+// `continued`: Ctrl+C, and the tab now has the session open for the owner. `ended`: the tab closed, or claude was
+// stopped before it started, so there is no session in the tab to go on with.
+export type TabStopReason = 'continued' | 'ended'
+
+// The owner stopped the run in the terminal tab it ran in. Like a stop from Slack, with what the run had spent when
+// claude still reported it.
+export class AgentStoppedInTab extends AgentAborted {
+  readonly costUsd: number | undefined
+  readonly reason: TabStopReason
+
+  constructor(costUsd: number | undefined, reason: TabStopReason) {
+    super()
+    this.name = 'AgentStoppedInTab'
+    this.costUsd = costUsd
+    this.reason = reason
+  }
+}
+
 const READ_TOOLS = ['Read', 'Glob', 'Grep']
 
 // What a build may run without asking: edit files, run the repository's own checks, and commit. Anything else would
@@ -146,11 +164,13 @@ const toolNames = (tools: readonly string[]): string[] => [
 const setupFlags = (call: AgentCall): string[] =>
   call.ownSetup === true ? [] : ['--safe-mode', '--restricted', '--tools', toolNames(MODE_TOOLS[call.mode]).join(',')]
 
-export function claudeArgs(call: AgentCall): string[] {
+// `stream-json` prints every message as it comes, one JSON object a line, and ends with the same result object.
+export function claudeArgs(call: AgentCall, output: 'json' | 'stream-json' = 'json'): string[] {
   return [
     '-p',
     '--output-format',
-    'json',
+    output,
+    ...(output === 'stream-json' ? ['--verbose'] : []),
     '--model',
     call.model,
     '--max-budget-usd',
@@ -176,7 +196,22 @@ export function parseAgentOutput(stdout: string): AgentResult | null {
   } catch {
     return null
   }
-  const events: unknown[] = Array.isArray(parsed) ? parsed : [parsed]
+  return resultOf(Array.isArray(parsed) ? parsed : [parsed])
+}
+
+// The output of `--output-format stream-json`: one event a line. A line cut off by a stop is left out.
+export function parseStreamOutput(text: string): AgentResult | null {
+  const events = text.split('\n').flatMap((line): unknown[] => {
+    try {
+      return [JSON.parse(line)]
+    } catch {
+      return []
+    }
+  })
+  return resultOf(events)
+}
+
+function resultOf(events: readonly unknown[]): AgentResult | null {
   const entry = events.findLast((event) => isRecord(event) && event.type === 'result')
   if (!isRecord(entry)) return null
   const subtype = typeof entry.subtype === 'string' ? entry.subtype : 'unknown'
@@ -191,6 +226,14 @@ export function parseAgentOutput(stdout: string): AgentResult | null {
 // What claude says on standard error when the session id does not match what is on disk.
 const ALREADY_IN_USE = /is already in use/i
 const NOT_FOUND = /no conversation found/i
+
+// A first call that died after claude saved the session, or a resume of a session that was never saved: the session on
+// disk, not our bookkeeping, has the last word, so the call is made once more the other way.
+export function switchedSession(call: AgentCall, stderr: string): AgentCall | undefined {
+  if (!call.resume && ALREADY_IN_USE.test(stderr)) return { ...call, resume: true }
+  if (call.resume && NOT_FOUND.test(stderr)) return { ...call, resume: false }
+  return undefined
+}
 
 export function createClaudeAgent(run: Run): Agent {
   async function attempt(call: AgentCall, mayRetry: boolean): Promise<AgentResult> {
@@ -212,11 +255,8 @@ export function createClaudeAgent(run: Run): Agent {
     } catch (error) {
       if (wasStopped()) throw new AgentAborted()
       if (!(error instanceof CommandError)) throw error
-      // A first call that died after claude saved the session, or a resume of a session that was never saved: the
-      // session on disk, not our bookkeeping, has the last word, so switch once.
-      if (mayRetry && !call.resume && ALREADY_IN_USE.test(error.stderr))
-        return attempt({ ...call, resume: true }, false)
-      if (mayRetry && call.resume && NOT_FOUND.test(error.stderr)) return attempt({ ...call, resume: false }, false)
+      const switched = mayRetry ? switchedSession(call, error.stderr) : undefined
+      if (switched !== undefined) return attempt(switched, false)
       // claude exits non-zero when a budget or turn limit stops it, but still reports the cost on standard output.
       const reported = parseAgentOutput(error.stdout)
       if (reported !== null) return { ...reported, ok: false }

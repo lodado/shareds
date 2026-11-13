@@ -4,7 +4,7 @@
 // only writes the plan and the change, and its own report is taken as its word. Items run in parallel, within the
 // caps.
 
-import type { Agent, AgentModel, AgentResult } from '../agent/claude.ts'
+import type { Agent, AgentModel, AgentResult, TabStopReason } from '../agent/claude.ts'
 import type { BuildInput } from '../agent/prompts.ts'
 import type { DigestMessage } from '../digest/digest.ts'
 import type { Run } from '../exec/exec.ts'
@@ -14,7 +14,7 @@ import type { SlackClient } from '../slack/client.ts'
 import type { ItemRow, Store } from '../store/store.ts'
 import type { WorkspaceRow } from '../store/work.ts'
 import type { ReviewGithub, ReviewKit } from './review-work.ts'
-import { AgentAborted, DEFAULT_MODEL } from '../agent/claude.ts'
+import { AgentAborted, AgentStoppedInTab, DEFAULT_MODEL } from '../agent/claude.ts'
 import {
   buildPrompt,
   parseBuildResult,
@@ -34,11 +34,9 @@ import {
 } from '../cards/cards.ts'
 import { openPr, pushBranch } from '../github/github.ts'
 import {
-  closeLiveView,
   commitProblem,
   createWorktree,
   installDependencies,
-  openLiveView,
   removeWorktree,
   resolveBaseBranch,
   setWorkspaceStatus,
@@ -128,6 +126,12 @@ const MIN_RUN_BUDGET_USD = 0.25
 // What a run the owner stopped is charged, as a part of its budget: what it cost is unknown, and a revise loop must
 // still run into the spending cap.
 const STOPPED_CHARGE = 0.25
+const STOPPED_IN_TAB: Readonly<Record<TabStopReason, string>> = {
+  continued:
+    'Orca 탭에서 멈췄어요. 같은 탭에서 세션을 이어서 직접 작업할 수 있어요. 봇에게 다시 맡기려면 카드의 다시 시도를 눌러요.',
+  ended:
+    'Orca 탭이 닫히거나 Claude가 시작하기 전에 멈춰서 run이 끝났어요. 봇에게 다시 맡기려면 카드의 다시 시도를 눌러요.',
+}
 const CLEANUP_RETRY_MS = 5 * 60_000
 // How often an open pull request is asked about. Only the items waiting in pr_open are, so this stays a few calls.
 const PR_CHECK_MS = 10 * 60_000
@@ -388,8 +392,6 @@ const kitOf = (ctx: Ctx): ReviewKit => ({
   failRun: (info, result, reason) => failRun(ctx, info, result, reason),
   syncBoard: (itemKey) => syncBoard(ctx, itemKey),
   checkVisually: (info, workspace, result, asked) => checkVisually(ctx, info, workspace, result, asked),
-  showLive: (itemKey, path) => showLive(ctx, itemKey, path),
-  hideLive: (itemKey, handle) => hideLive(ctx, itemKey, handle),
   assertActive: (info) => {
     assertActive(ctx, info)
   },
@@ -648,36 +650,6 @@ async function buildInput(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow): Pro
   }
 }
 
-// A terminal tab in Orca that shows what the build changes. Only a convenience, so a failure is logged and nothing more.
-async function showLive(ctx: Ctx, itemKey: string, path: string): Promise<string | undefined> {
-  try {
-    return await openLiveView(ctx.deps.run, path)
-  } catch (error) {
-    logEvent(ctx.deps.store, {
-      itemKey,
-      kind: 'system',
-      type: 'live_view_failed',
-      payload: { error: errorText(error) },
-    })
-    return undefined
-  }
-}
-
-// The tab is closed when the build is over: left open it would keep refreshing, and a retry would add a second one.
-async function hideLive(ctx: Ctx, itemKey: string, handle: string | undefined): Promise<void> {
-  if (handle === undefined) return
-  try {
-    await closeLiveView(ctx.deps.run, handle)
-  } catch (error) {
-    logEvent(ctx.deps.store, {
-      itemKey,
-      kind: 'system',
-      type: 'live_view_close_failed',
-      payload: { error: errorText(error) },
-    })
-  }
-}
-
 async function buildAndDeliver(ctx: Ctx, info: RunInfo, workspace: WorkspaceRow): Promise<void> {
   const { store, run, agent, config } = ctx.deps
   const { item } = info
@@ -729,12 +701,17 @@ async function buildJob(ctx: Ctx, info: RunInfo): Promise<void> {
   if (workspace === undefined) throw new Error(`item ${item.key} has no workspace`)
   // The worktree has the repository's files but not its installed packages; the build and the QA both need them.
   await installDependencies(run, workspace.path, info.signal)
-  const live = await showLive(ctx, item.key, workspace.path)
-  try {
-    await buildAndDeliver(ctx, info, workspace)
-  } finally {
-    await hideLive(ctx, item.key, live)
-  }
+  await buildAndDeliver(ctx, info, workspace)
+}
+
+// The owner pressed Ctrl+C in the tab the run was in, or closed it: an owner's stop, so no try is used up. After a
+// Ctrl+C the session is theirs to go on with in that tab. The item fails like a run that could not finish, with the card
+// that lets the bot try again.
+async function stoppedInTab(ctx: Ctx, info: RunInfo, stop: AgentStoppedInTab): Promise<void> {
+  const { store } = ctx.deps
+  const charged = info.free === true ? 0 : stop.costUsd ?? info.costUsd ?? info.budget * STOPPED_CHARGE
+  endRun(store, info.runId, { type: 'cancel' }, { costUsd: charged, detail: STOPPED_DETAIL })
+  await failItem(ctx, info.item.key, STOPPED_IN_TAB[stop.reason])
 }
 
 async function runJob(ctx: Ctx, info: RunInfo): Promise<void> {
@@ -742,6 +719,10 @@ async function runJob(ctx: Ctx, info: RunInfo): Promise<void> {
   try {
     await (info.kind === 'plan' ? planJob(ctx, info) : buildJob(ctx, info))
   } catch (error) {
+    if (error instanceof AgentStoppedInTab) {
+      await stoppedInTab(ctx, info, error)
+      return
+    }
     if (error instanceof AgentAborted) {
       const costUsd = info.costUsd ?? info.budget * STOPPED_CHARGE
       endRun(store, info.runId, { type: 'cancel' }, { costUsd, detail: STOPPED_DETAIL })

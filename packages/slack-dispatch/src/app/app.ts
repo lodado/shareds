@@ -46,6 +46,8 @@ export interface AppDeps {
   slack: SlackClient
   run: Run
   agent: Agent
+  // The agent of the plan, build and review runs, which work in an Orca worktree; `agent` when left out.
+  workAgent?: Agent
   store: Store
   newSessionId: () => string
   now: () => Date
@@ -198,7 +200,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
   const worker = createWorker({
     store,
     run,
-    agent: deps.agent,
+    agent: deps.workAgent ?? deps.agent,
     slack,
     ownerId,
     config: settings,
