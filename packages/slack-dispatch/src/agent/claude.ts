@@ -73,6 +73,15 @@ export class AgentStoppedInTab extends AgentAborted {
   }
 }
 
+// A claude of the same session is running already, most likely the one the owner went on with in an Orca tab after a
+// Ctrl+C. Two of them would write the same session and the same worktree, so the run did not start and spent nothing.
+export class AgentSessionBusy extends Error {
+  constructor() {
+    super('a claude of this session is running already')
+    this.name = 'AgentSessionBusy'
+  }
+}
+
 const READ_TOOLS = ['Read', 'Glob', 'Grep']
 
 // What a build may run without asking: edit files, run the repository's own checks, and commit. Anything else would

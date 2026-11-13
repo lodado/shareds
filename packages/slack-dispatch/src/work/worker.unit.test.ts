@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AgentAborted, AgentStoppedInTab } from '../agent/claude'
+import { AgentAborted, AgentSessionBusy, AgentStoppedInTab } from '../agent/claude'
 import { CommandError } from '../exec/exec'
 import { NO_HOOKS } from '../github/github'
 import { worktreeNameFor } from '../orca/worktree'
@@ -136,6 +136,8 @@ interface RigOptions {
   fixedHead?: string
   // Runs inside the read of the checks, before it answers.
   onGate?: () => void
+  // Whether a claude of the asked session runs now (the owner's, after a Ctrl+C); never when not given.
+  sessionBusy?: () => boolean
   // The merges in progress, as the buttons hold them.
   mergeLocks?: Set<string>
 }
@@ -309,6 +311,7 @@ function rig(options: RigOptions = {}): Rig {
       return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer)
     },
     github: fakeGithub(options, github),
+    sessionBusy: () => Promise.resolve(options.sessionBusy?.() === true),
     ...(options.mergeLocks === undefined ? {} : { mergeLocks: options.mergeLocks }),
   })
   return {
@@ -1591,6 +1594,27 @@ describe('worker as a run the owner stopped with Ctrl+C in its Orca tab', () => 
     expect(stageOf(r.store, key)).toBe('failed')
   })
 
+  it('to start nothing, charge nothing and use no try while the owner still has the session open, and say what to close', async () => {
+    const r = rig({ agent: () => Promise.reject(new AgentSessionBusy()) })
+    const key = item(r.store, 'web-app', TO_PLANNING)
+    await settle(r)
+    expect(listRuns(r.store, key)).toMatchObject([{ state: 'failed', detail: STOPPED_DETAIL, costUsd: 0 }])
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(retriesLeft(r.store, key, { maxAttempts: 1, maxCostPerItemUsd: CONFIG.maxCostPerItemUsd })).toBe(true)
+    expect(JSON.stringify(r.posted[0]?.blocks)).toContain('Orca 탭에서 이어 하던 Claude를 끝낸 뒤')
+    expect(buttonIds(r.posted[0]?.blocks)).toStrictEqual(['item.retry:0'])
+  })
+
+  it('to leave the worktree as it is, no install and no agent, when the build finds the session still open', async () => {
+    const r = rig({ sessionBusy: () => true })
+    const key = approvedInWorktree(r)
+    await settle(r)
+    expect(r.commands.filter((line) => line.includes('install'))).toStrictEqual([])
+    expect(r.calls).toStrictEqual([])
+    expect(listRuns(r.store, key).at(-1)).toMatchObject({ state: 'failed', detail: STOPPED_DETAIL, costUsd: 0 })
+    expect(JSON.stringify(r.posted[0]?.blocks)).toContain('Orca 탭에서 이어 하던 Claude를 끝낸 뒤')
+  })
+
   it('to not offer the session in the tab when the tab closed and there is none to go on with', async () => {
     const r = rig({ agent: () => Promise.reject(new AgentStoppedInTab(undefined, 'ended')) })
     item(r.store, 'web-app', TO_PLANNING)
@@ -1871,6 +1895,30 @@ describe('worker as a review item in planning', () => {
     expect(pushes(r)).toHaveLength(0)
     expect(approvals(r)).toHaveLength(0)
     expect(r.posted).toHaveLength(0)
+  })
+
+  it('to reset nothing in the worktree of an earlier try while its session is still open, and say what to close', async () => {
+    const r = reviewRig({ sessionBusy: () => true })
+    const key = reviewItem(r)
+    saveWorkspace(r.store, key, { sessionId: 's', path: '/wt/review', branch: 'dispatch-r', baseRef: 'origin/develop' })
+    await settle(r)
+    expect(r.commands.filter((line) => line.includes('reset --hard') || line.includes('fetch'))).toStrictEqual([])
+    expect(r.calls).toStrictEqual([])
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(listRuns(r.store, key).at(-1)).toMatchObject({ detail: STOPPED_DETAIL, costUsd: 0 })
+  })
+
+  it('to fix nothing while the session of the review is still open', async () => {
+    let busy = false
+    const r = reviewRig({ sessionBusy: () => busy })
+    const key = reviewItem(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('implementing')
+    busy = true
+    await settle(r)
+    expect(r.calls.map((call) => call.mode)).toStrictEqual(['plan'])
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(listRuns(r.store, key).at(-1)).toMatchObject({ detail: STOPPED_DETAIL, costUsd: 0 })
   })
 
   it('to be declined with a note to the owner and no agent when the pull request was merged already', async () => {

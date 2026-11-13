@@ -48,6 +48,8 @@ export interface AppDeps {
   agent: Agent
   // The agent of the plan, build and review runs, which work in an Orca worktree; `agent` when left out.
   workAgent?: Agent
+  // Whether a claude of an item's session runs now; asked before a job touches the item's worktree.
+  sessionBusy?: (sessionId: string) => Promise<boolean>
   store: Store
   newSessionId: () => string
   now: () => Date
@@ -201,6 +203,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
     store,
     run,
     agent: deps.workAgent ?? deps.agent,
+    ...(deps.sessionBusy === undefined ? {} : { sessionBusy: deps.sessionBusy }),
     slack,
     ownerId,
     config: settings,

@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AgentAborted, AgentStoppedInTab } from './claude'
+import { AgentAborted, AgentSessionBusy, AgentStoppedInTab } from './claude'
 import { createTabAgent, reapTabRuns, shellQuote, tabScript } from './tab'
 
 const SESSION = '0b6a6a50-3e51-4c93-9a0a-0d1c2a3b4c5d'
@@ -83,7 +83,13 @@ interface RigOptions {
   alive?: boolean
   env?: Record<string, string>
   startAt?: number
+  // What `ps` lists, one command line a line.
+  processes?: string
+  psFails?: boolean
 }
+
+// What `ps` lists on a Mac where no claude of the session runs.
+const OTHER_PROCESSES = '/sbin/launchd\n/usr/bin/vim notes.txt\n'
 
 function rig(tab: Tab, options: RigOptions = {}): Rig {
   const runsDir = folder()
@@ -97,6 +103,10 @@ function rig(tab: Tab, options: RigOptions = {}): Rig {
     runsDir,
   }
   const run: Run = (file, args) => {
+    if (file === 'ps') {
+      if (options.psFails === true) return Promise.reject(new Error('ps: not found'))
+      return Promise.resolve({ stdout: options.processes ?? OTHER_PROCESSES, stderr: '' })
+    }
     if (file !== 'orca') return Promise.reject(new Error(`unexpected ${file}`))
     if (args[1] === 'close') {
       r.closes.push([...args])
@@ -393,6 +403,35 @@ describe('createTabAgent as a run in an Orca tab of its worktree', () => {
       costUsd: 0,
       subtype: 'process_failed',
     })
+  })
+
+  it.each([
+    ['the session the owner went on with in the tab', `62450 claude --resume ${SESSION} --safe-mode\n`],
+    ['a run of the bot still on that session', `  731 claude -p --output-format stream-json --session-id ${SESSION}\n`],
+    ['a claude that node runs', `812 /opt/node/bin/node /opt/lib/claude-code/cli.js --resume=${SESSION}\n`],
+  ])('to start nothing, and spend nothing, while a claude of the same session runs: %s', async (_name, claude) => {
+    const r = rig({ open: finishing(result('ok', 0.1), '0 0') }, { processes: OTHER_PROCESSES + claude })
+    await expect(r.agent(call())).rejects.toBeInstanceOf(AgentSessionBusy)
+    expect(r.creates).toStrictEqual([])
+    expect(r.fallbacks).toStrictEqual([])
+    expect(r.problems).toStrictEqual(['session_busy'])
+  })
+
+  it.each([
+    ['a claude of another session', 'claude --resume 11111111-1111-4111-8111-111111111111'],
+    ['a script in that session scratchpad', `bash /private/tmp/claude-501/proj/${SESSION}/scratchpad/dev.sh`],
+    ['a shell that names the session', `/bin/zsh -c source ~/.claude/snap.sh && export CLAUDE_SESSION='${SESSION}'`],
+    ['a dev server logging there', `node /wt/node_modules/.bin/next dev --log /tmp/claude-501/${SESSION}/dev.log`],
+    ['another program given the session as a flag', `node /wt/scripts/replay.mjs --session-id ${SESSION}`],
+  ])('to run as usual while only %s runs', async (_name, command) => {
+    const r = rig({ open: finishing(result('ok', 0.1), '0 0') }, { processes: `${OTHER_PROCESSES}900 ${command}\n` })
+    expect(await r.agent(call())).toMatchObject({ ok: true, text: 'ok' })
+  })
+
+  it('to run as usual, and say so, when it cannot list the processes', async () => {
+    const r = rig({ open: finishing(result('ok', 0.1), '0 0') }, { psFails: true })
+    expect(await r.agent(call())).toMatchObject({ ok: true, text: 'ok' })
+    expect(r.problems).toStrictEqual(['ps'])
   })
 
   it('to remove the folders of runs over for longer than it keeps them when it starts a run', async () => {
