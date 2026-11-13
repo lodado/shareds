@@ -1,6 +1,18 @@
 import type { Run } from '../exec/exec'
 import { describe, expect, it } from 'vitest'
-import { mergePr, openPr, parseGate, pushBranch, readGate, readPrState } from './github'
+import {
+  approvePr,
+  mergePr,
+  openPr,
+  parseGate,
+  pushBranch,
+  pushToPrBranch,
+  readGate,
+  readLogin,
+  readPrInfo,
+  readPrState,
+  readReviewGate,
+} from './github'
 
 type Call = [string, readonly string[], string | undefined]
 
@@ -162,5 +174,68 @@ describe('readPrState as what the host says about a pull request', () => {
   it('to be an error for an answer that is not JSON', async () => {
     const { run } = recording('not json')
     await expect(readPrState(run, PR)).rejects.toThrow()
+  })
+})
+
+describe('the calls a review makes to gh and git', () => {
+  it('to approve exactly one commit with no text, as the signed-in user', async () => {
+    const { run, calls } = recording()
+    await approvePr(run, 'acme/web-app', 7, 'b'.repeat(40))
+    expect(calls).toStrictEqual([
+      [
+        'gh',
+        [
+          'api',
+          '--method',
+          'POST',
+          'repos/acme/web-app/pulls/7/reviews',
+          '-f',
+          'event=APPROVE',
+          '-f',
+          `commit_id=${'b'.repeat(40)}`,
+        ],
+        undefined,
+      ],
+    ])
+  })
+
+  it.each([
+    ['a slug with a space', 'acme/web app', 7, 'b'.repeat(40)],
+    ['no number', 'acme/web-app', 0, 'b'.repeat(40)],
+    ['a short commit', 'acme/web-app', 7, 'b'.repeat(39)],
+  ])('to be refused, with nothing run, for %s', async (_name, slug, number, commit) => {
+    const { run, calls } = recording()
+    await expect(approvePr(run, slug, number, commit)).rejects.toThrow('not a pull request and commit to approve')
+    expect(calls).toHaveLength(0)
+  })
+
+  it("to push the fixes onto the pull request branch, never forced, with the repository's hooks off", async () => {
+    const seen: [readonly string[], Readonly<Record<string, string>> | undefined][] = []
+    const run: Run = (_file, args, options) => {
+      seen.push([args, options?.env])
+      return Promise.resolve({ stdout: '', stderr: '' })
+    }
+    await pushToPrBranch(run, '/work/wt', 'feature/login')
+    expect(seen).toStrictEqual([
+      [
+        ['-C', '/work/wt', 'push', 'origin', 'HEAD:refs/heads/feature/login'],
+        { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: '/dev/null' },
+      ],
+    ])
+  })
+
+  it('to read the pull request and its checks with the fields the parsers know', async () => {
+    const { run, calls } = recording('{}')
+    await readPrInfo(run, PR)
+    await readReviewGate(run, PR)
+    expect(calls.map(([, args]) => args.at(-1))).toStrictEqual([
+      'url,state,isDraft,author,reviewRequests,isCrossRepository,headRefName,headRefOid,baseRefName,title,body',
+      'state,statusCheckRollup,reviewDecision,headRefOid',
+    ])
+  })
+
+  it('to be the login gh signs in as, and an error for anything that is not a login', async () => {
+    expect(await readLogin(recording('owner-login\n').run)).toBe('owner-login')
+    await expect(readLogin(recording('not a login\n').run)).rejects.toThrow('gh api user did not print a login')
   })
 })

@@ -3,7 +3,9 @@ import type { Run } from '../exec/exec'
 import type { PrState } from '../github/github'
 import type { ItemEvent } from '../machine/machine'
 import type { QaInput, QaOutcome } from '../qa/qa'
+import type { PrInfo, ReviewGate, ReviewMeta } from '../review/review'
 import type { ItemMeta, Store } from '../store/store'
+import type { ReviewGithub } from './review-work'
 import type { WorkerConfig } from './worker'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,7 +13,10 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AgentAborted } from '../agent/claude'
 import { CommandError } from '../exec/exec'
+import { NO_HOOKS } from '../github/github'
 import { worktreeNameFor } from '../orca/worktree'
+import { mergeLockOf } from '../review/review'
+import { createReviewItem } from '../review/start'
 import {
   applyEvent,
   closeStore,
@@ -85,6 +90,8 @@ interface Rig {
   threadReads: () => number
   // The pull requests the worker asked the host about, in order.
   prAsks: string[]
+  // What a review did on GitHub, in order: `readPr <url>`, `approve <url>`, `push <head>`, `merge <url> <oid>`, ...
+  github: string[]
 }
 
 interface RigOptions {
@@ -114,6 +121,49 @@ interface RigOptions {
   openDmFailures?: number
   // What Visual QA answers; skipped when not given.
   qa?: (input: QaInput) => Promise<QaOutcome>
+  // What GitHub says about the pull request under review, over an open one of a teammate.
+  pr?: Partial<PrInfo>
+  // What GitHub says about the checks of the pull request under review; passing, at the pushed commit, when not given.
+  gate?: Partial<ReviewGate>
+  // What GitHub says about the pull request at the n-th read (counted from 0), over `pr`.
+  prByRead?: readonly Partial<PrInfo>[]
+  // The GitHub calls of a review that fail.
+  githubFails?: readonly (keyof ReviewGithub)[]
+  // The commit a fixing agent leaves: `git rev-parse HEAD` prints it once a build ran and made a commit, and GitHub
+  // shows it as the head once it was pushed.
+  fixedHead?: string
+  // Runs inside the read of the checks, before it answers.
+  onGate?: () => void
+  // The merges in progress, as the buttons hold them.
+  mergeLocks?: Set<string>
+}
+
+// The pull request a review item is about, and the commit at its head.
+const PR_HEAD = 'a'.repeat(40)
+// The commit the fixing agent of a review leaves on top of it.
+const FIXED_HEAD = 'f'.repeat(40)
+const REVIEW_PR = 'https://github.com/acme/web-app/pull/7'
+const REVIEW: ReviewMeta = {
+  prUrl: REVIEW_PR,
+  slug: 'acme/web-app',
+  number: 7,
+  head: 'feature/login',
+  base: 'develop',
+  title: 'Add login',
+  manual: false,
+}
+const OPEN_PR: PrInfo = {
+  url: REVIEW_PR,
+  state: 'OPEN',
+  isDraft: false,
+  author: 'teammate',
+  reviewRequests: [],
+  isCrossRepository: false,
+  headRefName: 'feature/login',
+  headRefOid: PR_HEAD,
+  baseRefName: 'develop',
+  title: 'Add login',
+  body: 'please review',
 }
 
 // What the commands of orca, git and gh print in the rig, as far as the worker reads them.
@@ -136,7 +186,49 @@ function commandOutput(line: string, args: readonly string[], options: RigOption
     return nothingNew ? '0\n' : '1\n'
   }
   if (line.includes('pr create')) return `${PR_URL}\n`
+  if (line.includes('remote get-url')) return 'https://github.com/acme/web-app.git\n'
+  if (line.includes(' diff ')) return 'diff --git a/a.ts b/a.ts\n+const x = 1\n'
   return ''
+}
+
+function fakeGithub(options: RigOptions, calls: string[]): ReviewGithub {
+  const answer = <T>(name: keyof ReviewGithub, line: string, value: T): Promise<T> => {
+    calls.push(line)
+    if (options.githubFails?.includes(name) === true) return Promise.reject(new Error(`${name} failed`))
+    return Promise.resolve(value)
+  }
+  // The head of the pull request on GitHub: what the bot pushed, once it did.
+  let head = PR_HEAD
+  let reads = 0
+  return {
+    readPr: (url) => {
+      reads += 1
+      return answer('readPr', `readPr ${url}`, {
+        ...OPEN_PR,
+        headRefOid: head,
+        ...options.pr,
+        ...options.prByRead?.[reads - 1],
+      })
+    },
+    readGate: (url) => {
+      options.onGate?.()
+      return answer('readGate', `readGate ${url}`, {
+        state: 'OPEN',
+        ci: 'pass',
+        decision: '',
+        headOid: head,
+        ...options.gate,
+      })
+    },
+    approve: (review, oid) => answer('approve', `approve ${review.prUrl} ${oid}`, undefined),
+    merge: (url, oid) => answer('merge', `merge ${url} ${oid}`, undefined),
+    push: (path, branch) => {
+      const pushed = answer('push', `push ${path} ${branch}`, undefined)
+      if (options.githubFails?.includes('push') !== true) head = options.fixedHead ?? head
+      return pushed
+    },
+    ownerLogin: () => answer('ownerLogin', 'ownerLogin', 'owner-login'),
+  }
 }
 
 function rig(options: RigOptions = {}): Rig {
@@ -150,6 +242,7 @@ function rig(options: RigOptions = {}): Rig {
   let openDmCalls = 0
   let threadReads = 0
   const prAsks: string[] = []
+  const github: string[] = []
   const run: Run = (file, args) => {
     const line = `${file} ${args.join(' ')}`
     commands.push(line)
@@ -160,6 +253,10 @@ function rig(options: RigOptions = {}): Rig {
     }
     if (options.noUpstream === true && line.includes('@{upstream}')) {
       return Promise.reject(new CommandError(file, 128, 'no upstream configured'))
+    }
+    if (line.includes('rev-parse HEAD')) {
+      const fixed = options.noCommit !== true && calls.some((call) => call.mode === 'build')
+      return Promise.resolve({ stdout: `${fixed ? options.fixedHead ?? PR_HEAD : PR_HEAD}\n`, stderr: '' })
     }
     return Promise.resolve({ stdout: commandOutput(line, args, options), stderr: '' })
   }
@@ -207,6 +304,8 @@ function rig(options: RigOptions = {}): Rig {
       const answer = options.prStates?.[prUrl] ?? 'open'
       return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer)
     },
+    github: fakeGithub(options, github),
+    ...(options.mergeLocks === undefined ? {} : { mergeLocks: options.mergeLocks }),
   })
   return {
     store,
@@ -219,6 +318,7 @@ function rig(options: RigOptions = {}): Rig {
     openDmCalls: () => openDmCalls,
     threadReads: () => threadReads,
     prAsks,
+    github,
   }
 }
 
@@ -1658,5 +1758,363 @@ describe('worker as a pull request that is merged or closed on the host', () => 
     const second = waitingWithPr(r, 2, other)
     await settle(r)
     expect([stageOf(r.store, first), stageOf(r.store, second)]).toStrictEqual(['merged', 'pr_open'])
+  })
+})
+
+const REVIEW_KEY = itemKeyOf('pr:acme/web-app/7', 'web-app')
+const REVIEW_BRANCH = worktreeNameFor(REVIEW_KEY)
+const REVIEW_THREAD = 'https://example.slack.com/archives/C1/p1'
+const FINDINGS = JSON.stringify({
+  summary: '로그인 검증이 빠졌어요',
+  findings: [
+    { severity: 'major', file: 'a.ts', line: 3, issue: '빈 비밀번호를 받아요', fix: '검사를 넣어요' },
+    { severity: 'nit', file: 'b.ts', issue: '이름이 모호해요', fix: '바꿔요' },
+  ],
+})
+
+// The review agent finds `findings`; the fixing agent answers with `fixText`.
+const reviewAgent =
+  (fixText = 'fixed 1\nUNFIXED: 2\nRESULT: PASS', findings = FINDINGS) =>
+  (call: AgentCall): Promise<AgentResult> =>
+    Promise.resolve(ok(call.mode === 'plan' ? findings : fixText))
+
+function reviewRig(options: RigOptions = {}): Rig {
+  return rig({ agent: reviewAgent(), branchNow: REVIEW_BRANCH, fixedHead: FIXED_HEAD, ...options })
+}
+
+function reviewItem(r: Rig, review: ReviewMeta = REVIEW): string {
+  const started = createReviewItem(
+    r.store,
+    {
+      repo: 'web-app',
+      review,
+      summary: 'PR 리뷰: Add login',
+      url: REVIEW_THREAD,
+      source: 'mention',
+      at: '1',
+    },
+    () => true,
+  )
+  if (started.kind !== 'started') throw new Error('the review item was not made')
+  return started.key
+}
+
+const pushes = (r: Rig): string[] => r.github.filter((call) => call.startsWith('push '))
+const approvals = (r: Rig): string[] => r.github.filter((call) => call.startsWith('approve '))
+const merges = (r: Rig): string[] => r.github.filter((call) => call.startsWith('merge '))
+const blocksText = (r: Rig, index: number): string => JSON.stringify(r.posted[index]?.blocks ?? [])
+
+describe('worker as a review item in planning', () => {
+  it('to be reviewed on Sonnet in a worktree at the pull request head, then sent on to the fix', async () => {
+    const r = reviewRig()
+    const key = reviewItem(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('implementing')
+    expect(r.calls).toHaveLength(1)
+    expect(r.calls[0]).toMatchObject({ mode: 'plan', model: 'sonnet', resume: false })
+    expect(r.calls[0]?.prompt).toContain('+const x = 1')
+    expect(r.calls[0]?.prompt).toContain('please review')
+    expect(r.commands.filter((c) => c.includes('worktree create') && c.includes('origin/develop'))).toHaveLength(1)
+    expect(
+      r.commands.filter((c) => c.includes('fetch origin +refs/heads/feature/login:refs/remotes/origin/feature/login')),
+    ).toHaveLength(1)
+    expect(r.commands.filter((c) => c.endsWith('reset --hard refs/remotes/origin/feature/login'))).toHaveLength(1)
+    expect(getWorkspace(r.store, key)?.baseRef).toBe(PR_HEAD)
+    expect(JSON.parse(getWorkspace(r.store, key)?.plan ?? '{}')).toMatchObject({ findings: [{ id: 1 }, { id: 2 }] })
+    // Nothing reached the pull request or the owner yet.
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(0)
+    expect(r.posted).toHaveLength(0)
+  })
+
+  it('to be declined with a note to the owner and no agent when the pull request was merged already', async () => {
+    const r = reviewRig({ pr: { state: 'MERGED' } })
+    const key = reviewItem(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(r.calls).toHaveLength(0)
+    expect(r.posted.map((post) => post.text)).toStrictEqual([`리뷰하기 전에 PR이 이미 머지됐어요: ${REVIEW_PR}`])
+  })
+
+  it("to fail, charged nothing and with no agent, when the pull request is the owner's own", async () => {
+    const r = reviewRig({ pr: { author: 'owner-login' } })
+    const key = reviewItem(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(r.calls).toHaveLength(0)
+    expect(listRuns(r.store, key)).toMatchObject([{ state: 'failed', costUsd: 0, detail: '내가 올린 PR이에요' }])
+  })
+
+  it('to fail with no worktree and no agent when the clone Orca knows has another origin', async () => {
+    const r = reviewRig()
+    const key = reviewItem(r, { ...REVIEW, prUrl: 'https://github.com/other/web-app/pull/7', slug: 'other/web-app' })
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(r.commands.filter((c) => c.includes('worktree create'))).toHaveLength(0)
+    expect(r.calls).toHaveLength(0)
+  })
+
+  it('to be charged nothing when the worktree cannot be made, since no agent ran', async () => {
+    const r = reviewRig({ failCommand: 'worktree create' })
+    const key = reviewItem(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(r.calls).toHaveLength(0)
+    expect(listRuns(r.store, key)).toMatchObject([{ state: 'failed', costUsd: 0 }])
+  })
+})
+
+describe('worker as a review item whose findings are being fixed', () => {
+  it('to push the fixes once, approve once after the push, and wait in pr_open with the approved commit', async () => {
+    const r = reviewRig()
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(r.calls[1]).toMatchObject({ mode: 'build', model: 'sonnet', resume: true })
+    expect(r.calls[1]?.prompt).toContain('1. [major] a.ts:3 - 빈 비밀번호를 받아요')
+    // The pull request's hooks do not run in its commits.
+    expect(r.calls[1]?.env).toStrictEqual(NO_HOOKS)
+    const path = getWorkspace(r.store, key)?.path ?? ''
+    expect(pushes(r)).toStrictEqual([`push ${path} feature/login`])
+    // The approval names the commit that was pushed, and comes after GitHub was asked again.
+    expect(approvals(r)).toStrictEqual([`approve ${REVIEW_PR} ${FIXED_HEAD}`])
+    expect(r.github.slice(r.github.indexOf(pushes(r)[0] ?? ''))).toStrictEqual([
+      `push ${path} feature/login`,
+      `readPr ${REVIEW_PR}`,
+      'ownerLogin',
+      `approve ${REVIEW_PR} ${FIXED_HEAD}`,
+    ])
+    expect(getItem(r.store, key)?.meta.review).toMatchObject({
+      pushedOid: FIXED_HEAD,
+      pushedAt: clock.now,
+      unfixed: [2],
+    })
+    expect(getWorkspace(r.store, key)?.prUrl).toBe(REVIEW_PR)
+    // Visual QA looked at the fixes against the findings, from the pull request's head.
+    expect(r.qaInputs).toHaveLength(1)
+    expect(r.qaInputs[0]?.baseRef).toBe(PR_HEAD)
+    expect(r.qaInputs[0]?.plan).toContain('빈 비밀번호를 받아요')
+    expect(r.posted).toHaveLength(0)
+  })
+
+  it.each([
+    ['the major finding is left', 'UNFIXED: 1\nRESULT: PASS'],
+    ['the agent did not say what it left', 'did it\nRESULT: PASS'],
+  ])('to push and approve nothing and be declined with one report when %s', async (_name, fixText) => {
+    const r = reviewRig({ agent: reviewAgent(fixText) })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(0)
+    expect(r.posted).toHaveLength(1)
+    expect(r.posted[0]?.text).toBe('리뷰했지만 머지하지 않았어요: web-app')
+    expect(blocksText(r, 0)).toContain('고치지 못한 blocker·major 지적이 1개 남았어요')
+    expect(blocksText(r, 0)).toContain(REVIEW_THREAD)
+  })
+
+  it('to push and approve nothing when Visual QA failed', async () => {
+    const r = reviewRig({
+      qa: () => Promise.resolve({ status: 'failed', reason: '버튼이 사라졌어요', report: '', shots: 1, costUsd: 0.1 }),
+    })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(0)
+    expect(blocksText(r, 0)).toContain('Visual QA 실패: 버튼이 사라졌어요')
+  })
+
+  it('to approve without a fix run or a push when the review found nothing', async () => {
+    const r = reviewRig({ agent: reviewAgent('unused', JSON.stringify({ summary: '좋아요', findings: [] })) })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(r.calls).toHaveLength(1)
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(1)
+  })
+
+  it('to approve the head as it was, without a push or Visual QA, when only nits were found and none committed', async () => {
+    const nits = JSON.stringify({
+      summary: '',
+      findings: [{ severity: 'nit', file: 'b.ts', issue: '이름', fix: '바꿔요' }],
+    })
+    const r = reviewRig({ agent: reviewAgent('nothing to change\nUNFIXED: none\nRESULT: PASS', nits), noCommit: true })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toStrictEqual([`approve ${REVIEW_PR} ${PR_HEAD}`])
+    expect(r.qaInputs).toHaveLength(0)
+  })
+
+  it('to push and approve nothing when a major finding is said to be fixed but no commit was made', async () => {
+    const r = reviewRig({ agent: reviewAgent('done\nUNFIXED: none\nRESULT: PASS'), noCommit: true })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(0)
+    expect(blocksText(r, 0)).toContain('blocker·major 지적이 1개인데 고친 커밋이 없어요 (수정은 PR에 올리지 않았어요)')
+  })
+
+  // Reads of the pull request: 0 by the review, 1 right before the push, 2 right before the approval.
+  it('to push and approve nothing when another commit reached the pull request during the fix', async () => {
+    const r = reviewRig({ prByRead: [{}, { headRefOid: 'c'.repeat(40) }] })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(0)
+    expect(blocksText(r, 0)).toContain('수정하는 동안 PR에 다른 커밋이 올라왔어요 (수정은 PR에 올리지 않았어요)')
+  })
+
+  it('to approve nothing, and say the fixes are on the pull request, when it was closed right after the push', async () => {
+    const r = reviewRig({ prByRead: [{}, {}, { state: 'CLOSED' }] })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(pushes(r)).toHaveLength(1)
+    expect(approvals(r)).toHaveLength(0)
+    expect(blocksText(r, 0)).toContain('수정하는 동안 PR이 닫혔어요 (수정은 PR에 올렸지만 승인하지 않았어요)')
+  })
+
+  it('to fail with nothing pushed when the agent left uncommitted changes', async () => {
+    const r = reviewRig({ dirty: true })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(pushes(r)).toHaveLength(0)
+    expect(approvals(r)).toHaveLength(0)
+    expect(listRuns(r.store, key).at(-1)?.detail).toBe('the agent left uncommitted changes in the worktree')
+  })
+
+  it('to fail without an approval when the push is refused', async () => {
+    const r = reviewRig({ githubFails: ['push'] })
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(pushes(r)).toHaveLength(1)
+    expect(approvals(r)).toHaveLength(0)
+    expect(listRuns(r.store, key).at(-1)?.detail).toBe('push failed')
+  })
+})
+
+describe('worker as an approved review waiting in pr_open', () => {
+  async function approved(options: RigOptions = {}): Promise<{ r: Rig; key: string }> {
+    const r = reviewRig(options)
+    const key = reviewItem(r)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    return { r, key }
+  }
+
+  it('to wait while CI may not have started, then merge the approved commit once and tell the owner', async () => {
+    const { r, key } = await approved()
+    await settle(r)
+    expect(merges(r)).toHaveLength(0)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(merges(r)).toStrictEqual([`merge ${REVIEW_PR} ${FIXED_HEAD}`])
+    expect(stageOf(r.store, key)).toBe('merged')
+    expect(r.posted.map((post) => post.text)).toStrictEqual(['리뷰하고 머지했어요: web-app'])
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(merges(r)).toHaveLength(1)
+  })
+
+  it('to ask GitHub at most every two minutes', async () => {
+    const { r } = await approved()
+    const gates = (): number => r.github.filter((call) => call.startsWith('readGate ')).length
+    await settle(r)
+    await settle(r)
+    expect(gates()).toBe(1)
+    clock.now += 2 * 60_000
+    await settle(r)
+    expect(gates()).toBe(2)
+  })
+
+  it.each([
+    ['a new commit came', { headOid: 'c'.repeat(40) }, 'PR에 새 커밋이 올라와서 멈췄어요'],
+    ['CI failed', { ci: 'fail' as const }, 'CI가 실패했어요'],
+    ['a reviewer asked for changes', { decision: 'CHANGES_REQUESTED' }, '변경 요청 리뷰가 남아 있어요'],
+  ])('to merge nothing and be declined with the reason when %s', async (_name, gate, reason) => {
+    const { r, key } = await approved({ gate })
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(merges(r)).toHaveLength(0)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(r.posted).toHaveLength(1)
+    expect(blocksText(r, 0)).toContain(`${reason}. 내 승인은 PR에 남아 있어요.`)
+  })
+
+  it('to be declined with the reason when the merge is refused', async () => {
+    const { r, key } = await approved({ githubFails: ['merge'] })
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(merges(r)).toHaveLength(1)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(blocksText(r, 0)).toContain('머지하지 못했어요: merge failed')
+  })
+
+  it('to stay in pr_open, with nothing said, when GitHub does not answer', async () => {
+    const { r, key } = await approved({ githubFails: ['readGate'] })
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(r.posted).toHaveLength(0)
+    expect(listEvents(r.store, { itemKey: key }).filter((event) => event.type === 'pr_state_failed')).toHaveLength(1)
+  })
+
+  it('to be declined with the reason when GitHub has not answered for longer than CI gets', async () => {
+    const { r, key } = await approved({ githubFails: ['readGate'] })
+    clock.now += 6 * 60 * 60_000 + 1
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(r.posted).toHaveLength(1)
+    expect(blocksText(r, 0)).toContain('GitHub에서 PR 상태를 읽지 못했어요. 내 승인은 PR에 남아 있어요.')
+  })
+
+  it('to merge nothing and say nothing when the owner declined it while GitHub was being asked', async () => {
+    const decline = { run: (): void => {} }
+    const { r, key } = await approved({ onGate: () => decline.run() })
+    decline.run = () => applyEvent(r.store, key, { type: 'reject', owner: true })
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(merges(r)).toHaveLength(0)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(r.posted).toHaveLength(0)
+  })
+
+  it('to merge nothing while a button holds the merge of the item', async () => {
+    const locks = new Set<string>()
+    const { r, key } = await approved({ mergeLocks: locks })
+    locks.add(mergeLockOf(key))
+    clock.now += 5 * 60_000
+    await settle(r)
+    expect(merges(r)).toHaveLength(0)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+  })
+
+  it('to follow a merge made on GitHub without merging again, and say the bot did not merge it', async () => {
+    const { r, key } = await approved({ gate: { state: 'MERGED' } })
+    await settle(r)
+    expect(merges(r)).toHaveLength(0)
+    expect(stageOf(r.store, key)).toBe('merged')
+    expect(r.posted.map((post) => post.text)).toStrictEqual(['리뷰하고 머지했어요: web-app'])
+    expect(blocksText(r, 0)).toContain('참고: GitHub에서 직접 머지됐어요 (봇이 머지하지 않았어요)')
   })
 })

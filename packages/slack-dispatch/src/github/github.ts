@@ -2,6 +2,8 @@
 // each time it is needed: a result remembered from earlier says nothing about the pull request now.
 
 import type { Run } from '../exec/exec.ts'
+import type { PrInfo, ReviewGate } from '../review/review.ts'
+import { parsePrInfo, parseReviewGate, PR_INFO_FIELDS, REVIEW_GATE_FIELDS } from '../review/review.ts'
 
 export interface Gate {
   ci: boolean
@@ -100,4 +102,62 @@ export async function readGate(run: Run, prUrl: string): Promise<Gate> {
 // Merges only if the head is still the commit the gate was read for.
 export async function mergePr(run: Run, prUrl: string, headOid: string): Promise<void> {
   await run('gh', ['pr', 'merge', prUrl, '--squash', '--match-head-commit', headOid])
+}
+
+// The pull request a review is about, read again at every step that acts on it.
+export async function readPrInfo(run: Run, prUrl: string): Promise<PrInfo> {
+  const { stdout } = await run('gh', ['pr', 'view', prUrl, '--json', PR_INFO_FIELDS])
+  return parsePrInfo(stdout)
+}
+
+export async function readReviewGate(run: Run, prUrl: string): Promise<ReviewGate> {
+  const { stdout } = await run('gh', ['pr', 'view', prUrl, '--json', REVIEW_GATE_FIELDS])
+  return parseReviewGate(stdout)
+}
+
+const SLUG = /^[\w.-]+\/[\w.-]+$/
+const COMMIT = /^[0-9a-f]{40}$/
+
+// Approves one commit as the signed-in GitHub user, with no text: the owner asked for no comment on the pull request.
+// The commit is named, so the approval is of the code that was reviewed, not of whatever the head is by then.
+export async function approvePr(run: Run, slug: string, number: number, commit: string): Promise<void> {
+  if (!SLUG.test(slug) || !Number.isSafeInteger(number) || number <= 0 || !COMMIT.test(commit)) {
+    throw new RangeError('not a pull request and commit to approve')
+  }
+  await run('gh', [
+    'api',
+    '--method',
+    'POST',
+    `repos/${slug}/pulls/${number}/reviews`,
+    '-f',
+    'event=APPROVE',
+    '-f',
+    `commit_id=${commit}`,
+  ])
+}
+
+const LOGIN = /^[\da-z][\da-z-]{0,38}$/i
+
+// The GitHub login the gh on this machine signs in as: the person a review request names.
+export async function readLogin(run: Run): Promise<string> {
+  const { stdout } = await run('gh', ['api', 'user', '--jq', '.login'])
+  const login = stdout.trim()
+  if (!LOGIN.test(login)) throw new Error('gh api user did not print a login')
+  return login
+}
+
+// Git without the repository's hooks: in a pull request somebody else wrote, a hook is code from that pull request.
+export const NO_HOOKS: Readonly<Record<string, string>> = {
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'core.hooksPath',
+  GIT_CONFIG_VALUE_0: '/dev/null',
+}
+
+// Pushes the reviewed fixes onto the branch of somebody else's pull request, with its hooks off (CI checks the push).
+// Never forced: if the author pushed in the meantime the push is refused, and the fixes are not merged over their work.
+export async function pushToPrBranch(run: Run, worktreePath: string, head: string): Promise<void> {
+  await run('git', ['-C', worktreePath, 'push', 'origin', `HEAD:refs/heads/${head}`], {
+    timeoutMs: PUSH_TIMEOUT_MS,
+    env: NO_HOOKS,
+  })
 }

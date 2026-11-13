@@ -40,6 +40,11 @@ ${DATA_RULE}
 
 The block above holds the thread and, at its end, the failure report of the last try. Keep the same format and the same limit of 25 lines, in Korean. Reply with the new plan only.`
 
+// How a change that users see is reached by Visual QA; the build and the review's fix both follow it.
+const QA_RULES = `- You cannot start the app or a browser here, and you do not need to: the system runs Visual QA after you finish. If the change affects what users see, it needs a way to reach the changed screen:
+  - When the repository has Playwright end-to-end tests (a playwright config and a test:e2e script), add or update ONE spec that opens the changed screen the way a user does, with the repository's own login and mock helpers, clicks to every state that shows the change, and saves a screenshot of each with page.screenshot({ path: path.join(process.env.QA_SHOTS_DIR ?? 'test-results', 'name.png'), fullPage: true }). Commit it, and add a line "QA-SPEC: e2e/name.spec.ts" just before the RESULT line. The system runs that spec with the repository's e2e script, in its mock mode; a spec that fails, or saves no screenshot, fails the QA.
+  - Otherwise add a line "QA-ROUTES: /path /other" just before the RESULT line, naming the pages that show the change (paths only, at most 6). The system starts the app with the repository's mock-mode script when there is one (for example pnpm dev:msw; otherwise pnpm dev) and photographs each page as it loads. Name only routes that exist in the app's route files, with any locale prefix the app needs, and that show the change without a click; a path that does not exist fails the QA.`
+
 const BUILD_TEMPLATE = `{{intro}}
 
 ${DATA_RULE}
@@ -50,9 +55,7 @@ Rules:
 - Read the repository's AGENTS.md or CLAUDE.md first and follow it, including its lint rules.
 - Change only what the plan needs. Add or update tests for the behavior you change.
 - Run the repository's own lint, typecheck and tests (for example pnpm lint, pnpm typecheck, pnpm test) until they pass, at most 3 rounds of fixes.
-- You cannot start the app or a browser here, and you do not need to: the system runs Visual QA after you finish. If the change affects what users see, it needs a way to reach the changed screen:
-  - When the repository has Playwright end-to-end tests (a playwright config and a test:e2e script), add or update ONE spec that opens the changed screen the way a user does, with the repository's own login and mock helpers, clicks to every state that shows the change, and saves a screenshot of each with page.screenshot({ path: path.join(process.env.QA_SHOTS_DIR ?? 'test-results', 'name.png'), fullPage: true }). Commit it, and add a line "QA-SPEC: e2e/name.spec.ts" just before the RESULT line. The system runs that spec with the repository's e2e script, in its mock mode; a spec that fails, or saves no screenshot, fails the QA.
-  - Otherwise add a line "QA-ROUTES: /path /other" just before the RESULT line, naming the pages that show the change (paths only, at most 6). The system starts the app with the repository's mock-mode script when there is one (for example pnpm dev:msw; otherwise pnpm dev) and photographs each page as it loads. Name only routes that exist in the app's route files, with any locale prefix the app needs, and that show the change without a click; a path that does not exist fails the QA.
+${QA_RULES}
 {{base}}
 - Commit with a conventional commit message on the current branch ({{branch}}). Do not create or switch branches, do not push and do not open a pull request.
 {{retry}}
@@ -177,6 +180,93 @@ export function buildPrompt(input: BuildInput): string {
 
 export function splitPrompt(prompt: string, repos: readonly string[]): string {
   return renderPrompt(SPLIT_TEMPLATE, { repos: repos.join(', ') }, prompt)
+}
+
+const REVIEW_INTENT_TEMPLATE = `Classify this Slack message sent to a developer. Answer only JSON {"kind":"review|build|other","reason":"..."}. review: asks the developer to review or merge a GitHub pull request that is open now. build: asks for a code or content change or reports a bug. other: anything else (FYI, scheduling, doc review, deploy, already merged).
+
+${DATA_RULE}
+
+{{thread}}`
+
+// Whether a Slack message asks the owner to review a pull request. Measured on 156 real and made-up messages before it
+// was used: it is only asked about a pull request GitHub already let through.
+export function reviewIntentPrompt(text: string): string {
+  return renderPrompt(REVIEW_INTENT_TEMPLATE, {}, text)
+}
+
+const REVIEW_TEMPLATE = `You are reviewing pull request #{{number}} in the repository {{repo}}, from the branch {{head}} into {{base}}. This worktree is checked out at the pull request's last commit. You are in plan mode: read the code with the read tools and change nothing.
+
+${DATA_RULE}
+
+{{thread}}
+
+The block above holds the pull request's title and description (its author wrote them) and its diff against {{base}}. Read the changed files around the diff when you need context, and the repository's AGENTS.md or CLAUDE.md.
+Look for: correctness bugs, missing error handling or edge cases, changed behavior without a test, security problems, and breaks of the repository's own rules. Report only real problems in the changed code: no praise, no taste that the repository's lint does not enforce.
+
+Answer with JSON only, in Korean, in this shape:
+{"summary":"<one or two lines>","findings":[{"severity":"blocker","file":"<path>","line":12,"issue":"<what is wrong>","fix":"<how to fix it>"}]}
+severity: blocker = ships broken or unsafe; major = wrong behavior in a real case, or changed behavior without a test; minor = a small real problem; nit = naming or wording. An empty findings list is right when nothing is wrong. At most 30 findings.`
+
+export interface ReviewInput {
+  repo: string
+  number: number
+  title: string
+  head: string
+  base: string
+  // What the author wrote; untrusted.
+  body: string
+  // `git diff` of the pull request, already cut to size; untrusted.
+  diff: string
+}
+
+export function reviewPrompt(input: ReviewInput): string {
+  const data = [
+    `--- pull request title (written by its author) ---\n${input.title}`,
+    `--- pull request description (written by its author) ---\n${input.body}`,
+    `--- diff ---\n${input.diff}`,
+  ].join('\n\n')
+  return renderPrompt(
+    REVIEW_TEMPLATE,
+    { repo: input.repo, number: String(input.number), head: input.head, base: input.base },
+    data,
+  )
+}
+
+const FIX_TEMPLATE = `Fix every finding of your review in this worktree (branch {{branch}}, which holds the pull request's last commit). The findings, with the ids you report back, are in the data block below.
+
+${DATA_RULE}
+
+{{thread}}
+
+Rules:
+- Read the repository's AGENTS.md or CLAUDE.md first and follow it, including its lint rules.
+- Fix each finding with the smallest change that solves it. If reading the code shows a finding is wrong, leave it and say why. Change nothing the findings do not ask for.
+- Run the repository's own lint, typecheck and tests (for example pnpm lint, pnpm typecheck, pnpm test) until they pass, at most 3 rounds of fixes.
+${QA_RULES}
+{{base}}
+- Commit with a conventional commit message on the current branch ({{branch}}). Do not create or switch branches, do not push, and do not open, comment on or approve a pull request.
+- Just before the RESULT line, add the line "UNFIXED: none" when every finding is fixed, or "UNFIXED: 2, 5" with the ids of the findings you left.
+{{retry}}
+Final reply: a short report in Korean (each finding id: fixed, or why not; each check with PASS or FAIL). Its last line must be exactly "RESULT: PASS" or "RESULT: FAIL <one-line reason>".`
+
+export interface FixInput {
+  branch: string
+  // The commit the fixes start from (the pull request's head).
+  base?: string
+  // The findings as numbered lines; written by the review agent from untrusted text.
+  findings: string
+  lastFailure: string
+}
+
+export function fixPrompt(input: FixInput): string {
+  const failed = input.lastFailure !== ''
+  const retry = failed ? '- The last try failed; its report is at the end of the data block above. Fix that first.' : ''
+  const base =
+    input.base === undefined
+      ? ''
+      : `- When a repository script tests only what changed against a base (for example \`pnpm test:agent <base>\`), pass ${input.base}, the commit this branch started from, and not a branch name.`
+  const data = [input.findings, failed ? `${FAILURE_HEADING}\n${input.lastFailure}` : ''].filter((part) => part !== '')
+  return renderPrompt(FIX_TEMPLATE, { branch: input.branch, retry, base }, data.join('\n\n'))
 }
 
 // `repo` is a repository name, or empty when the item could not be routed to one.

@@ -7,12 +7,17 @@ import type { AgentModel } from '../agent/claude.ts'
 import type { Gate } from '../github/github.ts'
 import type { CatchUp } from '../ingest/catch-up.ts'
 import type { ItemEvent, Stage } from '../machine/machine.ts'
+import type { Detection, DetectReview } from '../review/detect.ts'
+import type { Started } from '../review/start.ts'
 import type { SlackClient } from '../slack/client.ts'
 import type { ItemRow, Store } from '../store/store.ts'
 import { parseItemAction } from '../cards/cards.ts'
 import { isSelectionClick, MODEL_NAME, parseDigestAction } from '../digest/digest.ts'
 import { decide, isStage } from '../machine/machine.ts'
+import { mergeLockOf, parsePrUrl } from '../review/review.ts'
+import { createReviewItem, startReviewOf } from '../review/start.ts'
 import { clip, escapeMrkdwn } from '../slack/blocks.ts'
+import { extractLinks } from '../slack/text.ts'
 import { describeSplit, validateSplit } from '../split/split.ts'
 import { redact } from '../store/redact.ts'
 import {
@@ -37,6 +42,8 @@ export interface InteractDeps {
   knownRepos: () => readonly string[]
   // The cheap agent that cuts a DM prompt into per-repo tasks. Its answer is checked by validateSplit.
   splitPrompt: (prompt: string, repos: readonly string[]) => Promise<unknown>
+  // Reads a pull request the owner asked to have reviewed and says whether the service may take it on.
+  detectReview: DetectReview
   // CI and review state of the item's PR, as the host reports it now.
   checkGate: (item: ItemRow) => Promise<Gate>
   // Lands the PR. Called only after the state machine would allow the merge.
@@ -108,7 +115,8 @@ function tallyText(label: string, tally: Tally, model?: AgentModel): string {
   const parts = [`${label} ${tally.done}개${modelNote}`]
   if (tally.noPlan > 0) parts.push(`분석된 플랜이 없어 플랜부터 시작 ${tally.noPlan}개`)
   if (tally.settled > 0) parts.push(`이미 처리된 항목 ${tally.settled}개`)
-  if (tally.needsRepo > 0) parts.push(`레포를 못 정해서 대기 ${tally.needsRepo}개 (다이제스트의 레포 지정에서 고르거나 적어주세요)`)
+  if (tally.needsRepo > 0)
+    parts.push(`레포를 못 정해서 대기 ${tally.needsRepo}개 (다이제스트의 레포 지정에서 고르거나 적어주세요)`)
   return parts.join(', ')
 }
 
@@ -193,6 +201,10 @@ async function handleDigestClick(
     await say(deps, where, '고른 항목이 없어요. 체크박스로 항목을 고른 뒤 눌러주세요.')
     return
   }
+  if (click.action === 'review_selected') {
+    await say(deps, where, await reviewChosen(deps, chosen))
+    return
+  }
   const direct = click.action === 'build_selected'
   const moved = moveChosen(deps, chosen, click.repo)
   if (moved.error !== null) {
@@ -204,6 +216,79 @@ async function handleDigestClick(
   const withPlan = click.ownPlan === '' ? label : `${label} (내 플랜)`
   const withRepo = moved.repo === null ? withPlan : `${withPlan} → ${moved.repo}`
   await say(deps, where, tallyText(withRepo, tally, click.model))
+}
+
+// Asks GitHub about the pull request the owner wants reviewed. A failed question is an answer for the owner, not an
+// error: the owner asked and is waiting for one.
+async function detectFor(deps: InteractDeps, prUrl: string): Promise<Detection> {
+  try {
+    return await deps.detectReview({ text: '', links: [prUrl], manual: true })
+  } catch (error) {
+    return { kind: 'refused', prUrl, reason: `PR을 읽지 못했어요 (${clip(redact(errorText(error)), 200)})` }
+  }
+}
+
+function startedText(started: Started): string {
+  if (started.kind === 'started') return '리뷰를 시작했어요. 끝나면 결과를 DM으로 알려드릴게요.'
+  if (started.kind === 'already') return '이 PR은 이미 리뷰하고 있어요.'
+  return `리뷰를 시작하지 못했어요: ${started.reason}`
+}
+
+const refusedText = (detection: Detection): string =>
+  detection.kind === 'refused'
+    ? `리뷰할 수 없는 PR이에요: ${escapeMrkdwn(detection.reason)}`
+    : 'PR 링크를 찾지 못했어요.'
+
+// One ticked item becomes the review of the pull request linked in its thread. Returns why it did not, or null.
+async function reviewOne(deps: InteractDeps, item: ItemRow): Promise<string | null> {
+  const link = item.meta.prLink
+  if (link === undefined) return '쓰레드에 PR 링크가 없어요'
+  const detection = await detectFor(deps, link.url)
+  if (detection.kind !== 'review') return refusedText(detection)
+  const result = startReviewOf(deps.store, item, detection.repo, detection.review, deps.retriesLeft)
+  return result.kind === 'started' ? null : startedText(result)
+}
+
+// The ticked items become reviews. One without a link, or whose pull request GitHub refuses, keeps waiting, and the
+// owner is told why.
+async function reviewChosen(deps: InteractDeps, chosen: readonly ItemRow[]): Promise<string> {
+  const lines: string[] = []
+  let started = 0
+  for (const item of chosen) {
+    const problem = await reviewOne(deps, item)
+    if (problem === null) started += 1
+    else lines.push(`• ${escapeMrkdwn(clip(item.meta.summary ?? item.key, 60))}: ${problem}`)
+  }
+  const head = `리뷰 시작 ${started}개${started > 0 ? ' (끝나면 결과를 DM으로 알려드려요)' : ''}`
+  return [head, ...lines].join('\n')
+}
+
+// The owner pressed the review button under a notice that a thread was tagged again: the pull request linked in that
+// tag gets its own review item, next to the item already under way.
+async function reviewFromRetag(deps: InteractDeps, item: ItemRow, where: Where): Promise<void> {
+  const link = item.meta.prLink
+  if (link === undefined) {
+    await say(deps, where, 'PR 링크를 찾지 못했어요.')
+    return
+  }
+  const detection = await detectFor(deps, link.url)
+  if (detection.kind !== 'review') {
+    await say(deps, where, refusedText(detection))
+    return
+  }
+  const started = createReviewItem(
+    deps.store,
+    {
+      repo: detection.repo,
+      review: detection.review,
+      summary: clip(`PR 리뷰: ${detection.review.title}`, SUMMARY_LENGTH),
+      url: link.from,
+      source: 'mention',
+      at: String(deps.now()),
+    },
+    deps.retriesLeft,
+  )
+  await say(deps, where, startedText(started))
 }
 
 // Moves the ticked items to the repo the owner named, if any. The name must be a repo Orca knows, matched without
@@ -218,12 +303,16 @@ function moveChosen(
   const repo = known.find((candidate) => candidate.toLowerCase() === named.toLowerCase())
   if (repo === undefined) {
     const shown = known.slice(0, 20).join(', ')
-    return { items: [], repo: null, error: `모르는 레포예요: ${named}\n쓸 수 있는 레포: ${shown === '' ? '(없음)' : shown}` }
+    return {
+      items: [],
+      repo: null,
+      error: `모르는 레포예요: ${named}\n쓸 수 있는 레포: ${shown === '' ? '(없음)' : shown}`,
+    }
   }
   const items = chosen.flatMap((item) => {
     const key = moveToRepo(deps.store, item.key, repo)
     // An item that no longer waits keeps where it is; planItems counts it as settled.
-    return key === null ? [item] : (getItem(deps.store, key) ?? [])
+    return key === null ? [item] : getItem(deps.store, key) ?? []
   })
   return { items, repo, error: null }
 }
@@ -252,11 +341,9 @@ async function landPr(deps: InteractDeps, itemKey: string, where: Where): Promis
   await say(deps, where, `머지했어요: ${item.repo}`)
 }
 
-const mergeLock = (itemKey: string): string => `merge:${itemKey}`
-
 // A second click while the first is landing the PR would land it twice.
 async function mergeIfAllowed(deps: InteractDeps, item: ItemRow, where: Where): Promise<void> {
-  const lock = mergeLock(item.key)
+  const lock = mergeLockOf(item.key)
   if (deps.locks.has(lock)) {
     await say(deps, where, '머지를 진행하고 있어요.')
     return
@@ -315,7 +402,7 @@ async function handleItemClick(deps: InteractDeps, payload: Record<string, unkno
     }
     case 'reject':
     case 'cancel': {
-      if (deps.locks.has(mergeLock(item.key))) {
+      if (deps.locks.has(mergeLockOf(item.key))) {
         await say(deps, where, '머지를 진행하는 중이라 지금은 기각할 수 없어요.')
         return
       }
@@ -335,7 +422,10 @@ async function handleItemClick(deps: InteractDeps, payload: Record<string, unkno
         allowed: deps.retriesLeft(item.key),
       })
       await say(deps, where, retryText(item, applied.outcome.kind === 'moved'))
+      return
     }
+    case 'review':
+      await reviewFromRetag(deps, item, where)
   }
 }
 
@@ -407,6 +497,37 @@ export function describeQueue(items: readonly ItemRow[]): string {
 }
 
 const QUEUE_COMMAND = /^(?:대기|상태|status|list)$/i
+const REVIEW_COMMAND = /^리뷰(?:\s|$)/
+
+// "리뷰 <PR 링크> [Slack 링크]": the owner hands a pull request to the review flow, optionally with the message it was
+// asked in, which the result then points to.
+async function reviewFromCommand(deps: InteractDeps, where: Where, text: string): Promise<void> {
+  const links = extractLinks(text)
+  const prUrl = links.find((link) => parsePrUrl(link) !== null)
+  if (prUrl === undefined) {
+    await say(deps, where, '리뷰할 PR 링크를 같이 보내주세요. 예: 리뷰 https://github.com/<owner>/<repo>/pull/<번호>')
+    return
+  }
+  const from = links.find((link) => link !== prUrl && parsePrUrl(link) === null) ?? ''
+  const detection = await detectFor(deps, prUrl)
+  if (detection.kind !== 'review') {
+    await say(deps, where, refusedText(detection))
+    return
+  }
+  const started = createReviewItem(
+    deps.store,
+    {
+      repo: detection.repo,
+      review: detection.review,
+      summary: clip(`PR 리뷰: ${detection.review.title}`, SUMMARY_LENGTH),
+      url: from,
+      source: 'dm',
+      at: where.threadTs,
+    },
+    deps.retriesLeft,
+  )
+  await say(deps, where, startedText(started))
+}
 
 const MAX_DAYS_AGO = 30
 const DAY_WORDS: Readonly<Record<string, number>> = { 오늘: 0, 어제: 1, 그제: 2, 그저께: 2 }
@@ -550,6 +671,10 @@ export async function handleMessage(deps: InteractDeps, payload: unknown): Promi
   const where = { channel, threadTs: ts }
   if (QUEUE_COMMAND.test(text.trim())) {
     await say(deps, where, describeQueue(listOpenItems(deps.store, OPEN_STAGES)))
+    return
+  }
+  if (REVIEW_COMMAND.test(text.trim())) {
+    await reviewFromCommand(deps, where, text)
     return
   }
   const daysAgo = daysAgoOf(text.trim())

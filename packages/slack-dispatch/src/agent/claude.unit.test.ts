@@ -340,6 +340,13 @@ describe('createClaudeAgent as the call to claude', () => {
     expect(seen[0]?.args).not.toContain('secret thread text')
   })
 
+  it('to start claude with the environment the call adds, and with none added when it adds none', async () => {
+    const { run, seen } = fakeRun(succeeding('plan'))
+    await createClaudeAgent(run)(call({ env: { GIT_CONFIG_COUNT: '1' } }))
+    await createClaudeAgent(run)(call())
+    expect(seen.map((one) => one.options?.env)).toStrictEqual([{ GIT_CONFIG_COUNT: '1' }, {}])
+  })
+
   it('to be not ok, with the cost, when claude fails but printed its verdict', async () => {
     const verdict = JSON.stringify({ type: 'result', subtype: 'error_max_turns', is_error: true, total_cost_usd: 0.7 })
     const { run } = fakeRun(() => Promise.reject(new CommandError('claude', 1, 'stopped', verdict)))

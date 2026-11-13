@@ -1,3 +1,5 @@
+import type { DetectInput, Detection } from '../review/detect'
+import type { ReviewMeta } from '../review/review'
 import type { MentionMatch, SlackMessage } from '../slack/client'
 import type { Store } from '../store/store'
 import type { IngestDeps, IngestSlack } from './ingest'
@@ -725,5 +727,177 @@ describe('ingestMentions as a pass with a limit on the threads it reads', () => 
     expect(summary).toMatchObject({ created: 2, cutThreads: 1 })
     const cut = listEvents(deps.store).find((event) => event.type === 'threads_cut')
     expect(cut?.payload).toBe('{"cut":1,"limit":2}')
+  })
+})
+
+const REVIEW_PR = 'https://github.com/acme/web-app/pull/7'
+const REVIEW: ReviewMeta = {
+  prUrl: REVIEW_PR,
+  slug: 'acme/web-app',
+  number: 7,
+  head: 'feature/login',
+  base: 'develop',
+  title: 'Add login',
+  manual: false,
+}
+const REVIEW_ITEM = 'pr:acme/web-app/7#web-app'
+
+// A detector that answers `answer` and keeps what it was asked.
+function detector(answer: Detection | Error = { kind: 'review', repo: 'web-app', review: REVIEW }) {
+  const asked: DetectInput[] = []
+  const review = (input: DetectInput): Promise<Detection> => {
+    asked.push(input)
+    return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer)
+  }
+  return { asked, review }
+}
+
+const prTag = (offset: number, overrides: Partial<MentionMatch> = {}): MentionMatch =>
+  mention(offset, { text: `<@${OWNER}> 리뷰 부탁해요 <${REVIEW_PR}>`, ...overrides })
+
+describe('ingestMentions as a new tag that asks for a pull request review', () => {
+  it('to start the review item, list nothing in the digest, and not ask again at the next pass', async () => {
+    const tag = prTag(10)
+    const fake = fakeSlack([tag], { [`C1:${tag.threadTs}`]: [message(10, 'U_OTHER', tag.text)] })
+    const found = detector()
+    const deps = { ...setup(fake), review: found.review }
+    const summary = await ingestMentions(deps, real)
+    expect(summary).toMatchObject({ created: 0, reviewed: 1 })
+    expect(found.asked).toHaveLength(1)
+    expect(found.asked[0]).toMatchObject({ links: [REVIEW_PR], manual: false })
+    expect(getItem(deps.store, REVIEW_ITEM)).toMatchObject({
+      stage: 'planning',
+      meta: { review: REVIEW, url: tag.permalink },
+    })
+    // The thread's own item stands for the tag, closed, so it is in no digest.
+    expect(getItem(deps.store, `slack:C1:${tag.threadTs}#web-app`)).toMatchObject({
+      stage: 'skipped',
+      meta: { route: 'PR 리뷰 항목으로 넘김' },
+    })
+    expect(fake.posted).toHaveLength(0)
+
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ alreadyKnown: 1, reviewed: 0 })
+    expect(found.asked).toHaveLength(1)
+  })
+
+  it('to be an ordinary digest item that keeps the link when the tag is not a review request', async () => {
+    const tag = prTag(10)
+    const fake = fakeSlack([tag])
+    const found = detector({ kind: 'none' })
+    const deps = { ...setup(fake), review: found.review }
+    const summary = await ingestMentions(deps, real)
+    expect(summary).toMatchObject({ created: 1, reviewed: 0 })
+    const [item] = listItems(deps.store)
+    expect(item).toMatchObject({ stage: 'notified', meta: { prLink: { url: REVIEW_PR, from: tag.permalink } } })
+    expect(fake.posted).toHaveLength(1)
+  })
+
+  it('to start no review, only a digest item that suggests one, when GitHub does not name the owner', async () => {
+    const tag = prTag(10)
+    const fake = fakeSlack([tag])
+    const deps = { ...setup(fake), review: detector({ kind: 'suggest', prUrl: REVIEW_PR }).review }
+    const summary = await ingestMentions(deps, real)
+    expect(summary).toMatchObject({ created: 1, reviewed: 0 })
+    expect(getItem(deps.store, REVIEW_ITEM)).toBeUndefined()
+    const [item] = listItems(deps.store)
+    expect(item).toMatchObject({
+      stage: 'notified',
+      meta: {
+        route: 'PR 리뷰 요청으로 보여요. 리뷰 버튼으로 시작할 수 있어요',
+        prLink: { url: REVIEW_PR, from: tag.permalink },
+      },
+    })
+    expect(fake.posted).toHaveLength(1)
+  })
+
+  it('to be an ordinary digest item, with the failure logged, when the detector fails', async () => {
+    const fake = fakeSlack([prTag(10)])
+    const deps = { ...setup(fake), review: detector(new Error('gh is down')).review }
+    const summary = await ingestMentions(deps, real)
+    expect(summary).toMatchObject({ created: 1, reviewed: 0, failedThreads: 0 })
+    expect(listItems(deps.store)[0]?.stage).toBe('notified')
+    expect(listEvents(deps.store, {}).filter((event) => event.type === 'review_detect_failed')).toHaveLength(1)
+  })
+
+  it('to ask nothing in a dry run, or when the owner already answered in the thread', async () => {
+    const tag = prTag(10)
+    const found = detector()
+    const dry = { ...setup(fakeSlack([tag])), review: found.review }
+    await ingestMentions(dry, { since: SINCE, dryRun: true })
+    const answered = fakeSlack([tag], {
+      [`C1:${tag.threadTs}`]: [message(10, 'U_OTHER', tag.text), message(20, OWNER, '볼게요')],
+    })
+    await ingestMentions({ ...setup(answered), review: found.review }, real)
+    expect(found.asked).toHaveLength(0)
+  })
+})
+
+describe('ingestMentions as a later tag that links a pull request in a thread under way', () => {
+  it('to start the review with no DM when it asks for one, and not tell the tag again', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const found = detector()
+    const deps = { ...setupClocked(fake, clock), review: found.review }
+    await ingestMentions(deps, real)
+    const posts = fake.posted.length
+
+    matches.push(replyTag(500, `리뷰 부탁해요 <${REVIEW_PR}>`))
+    clock.now = clockAt(600)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ retagged: 0, reviewed: 1 })
+    expect(fake.posted).toHaveLength(posts)
+    expect(getItem(deps.store, REVIEW_ITEM)?.stage).toBe('planning')
+
+    const third = await ingestMentions(deps, real)
+    expect(third).toMatchObject({ alreadyKnown: 1, reviewed: 0 })
+    expect(found.asked).toHaveLength(1)
+  })
+
+  it('to tell the owner with a review button, and keep the link on the open item, when it is not a request', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = { ...setupClocked(fake, clock), review: detector({ kind: 'none' }).review }
+    await ingestMentions(deps, real)
+    const [open] = listItems(deps.store)
+
+    const later = replyTag(500, `이것도 봐주세요 <${REVIEW_PR}>`)
+    matches.push(later)
+    clock.now = clockAt(600)
+    await ingestMentions(deps, real)
+    const told = fake.posted.at(-1)
+    expect(told?.text).toContain('진행 중인 항목의 쓰레드에서 다시 태그됐어요')
+    expect(JSON.stringify(told?.blocks)).toContain('item.review:0')
+    expect(getItem(deps.store, open?.key ?? '')?.meta.prLink).toStrictEqual({ url: REVIEW_PR, from: later.permalink })
+  })
+
+  it('to start no review, and tell the owner it reads as one with a review button, when GitHub names nobody', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = { ...setupClocked(fake, clock), review: detector({ kind: 'suggest', prUrl: REVIEW_PR }).review }
+    await ingestMentions(deps, real)
+    matches.push(replyTag(500, `리뷰 부탁해요 <${REVIEW_PR}>`))
+    clock.now = clockAt(600)
+    const again = await ingestMentions(deps, real)
+    expect(again).toMatchObject({ reviewed: 0 })
+    expect(getItem(deps.store, REVIEW_ITEM)).toBeUndefined()
+    const told = fake.posted.at(-1)
+    expect(told?.text).toContain('PR 리뷰 요청으로 보여요. 리뷰 버튼으로 시작할 수 있어요.')
+    expect(JSON.stringify(told?.blocks)).toContain('item.review:0')
+  })
+
+  it('to tell the owner with no button when the later tag links no pull request', async () => {
+    const matches = [mention(10)]
+    const fake = fakeSlack(matches, threadWithReply(500, 'any news?'))
+    const clock = { now: clockAt(100) }
+    const deps = { ...setupClocked(fake, clock), review: detector({ kind: 'none' }).review }
+    await ingestMentions(deps, real)
+    matches.push(replyTag(500, 'any news?'))
+    clock.now = clockAt(600)
+    await ingestMentions(deps, real)
+    expect(JSON.stringify(fake.posted.at(-1)?.blocks)).not.toContain('item.review')
   })
 })

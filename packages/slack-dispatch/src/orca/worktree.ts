@@ -216,6 +216,11 @@ function installerFor(path: string, exists: (file: string) => boolean): Installe
   return undefined
 }
 
+export interface InstallOptions {
+  // Install without running any package's scripts: for code somebody else wrote, such as a teammate's pull request.
+  ignoreScripts?: boolean
+}
+
 // A new worktree has the repository's files but not its installed packages, and a build or a QA run needs them.
 // The install runs the repository's own scripts, so it gets the environment of repository code: nothing that signs in.
 export async function installDependencies(
@@ -223,11 +228,13 @@ export async function installDependencies(
   path: string,
   signal?: AbortSignal,
   exists: (file: string) => boolean = existsSync,
+  options: InstallOptions = {},
 ): Promise<'present' | 'installed' | 'none'> {
   if (exists(join(path, 'node_modules'))) return 'present'
   const installer = installerFor(path, exists)
   if (installer === undefined) return 'none'
-  await run(installer.file, installer.args, {
+  const args = options.ignoreScripts === true ? [...installer.args, '--ignore-scripts'] : installer.args
+  await run(installer.file, args, {
     cwd: path,
     timeoutMs: INSTALL_TIMEOUT_MS,
     inheritEnv: programEnv,

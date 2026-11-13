@@ -2,7 +2,7 @@ import type { Agent, AgentCall, AgentResult } from '../agent/claude'
 import type { Store } from '../store/store'
 import { afterEach, describe, expect, it } from 'vitest'
 import { closeStore, createItems, getItem, itemKeyOf, openStore } from '../store/store'
-import { createSplitAgent, createTriageAgent } from './agents'
+import { createReviewClassifier, createSplitAgent, createTriageAgent } from './agents'
 
 const costs: [string, number][] = []
 const onCost = (what: string, costUsd: number): void => {
@@ -176,5 +176,23 @@ describe('createTriageAgent as the reading of a new mention', () => {
       thread,
     )
     expect((await triage(itemOf())).recommend).toBe(false)
+  })
+})
+
+describe('createReviewClassifier as the question whether a message asks for a review', () => {
+  it('to be the answer, asked in an empty folder on the cheapest model with a small budget', async () => {
+    const { agent, calls } = fakeAgent(done('{"kind":"review"}'))
+    const classify = createReviewClassifier({ agent, newSessionId: () => SESSION, onCost }, '/scratch')
+    expect(await classify('리뷰 부탁해요')).toBe('review')
+    expect(calls[0]).toMatchObject({ cwd: '/scratch', mode: 'text', model: 'haiku', resume: false, maxBudgetUsd: 0.05 })
+    expect(calls[0]?.ownSetup).not.toBe(true)
+    expect(costs).toStrictEqual([['review_intent', 0.1]])
+  })
+
+  it('to be an error, with the cost recorded, when the agent stopped', async () => {
+    const { agent } = fakeAgent({ ok: false, text: '', costUsd: 0.05, subtype: 'error_max_budget_usd' })
+    const classify = createReviewClassifier({ agent, newSessionId: () => SESSION, onCost }, '/scratch')
+    await expect(classify('x')).rejects.toThrow('the review classifier stopped (error_max_budget_usd)')
+    expect(costs).toStrictEqual([['review_intent', 0.05]])
   })
 })

@@ -98,7 +98,7 @@ const REPO_SHOWN = 40
 const ROUTE_SHOWN = 60
 const SUMMARY_SHOWN = 300
 
-const ACTION_PATTERN = /^digest\.(plan_selected|build_selected|plan_all|reject_rest):(\d+)$/
+const ACTION_PATTERN = /^digest\.(plan_selected|build_selected|review_selected|plan_all|reject_rest):(\d+)$/
 const PICK_PREFIX = 'digest.pick:'
 const MODEL_PREFIX = 'digest.model:'
 const OWN_PLAN_PREFIX = 'digest.ownplan:'
@@ -110,7 +110,7 @@ const REPO_NAME_LIMIT = 100
 // The most the owner's own plan may hold; Slack's own limit for a text box is 3000.
 export const OWN_PLAN_LIMIT = 3000
 
-type DigestAction = 'plan_selected' | 'build_selected' | 'plan_all' | 'reject_rest'
+type DigestAction = 'plan_selected' | 'build_selected' | 'review_selected' | 'plan_all' | 'reject_rest'
 
 // The short name of a model in a message to the owner.
 export const MODEL_NAME: Readonly<Record<AgentModel, string>> = {
@@ -296,7 +296,10 @@ const repoInputs = (digestId: number, repos: readonly string[]): Block[] => {
       block_id: `digest:${digestId}:repotext`,
       optional: true,
       label: { type: 'plain_text', text: '레포 직접 입력 (선택)' },
-      hint: { type: 'plain_text', text: '고르거나 적으면 체크한 항목을 이 레포에서 작업해요. 적은 값이 메뉴보다 우선이에요.' },
+      hint: {
+        type: 'plain_text',
+        text: '고르거나 적으면 체크한 항목을 이 레포에서 작업해요. 적은 값이 메뉴보다 우선이에요.',
+      },
       element: {
         type: 'plain_text_input',
         action_id: `${REPO_TEXT_PREFIX}${digestId}`,
@@ -333,6 +336,7 @@ export function buildDigest(
         modelSelect(digestId),
         button('plan_selected', digestId, '선택한 항목 플랜 시작', 'primary'),
         button('build_selected', digestId, '선택한 항목 바로 구현'),
+        button('review_selected', digestId, '선택한 항목 PR 리뷰'),
         button('plan_all', digestId, '전체 플랜 시작'),
         button('reject_rest', digestId, '선택 안 한 항목 기각', 'danger'),
       ],
@@ -342,7 +346,7 @@ export function buildDigest(
       elements: [
         {
           type: 'mrkdwn',
-          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현 (내 플랜을 적으면 그걸 따라서)\n• 바로 구현: 내 플랜(없으면 위 개선 플랜)대로 플랜 단계 없이 바로 구현\n레포가 틀렸거나 미정이면 레포 지정에서 고르거나 적으세요.\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
+          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현 (내 플랜을 적으면 그걸 따라서)\n• 바로 구현: 내 플랜(없으면 위 개선 플랜)대로 플랜 단계 없이 바로 구현\n• PR 리뷰: 쓰레드의 PR을 리뷰하고 지적한 점을 고쳐 올린 뒤, 조건이 맞으면 머지하고 결과를 DM으로 알림\n레포가 틀렸거나 미정이면 레포 지정에서 고르거나 적으세요.\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
         },
       ],
     },
@@ -371,8 +375,16 @@ export type ParsedAction =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+const DIGEST_ACTIONS: ReadonlySet<string> = new Set<DigestAction>([
+  'plan_selected',
+  'build_selected',
+  'review_selected',
+  'plan_all',
+  'reject_rest',
+])
+
 function isDigestAction(value: string): value is DigestAction {
-  return value === 'plan_selected' || value === 'build_selected' || value === 'plan_all' || value === 'reject_rest'
+  return DIGEST_ACTIONS.has(value)
 }
 
 function optionValue(option: unknown): string[] {
@@ -454,8 +466,5 @@ export function parseDigestAction(payload: unknown): ParsedAction {
 // here so such a click can be let through without a log row for each change.
 export function isSelectionClick(payload: unknown): boolean {
   const first = firstAction(payload)
-  return (
-    first.ok &&
-    [PICK_PREFIX, MODEL_PREFIX, REPO_PICK_PREFIX].some((prefix) => first.actionId.startsWith(prefix))
-  )
+  return first.ok && [PICK_PREFIX, MODEL_PREFIX, REPO_PICK_PREFIX].some((prefix) => first.actionId.startsWith(prefix))
 }

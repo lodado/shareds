@@ -3,11 +3,16 @@
 
 import type { DigestEntry, DigestMessage } from '../digest/digest.ts'
 import type { Stage } from '../machine/machine.ts'
+import type { Detection, DetectReview } from '../review/detect.ts'
+import type { RetriesLeft } from '../review/start.ts'
 import type { RouteConfig } from '../route/route.ts'
 import type { MentionMatch, SlackClient, SlackMessage } from '../slack/client.ts'
-import type { ItemRow, Store } from '../store/store.ts'
+import type { ItemRow, PrLink, Store } from '../store/store.ts'
 import type { Analysis } from '../triage/analysis.ts'
+import { buildRetagCard } from '../cards/cards.ts'
 import { buildDigest, splitDigest } from '../digest/digest.ts'
+import { prLinksIn } from '../review/review.ts'
+import { createReviewItem } from '../review/start.ts'
 import { routeThread } from '../route/route.ts'
 import { clip, escapeMrkdwn } from '../slack/blocks.ts'
 import { SlackApiError } from '../slack/client.ts'
@@ -24,6 +29,7 @@ import {
   pendingForDigest,
   setAnalysis,
   setDigestSlackRef,
+  setPrLink,
   unsentDigestIds,
 } from '../store/store.ts'
 
@@ -37,6 +43,10 @@ export interface IngestDeps {
   // Reads a new item and says what it asks, why, how to fix it and whether it is worth doing. Left out, the digest
   // shows the plain summary.
   analyze?: (item: ItemRow) => Promise<Analysis>
+  // Says whether a new tag asks the owner to review a pull request the service may take on. Left out, none is reviewed.
+  review?: DetectReview
+  // Whether a failed item may still be tried again: a review that failed for good does not hold up a new one.
+  retriesLeft?: RetriesLeft
 }
 
 export interface IngestOptions {
@@ -67,10 +77,12 @@ interface Counts {
   skippedUnreadable: number
   // Threads where the owner was tagged again while an item of the thread was still under way: told in a DM, no new item.
   retagged: number
+  // Threads that asked for a pull request review: the review item was started, and the thread is not in the digest.
+  reviewed: number
 }
 
 // A thread that was found and left out of the digest, with the reason, so the owner can still see that it exists.
-export type SkipReason = 'answered' | 'unreadable' | 'known' | 'retold'
+export type SkipReason = 'answered' | 'unreadable' | 'known' | 'retold' | 'review'
 
 export interface SkippedThread {
   url: string
@@ -100,6 +112,8 @@ const UNROUTED = 'unrouted'
 const DAY_MS = 86_400_000
 // How many items are read by the model at once.
 const ANALYZE_CONCURRENCY = 3
+
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 const dateOf = (d: Date): string => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -180,6 +194,7 @@ const SKIPPED_REASON: Partial<Record<ThreadOutcome, SkipReason>> = {
   skippedUnreadable: 'unreadable',
   alreadyKnown: 'known',
   retagged: 'retold',
+  reviewed: 'review',
 }
 
 function skippedOf(thread: Thread, reason: SkipReason): SkippedThread {
@@ -271,6 +286,62 @@ function summarySource(thread: Thread, rootText: string): string {
   return ownWords.length < MIN_OWN_WORDS ? rootText : tag.text
 }
 
+// What a tag with a pull request link came to: a review under way (new or already running), a suggestion the owner
+// starts with a button, or nothing.
+type Asked = { kind: 'started'; key: string } | { kind: 'suggested' } | { kind: 'none' }
+
+const NOT_ASKED: Asked = { kind: 'none' }
+
+// Asks whether the text requests a review and, when it does, starts the review item. A detector that fails (GitHub or the
+// model is down) is logged, and the tag is treated as an ordinary one: the owner still sees it and can start the review.
+async function startReview(
+  deps: IngestDeps,
+  text: string,
+  links: readonly string[],
+  url: string,
+  at: string,
+): Promise<Asked> {
+  if (deps.review === undefined || prLinksIn(links).length === 0) return NOT_ASKED
+  let detection: Detection
+  try {
+    detection = await deps.review({ text: cleanSlackText(text), links, manual: false })
+  } catch (error) {
+    logEvent(deps.store, { kind: 'system', type: 'review_detect_failed', payload: { url, error: errorText(error) } })
+    return NOT_ASKED
+  }
+  if (detection.kind === 'refused') {
+    logEvent(deps.store, {
+      kind: 'system',
+      type: 'review_refused',
+      payload: { prUrl: detection.prUrl, reason: detection.reason },
+    })
+  }
+  if (detection.kind === 'suggest') return { kind: 'suggested' }
+  if (detection.kind !== 'review') return NOT_ASKED
+  const started = createReviewItem(
+    deps.store,
+    {
+      repo: detection.repo,
+      review: detection.review,
+      summary: clip(`PR 리뷰: ${detection.review.title}`, SUMMARY_LENGTH),
+      url,
+      source: 'mention',
+      at,
+    },
+    deps.retriesLeft ?? (() => true),
+  )
+  if (started.kind === 'refused') return NOT_ASKED
+  logEvent(deps.store, {
+    itemKey: started.key,
+    kind: 'inbound',
+    type: started.kind === 'started' ? 'review_started' : 'review_already',
+    payload: { prUrl: detection.review.prUrl },
+  })
+  return { kind: 'started', key: started.key }
+}
+
+const SUGGEST_NOTE = 'PR 리뷰 요청으로 보여요. 리뷰 버튼으로 시작할 수 있어요'
+
 // Somebody tagged the owner again in a thread whose item is still under way. The item is not made twice; the owner is
 // told in a DM, once, with the link to the new tag. A post by a program tells nothing new to the owner who already has
 // an item for the thread, so it is only written down.
@@ -289,15 +360,29 @@ async function tellRetag(
     return 'alreadyKnown'
   }
   if (!pass.dryRun) {
+    const texts = people.map((mention) => mention.text).join('\n')
+    const links = extractLinks(texts)
+    // A new tag that asks for a review starts it; the owner hears about it when it is over, not now.
+    const asked = await startReview(deps, texts, links, first.permalink, newest.ts)
+    if (asked.kind === 'started') {
+      markMentionSeen(deps.store, open.key, newest.ts)
+      return 'reviewed'
+    }
+    const prLink = prLinksIn(links).at(-1)
+    if (prLink !== undefined) setPrLink(deps.store, open.key, { url: prLink.url, from: first.permalink })
     const channel = await deps.slack.openDm(deps.ownerId)
     const item = escapeMrkdwn(clip(open.meta.summary ?? open.key, RETAG_SUMMARY_LENGTH))
     const tag = escapeMrkdwn(clip(cleanSlackText(first.text), RETAG_SUMMARY_LENGTH))
     const link = first.permalink === '' ? '' : ` <${first.permalink}|새 태그 보기>`
     const stage = STAGE_TEXT[open.stage] ?? open.stage
-    await deps.slack.postMessage({
-      channel,
-      text: `진행 중인 항목의 쓰레드에서 다시 태그됐어요 (${stage}).${link}\n항목: ${item}\n> ${tag}`,
+    const card = buildRetagCard({
+      itemKey: open.key,
+      text: `진행 중인 항목의 쓰레드에서 다시 태그됐어요 (${stage}).${link}\n항목: ${item}\n> ${tag}${
+        asked.kind === 'suggested' ? `\n${SUGGEST_NOTE}.` : ''
+      }`,
+      canReview: prLink !== undefined,
     })
+    await deps.slack.postMessage({ channel, text: card.text, blocks: card.blocks })
     markMentionSeen(deps.store, open.key, newest.ts)
   }
   logEvent(deps.store, {
@@ -307,6 +392,18 @@ async function tellRetag(
     payload: { stage: open.stage, tags: people.map((mention) => mention.ts), told: !pass.dryRun },
   })
   return 'retagged'
+}
+
+function routeText(reason: string, fromBot: boolean, asked: Asked): string {
+  if (fromBot) return '봇이 올린 알림이라 건너뜀'
+  if (asked.kind === 'started') return 'PR 리뷰 항목으로 넘김'
+  return asked.kind === 'suggested' ? SUGGEST_NOTE : reason
+}
+
+// The last pull request link of the thread, kept for the digest's review button; none once the review was started.
+function prLinkMeta(links: readonly string[], from: string, reviewed: boolean): { prLink?: PrLink } {
+  const ref = reviewed ? undefined : prLinksIn(links).at(-1)
+  return ref === undefined ? {} : { prLink: { url: ref.url, from } }
 }
 
 async function ingestThread(deps: IngestDeps, candidate: Candidate, pass: Pass): Promise<ThreadOutcome> {
@@ -336,26 +433,31 @@ async function ingestThread(deps: IngestDeps, candidate: Candidate, pass: Pass):
     (reply) => reply.user === ownerId && Number(reply.ts) > firstMention && !tagTimes.has(reply.ts),
   )
   const fromBot = !includeBots && taggedByBot(replies, thread)
-  const found = routeThread(
-    { text: cleanSlackText(allText), links: extractLinks(allText), channelName: thread.channelName },
-    route,
-  )
+  const links = extractLinks(allText)
+  const found = routeThread({ text: cleanSlackText(allText), links, channelName: thread.channelName }, route)
+  const url = thread.mentions[0]?.permalink ?? ''
+  // Only a tag nobody answered yet, from a person, in a pass that changes things, can start a review.
+  const mayReview = !pass.dryRun && !handled && !fromBot
+  const newestTag = thread.mentions.at(-1)?.ts ?? thread.threadTs
+  const asked = mayReview ? await startReview(deps, allText, links, url, newestTag) : NOT_ASKED
   const repo = found.repo ?? UNROUTED
   createItems(store, threadKey, [repo], {
     source: 'mention',
     meta: {
       [repo]: {
         summary: clip(cleanSlackText(summarySource(thread, rootText)), SUMMARY_LENGTH),
-        url: thread.mentions[0]?.permalink ?? '',
-        route: fromBot ? '봇이 올린 알림이라 건너뜀' : found.reason,
+        url,
+        route: routeText(found.reason, fromBot, asked),
         urgent: looksUrgent(allText),
         ...seenUntilOf(thread),
+        ...prLinkMeta(links, url, asked.kind === 'started'),
       },
     },
   })
   const key = `${threadKey}#${repo}`
-  // Policy: a mention always waits for the owner's approval, however sure the routing is.
-  applyEvent(store, key, { type: 'triage', handled: handled || fromBot, confident: false })
+  // Policy: a mention always waits for the owner's approval, however sure the routing is. A thread whose review was
+  // started is closed here: its item stands for the tags, so the next pass does not ask again.
+  applyEvent(store, key, { type: 'triage', handled: handled || fromBot || asked.kind === 'started', confident: false })
   logEvent(store, {
     itemKey: key,
     kind: 'inbound',
@@ -363,6 +465,7 @@ async function ingestThread(deps: IngestDeps, candidate: Candidate, pass: Pass):
     payload: { channel: thread.channelName, threadTs: thread.threadTs, handled, fromBot, repo, reason: found.reason },
   })
   if (fromBot) return 'skippedBots'
+  if (asked.kind === 'started') return 'reviewed'
   return handled ? 'handledByOwner' : 'created'
 }
 
@@ -381,8 +484,6 @@ function entriesOf(store: Store, keys: readonly string[]): DigestEntry[] {
     return item ? [toDigestEntry(item)] : []
   })
 }
-
-const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 // Runs `work` over the items, a few at a time. Each call handles its own failure.
 async function inBatches<T>(items: readonly T[], size: number, work: (item: T) => Promise<void>): Promise<void> {
@@ -422,6 +523,7 @@ export async function ingestMentions(deps: IngestDeps, options: IngestOptions): 
     skippedBots: 0,
     skippedUnreadable: 0,
     retagged: 0,
+    reviewed: 0,
     failedThreads: 0,
     cutThreads: 0,
     skipped: [],
