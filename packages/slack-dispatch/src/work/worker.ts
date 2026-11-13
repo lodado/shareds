@@ -14,7 +14,7 @@ import type { SlackClient } from '../slack/client.ts'
 import type { ItemRow, Store } from '../store/store.ts'
 import type { WorkspaceRow } from '../store/work.ts'
 import type { ReviewGithub, ReviewKit } from './review-work.ts'
-import { AgentAborted, AgentStoppedInTab, DEFAULT_MODEL } from '../agent/claude.ts'
+import { AgentAborted, AgentSessionBusy, AgentStoppedInTab, DEFAULT_MODEL } from '../agent/claude.ts'
 import {
   buildPrompt,
   parseBuildResult,
@@ -63,6 +63,7 @@ import {
   STOPPED_DETAIL,
 } from '../store/work.ts'
 import { checkReviewMerge, fixJob, REVIEW_CHECK_MS, reviewJob } from './review-work.ts'
+import { ensureSessionFree } from './session-free.ts'
 
 export interface WorkerConfig {
   maxTotal: number
@@ -109,6 +110,8 @@ export interface WorkerDeps {
   github: ReviewGithub
   // The merges in progress, the same set the buttons hold, so a merge and a decline never cross.
   mergeLocks?: Set<string>
+  // Whether a claude of the session runs now (the owner's, in an Orca tab after a Ctrl+C); not asked when not given.
+  sessionBusy?: (sessionId: string) => Promise<boolean>
 }
 
 export interface Worker {
@@ -132,6 +135,8 @@ const STOPPED_IN_TAB: Readonly<Record<TabStopReason, string>> = {
   ended:
     'Orca 탭이 닫히거나 Claude가 시작하기 전에 멈춰서 run이 끝났어요. 봇에게 다시 맡기려면 카드의 다시 시도를 눌러요.',
 }
+const SESSION_BUSY =
+  '같은 Claude 세션이 아직 열려 있어서 시작하지 않았어요. Orca 탭에서 이어 하던 Claude를 끝낸 뒤 카드의 다시 시도를 눌러요.'
 const CLEANUP_RETRY_MS = 5 * 60_000
 // How often an open pull request is asked about. Only the items waiting in pr_open are, so this stays a few calls.
 const PR_CHECK_MS = 10 * 60_000
@@ -699,6 +704,7 @@ async function buildJob(ctx: Ctx, info: RunInfo): Promise<void> {
   }
   const workspace = getWorkspace(store, item.key)
   if (workspace === undefined) throw new Error(`item ${item.key} has no workspace`)
+  await ensureSessionFree(ctx.deps, workspace.sessionId)
   // The worktree has the repository's files but not its installed packages; the build and the QA both need them.
   await installDependencies(run, workspace.path, info.signal)
   await buildAndDeliver(ctx, info, workspace)
@@ -714,6 +720,13 @@ async function stoppedInTab(ctx: Ctx, info: RunInfo, stop: AgentStoppedInTab): P
   await failItem(ctx, info.item.key, STOPPED_IN_TAB[stop.reason])
 }
 
+// The session is still open somewhere, most likely in the tab where the owner went on after a Ctrl+C. Nothing ran, so
+// nothing is charged and no try is used; the card says what to close before trying again.
+async function sessionBusy(ctx: Ctx, info: RunInfo): Promise<void> {
+  endRun(ctx.deps.store, info.runId, { type: 'cancel' }, { costUsd: info.costUsd ?? 0, detail: STOPPED_DETAIL })
+  await failItem(ctx, info.item.key, SESSION_BUSY)
+}
+
 async function runJob(ctx: Ctx, info: RunInfo): Promise<void> {
   const { store } = ctx.deps
   try {
@@ -721,6 +734,10 @@ async function runJob(ctx: Ctx, info: RunInfo): Promise<void> {
   } catch (error) {
     if (error instanceof AgentStoppedInTab) {
       await stoppedInTab(ctx, info, error)
+      return
+    }
+    if (error instanceof AgentSessionBusy) {
+      await sessionBusy(ctx, info)
       return
     }
     if (error instanceof AgentAborted) {

@@ -9,7 +9,7 @@ import process from 'node:process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { createClaudeAgent } from '../agent/claude.ts'
-import { createTabAgent, processAlive, reapTabRuns, terminateProcess } from '../agent/tab.ts'
+import { createTabAgent, processAlive, reapTabRuns, sessionRunning, terminateProcess } from '../agent/tab.ts'
 import {
   loadBaseBranches,
   loadChannelRepos,
@@ -115,6 +115,7 @@ export async function startApp(env: Env): Promise<App> {
       run,
       agent,
       workAgent,
+      sessionBusy: (sessionId) => sessionRunning(run, sessionId, tabProblem),
       qa,
       statusPort: config.statusPort,
       store: openStore(config.dbPath),

@@ -17,7 +17,14 @@ import process from 'node:process'
 import { programEnv } from '../exec/env.ts'
 import { closeTerminal, openTerminal } from '../orca/worktree.ts'
 import { redact } from '../store/redact.ts'
-import { AgentAborted, AgentStoppedInTab, claudeArgs, parseStreamOutput, switchedSession } from './claude.ts'
+import {
+  AgentAborted,
+  AgentSessionBusy,
+  AgentStoppedInTab,
+  claudeArgs,
+  parseStreamOutput,
+  switchedSession,
+} from './claude.ts'
 
 const PRIVATE_DIR = 0o700
 const PRIVATE_FILE = 0o600
@@ -196,6 +203,47 @@ const markEnded = (dir: string): void => {
   writeFileSync(join(dir, 'exit'), BOT_ENDED, { mode: PRIVATE_FILE })
 }
 
+const SESSION_FLAGS = new Set(['--resume', '-r', '--session-id'])
+const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
+
+// A process's command line is a claude of that session: the program is claude (or node running claude), and the
+// session is the value of its `--resume`/`--session-id`, as in the bot's own run and the `claude --resume` the tab opens
+// for the owner. Anything else that only mentions the id (a dev server logging into that session's scratchpad) is not.
+function isClaudeOf(command: string, sessionId: string): boolean {
+  const words = command.trim().split(/\s+/)
+  const program = baseName(words[0] ?? '')
+  // An npm install runs as `node …/@anthropic-ai/claude-code/cli.js`: the script's path names claude, not its file.
+  const claude = program === 'claude' || (program.startsWith('node') && (words[1] ?? '').includes('claude'))
+  if (!claude) return false
+  return words.some(
+    (word, index) =>
+      (SESSION_FLAGS.has(word) && words[index + 1] === sessionId) ||
+      word === `--resume=${sessionId}` ||
+      word === `--session-id=${sessionId}`,
+  )
+}
+
+// Whether a claude of this session runs now. A `ps` that fails is reported and taken as no, as before this check; a
+// claude found is reported with its pid and command line, so the owner can find it.
+export async function sessionRunning(
+  run: Run,
+  sessionId: string,
+  onProblem: (what: string, error: unknown) => void,
+): Promise<boolean> {
+  let listed: string
+  try {
+    // `-ww`: whole command lines, however long.
+    listed = (await run('ps', ['-ww', '-axo', 'pid=,command='])).stdout
+  } catch (error) {
+    onProblem('ps', error)
+    return false
+  }
+  const found = listed.split('\n').find((line) => isClaudeOf(line.trim().replace(/^\d+\s+/, ''), sessionId))
+  if (found === undefined) return false
+  onProblem('session_busy', new Error(found.trim()))
+  return true
+}
+
 const isAllowed = (name: string, value: string | undefined): value is string => value !== undefined && programEnv(name)
 
 const allowedEnv = (env: TabAgentDeps['env'], extra: Readonly<Record<string, string>>): Record<string, string> => ({
@@ -307,6 +355,8 @@ export function createTabAgent(deps: TabAgentDeps): Agent {
 
   async function attempt(call: AgentCall, mayRetry: boolean): Promise<AgentResult> {
     if (call.signal?.aborted === true) throw new AgentAborted()
+    // The jobs check before they touch the worktree; this is the last check, right before claude would start.
+    if (await sessionRunning(deps.run, call.sessionId, deps.onTabProblem)) throw new AgentSessionBusy()
     const dir = prepare(call)
     let handle: string | undefined
     try {
@@ -427,11 +477,11 @@ async function stopLeftover(deps: ReapDeps, dir: string): Promise<boolean> {
   const session = readText(join(dir, 'session')) ?? ''
   let stopped = false
   if (!unstarted && pid !== undefined && session !== '') {
-    const command = await deps.run('ps', ['-p', String(pid), '-o', 'command=']).then(
+    const command = await deps.run('ps', ['-ww', '-p', String(pid), '-o', 'command=']).then(
       (result) => result.stdout,
       () => '',
     )
-    if (command.includes('claude') && command.includes(session)) {
+    if (isClaudeOf(command, session)) {
       deps.terminate(pid)
       stopped = true
     }

@@ -32,6 +32,7 @@ import { clip } from '../slack/blocks.ts'
 import { redact } from '../store/redact.ts'
 import { applyEvent, getItem, logEvent, setReview } from '../store/store.ts'
 import { endRun, getWorkspace, listRuns, saveWorkspace, setBaseRef, setPlan, setPrUrl } from '../store/work.ts'
+import { ensureSessionFree } from './session-free.ts'
 
 // What the review jobs reach GitHub with. Injected, so the tests drive them with fakes.
 export interface ReviewGithub {
@@ -111,6 +112,9 @@ async function prepareWorkspace(kit: ReviewKit, item: ItemRow, review: ReviewMet
       branch: worktree.branch,
       baseRef: `origin/${review.base}`,
     })
+  } else {
+    // The reset below would drop what the owner does in this worktree with the session still open.
+    await ensureSessionFree(kit.deps, workspace.sessionId)
   }
   await git(kit, workspace.path, ['fetch', 'origin', fetchSpec(review.head), fetchSpec(review.base)])
   await git(kit, workspace.path, ['reset', '--hard', remoteRef(review.head)])
@@ -365,6 +369,7 @@ export async function fixJob(kit: ReviewKit, info: RunInfo, review: ReviewMeta):
   info.free = true
   const workspace = getWorkspace(store, item.key)
   if (workspace === undefined) throw new Error(`item ${item.key} has no workspace`)
+  await ensureSessionFree(kit.deps, workspace.sessionId)
   const found = readStoredReview(workspace.plan)
   if (found === undefined) {
     await kit.failRun(info, undefined, 'the stored review could not be read')
