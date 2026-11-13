@@ -32,6 +32,7 @@ import {
   setPrLink,
   unsentDigestIds,
 } from '../store/store.ts'
+import { tagsAskedAbout } from '../store/work.ts'
 
 export type IngestSlack = Pick<SlackClient, 'openDm' | 'postMessage' | 'searchMentions' | 'threadReplies'>
 
@@ -342,6 +343,56 @@ async function startReview(
 
 const SUGGEST_NOTE = 'PR 리뷰 요청으로 보여요. 리뷰 버튼으로 시작할 수 있어요'
 
+// The stages whose plan the owner has not approved yet: the new tags of one pass are answered by one new plan.
+const REPLAN_STAGES: ReadonlySet<Stage> = new Set(['planning', 'planned'])
+// The request the plan agent gets. The tags themselves stay in the thread, which it reads as data, marked as new.
+const replanRequest = (count: number): string =>
+  `The thread got ${count} new message${count === 1 ? '' : 's'} tagging the owner since your plan, marked [새 태그]. ` +
+  'Read them and revise the plan to answer what they ask.'
+
+// Asks for the plan again for the new tags of this pass, when the item's plan is still the owner's to approve. A plan
+// being written is not stopped: the request makes its answer outdated, so it is dropped without a card and the next
+// plan answers every tag so far. A review has no plan of its own, and a build from the digest plan has no plan step.
+function replanForTags(deps: IngestDeps, open: ItemRow, tags: readonly string[]): boolean {
+  if (!REPLAN_STAGES.has(open.stage) || open.meta.review !== undefined || open.meta.direct === true) return false
+  // The same tags again (the DM about them could not be sent): they were asked about already.
+  const asked = tagsAskedAbout(deps.store, open.key)
+  if (tags.every((ts) => asked.has(ts))) return true
+  // Tags from anyone must not cost the owner a plan they could approve: with no money or tries left the plan could not
+  // be made again, so the tags are only told about.
+  if (!(deps.retriesLeft?.(open.key) ?? true)) return false
+  const applied = applyEvent(deps.store, open.key, { type: 'revise', owner: true })
+  if (applied.outcome.kind === 'refused') return false
+  logEvent(deps.store, {
+    itemKey: open.key,
+    kind: 'inbound',
+    type: 'revise_text',
+    payload: { text: replanRequest(tags.length), source: 'retag', tags },
+  })
+  return true
+}
+
+// The words of the notice about new tags in the thread of an item under way.
+function retagNotice(input: {
+  open: ItemRow
+  stage: Stage
+  first: Mention
+  count: number
+  replanned: boolean
+  suggested: boolean
+}): string {
+  const { open, first } = input
+  const item = escapeMrkdwn(clip(open.meta.summary ?? open.key, RETAG_SUMMARY_LENGTH))
+  const tag = escapeMrkdwn(clip(cleanSlackText(first.text), RETAG_SUMMARY_LENGTH))
+  const link = first.permalink === '' ? '' : ` <${first.permalink}|새 태그 보기>`
+  const stage = STAGE_TEXT[input.stage] ?? input.stage
+  const head = input.replanned
+    ? `쓰레드에 새 태그가 ${input.count}개 달려서 반영해 플랜을 다시 짜요 (${stage}). 새 플랜 카드가 오면 확인해 주세요.`
+    : `진행 중인 항목의 쓰레드에서 다시 태그됐어요 (${stage}).`
+  const note = input.suggested ? `\n${SUGGEST_NOTE}.` : ''
+  return `${head}${link}\n항목: ${item}\n> ${tag}${note}`
+}
+
 // Somebody tagged the owner again in a thread whose item is still under way. The item is not made twice; the owner is
 // told in a DM, once, with the link to the new tag. A post by a program tells nothing new to the owner who already has
 // an item for the thread, so it is only written down.
@@ -371,16 +422,18 @@ async function tellRetag(
     const prLink = prLinksIn(links).at(-1)
     if (prLink !== undefined) setPrLink(deps.store, open.key, { url: prLink.url, from: first.permalink })
     const channel = await deps.slack.openDm(deps.ownerId)
-    const item = escapeMrkdwn(clip(open.meta.summary ?? open.key, RETAG_SUMMARY_LENGTH))
-    const tag = escapeMrkdwn(clip(cleanSlackText(first.text), RETAG_SUMMARY_LENGTH))
-    const link = first.permalink === '' ? '' : ` <${first.permalink}|새 태그 보기>`
-    const stage = STAGE_TEXT[open.stage] ?? open.stage
+    // Read before the plan is made again: the notice names the stage the owner last saw.
+    const stage = open.stage
+    const replanned = replanForTags(
+      deps,
+      open,
+      people.map((mention) => mention.ts),
+    )
     const card = buildRetagCard({
       itemKey: open.key,
-      text: `진행 중인 항목의 쓰레드에서 다시 태그됐어요 (${stage}).${link}\n항목: ${item}\n> ${tag}${
-        asked.kind === 'suggested' ? `\n${SUGGEST_NOTE}.` : ''
-      }`,
+      text: retagNotice({ open, stage, first, count: people.length, replanned, suggested: asked.kind === 'suggested' }),
       canReview: prLink !== undefined,
+      canPlan: stage === 'notified',
     })
     await deps.slack.postMessage({ channel, text: card.text, blocks: card.blocks })
     markMentionSeen(deps.store, open.key, newest.ts)

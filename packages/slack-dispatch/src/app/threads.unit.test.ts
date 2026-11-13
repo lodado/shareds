@@ -100,6 +100,28 @@ describe('loadThreadText as the thread an agent reads', () => {
     expect(text.length).toBeLessThanOrEqual(8100)
   })
 
+  it('to keep the new tags it is asked to, marked as new, when a long thread is cut', async () => {
+    const item = itemOf('slack:C1:1.1:2.0', 'mention')
+    // The root, the tagged message and five fillers of 1500 characters next to it take about 7600 of the 8000 the
+    // thread gets, so two later tags of about 900 characters each fit only when they are asked to be kept.
+    const filler = 'y'.repeat(1500)
+    const detail = 'z'.repeat(900)
+    const replies = [
+      message('1.1', 'U1', 'the root request'),
+      message('2.0', 'U2', 'the first ask'),
+      ...Array.from({ length: 7 }, (_, index) => message(`3.${index}`, 'U3', filler)),
+      message('9.1', 'U9', `also the header ${detail}`),
+      message('9.2', 'U9', `and the footer ${detail}`),
+    ]
+    const cut = await loadThreadText({ threadReplies: () => Promise.resolve(replies) }, item)
+    expect(cut).not.toContain('and the footer')
+    const kept = await loadThreadText({ threadReplies: () => Promise.resolve(replies) }, item, ['9.1', '9.2'])
+    expect(kept).toContain('[새 태그] [U9] also the header')
+    expect(kept).toContain('[새 태그] [U9] and the footer')
+    expect(kept).toContain('▶ [U2] the first ask')
+    expect(kept.length).toBeLessThanOrEqual(8100)
+  })
+
   it('to mark the tagging message of the first item too, from the permalink in its meta', async () => {
     const store = openStore(':memory:')
     opened.push(store)

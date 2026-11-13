@@ -265,12 +265,34 @@ function requestText(payload: string): string | undefined {
   return typeof parsed.text === 'string' ? parsed.text : undefined
 }
 
+// The Slack messages a request made from new tags in the thread is about; none for a request the owner typed.
+function requestTags(payload: string): string[] {
+  const parsed: unknown = JSON.parse(payload)
+  if (typeof parsed !== 'object' || parsed === null || !('tags' in parsed) || !Array.isArray(parsed.tags)) return []
+  return parsed.tags.filter((tag): tag is string => typeof tag === 'string')
+}
+
 export interface Instruction {
   // The latest request, which says whether a newer one came while a plan was being made.
   id: number
   // Every request since the last plan, oldest first.
   text: string
+  // The new tags of the thread the requests are about, so the plan reads them even in a long thread.
+  tags: string[]
 }
+
+function eventTags(store: Store, itemKey: string, type: 'revise_text' | 'mention_retag'): Set<string> {
+  const rows = store.db
+    .prepare(`SELECT payload FROM events WHERE item_key = ? AND type = ? ORDER BY id`)
+    .all(itemKey, type)
+  return new Set(rows.flatMap((row) => requestTags(text(row, 'payload'))))
+}
+
+// Every tag of the thread a request was ever made from, so the same tags never ask twice.
+export const tagsAskedAbout = (store: Store, itemKey: string): Set<string> => eventTags(store, itemKey, 'revise_text')
+
+// Every later tag in the thread of an item the owner was told about, oldest first.
+export const retagsOf = (store: Store, itemKey: string): string[] => [...eventTags(store, itemKey, 'mention_retag')]
 
 // What the owner asked to change in the plan and the plan has not answered yet. A plan that moved the item on
 // answers all earlier requests; a stale one that was refused answers none.
@@ -284,12 +306,17 @@ export function pendingInstruction(store: Store, itemKey: string): Instruction |
     )
     .all(itemKey, itemKey)
   const asked = rows.flatMap((row) => {
-    const request = requestText(text(row, 'payload'))
-    return request === undefined ? [] : [{ id: integer(row, 'id'), text: request }]
+    const payload = text(row, 'payload')
+    const request = requestText(payload)
+    return request === undefined ? [] : [{ id: integer(row, 'id'), text: request, tags: requestTags(payload) }]
   })
   const last = asked.at(-1)
   if (last === undefined) return undefined
-  return { id: last.id, text: asked.map((request) => request.text).join('\n') }
+  return {
+    id: last.id,
+    text: asked.map((request) => request.text).join('\n'),
+    tags: asked.flatMap((request) => request.tags),
+  }
 }
 
 // Items of this stage whose worktree has not been removed or deliberately kept yet. Found in SQL so that old,

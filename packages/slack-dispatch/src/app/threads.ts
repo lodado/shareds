@@ -1,6 +1,6 @@
 // The text of the Slack thread an item came from, shaped for an agent prompt.
 
-import type { SlackClient } from '../slack/client.ts'
+import type { SlackClient, SlackMessage } from '../slack/client.ts'
 import type { ItemRow } from '../store/store.ts'
 import { cleanSlackText } from '../slack/text.ts'
 
@@ -11,6 +11,8 @@ const THREAD_KEY = /^slack:([^:]+):(\d+\.\d+)(?::(\d+\.\d+))?$/
 const PERMALINK_TS = /\/p(\d{10})(\d{6})(?:[/?#]|$)/
 const MAX_THREAD_CHARS = 8000
 const TAGGED_MARK = '▶ '
+// A tag that came after the plan was asked for; the plan prompt names this mark.
+const NEW_MARK = '[새 태그] '
 
 export interface ThreadAddress {
   channelId: string
@@ -37,10 +39,10 @@ function taggedTsOf(where: ThreadAddress, item: ItemRow): string | undefined {
   return `${seconds}.${micros}`
 }
 
-// The order in which messages are given room: the root, the message that tagged the owner, then the ones around it,
-// then the rest from the start.
-function priority(count: number, tagged: number): number[] {
-  const order: number[] = [0]
+// The order in which messages are given room: the root, the new tags (newest first), the message that tagged the owner,
+// then the ones around it, then the rest from the start.
+function priority(count: number, tagged: number, focus: readonly number[]): number[] {
+  const order: number[] = [0, ...focus.toReversed()]
   if (tagged > 0) {
     order.push(tagged)
     for (let step = 1; step < count; step += 1) order.push(tagged + step, tagged - step)
@@ -51,18 +53,30 @@ function priority(count: number, tagged: number): number[] {
 
 // Whole messages only, oldest first. When the thread does not fit, the root and the message that tagged the owner come
 // first, then their neighbours; what is left out is said where it was left out.
-export async function loadThreadText(slack: Pick<SlackClient, 'threadReplies'>, item: ItemRow): Promise<string> {
+export async function loadThreadText(
+  slack: Pick<SlackClient, 'threadReplies'>,
+  item: ItemRow,
+  focus: readonly string[] = [],
+): Promise<string> {
   const where = parseThreadKey(item.threadKey)
   if (item.source !== 'mention' || where === null) return ''
   const replies = await slack.threadReplies(where.channelId, where.threadTs)
   const taggedTs = taggedTsOf(where, item)
   const tagged = replies.findIndex((reply) => reply.ts === taggedTs)
-  const lines = replies.map(
-    (reply, index) => `${index === tagged ? TAGGED_MARK : ''}[${reply.user ?? 'bot'}] ${cleanSlackText(reply.text)}`,
-  )
+  const wanted = new Set(focus)
+  const isFresh = (reply: SlackMessage | undefined, index: number): boolean => {
+    if (index === tagged || reply === undefined) return false
+    return wanted.has(reply.ts)
+  }
+  const fresh = replies.map((_reply, index) => index).filter((index) => isFresh(replies[index], index))
+  const mark = (index: number): string => {
+    if (index === tagged) return TAGGED_MARK
+    return fresh.includes(index) ? NEW_MARK : ''
+  }
+  const lines = replies.map((reply, index) => `${mark(index)}[${reply.user ?? 'bot'}] ${cleanSlackText(reply.text)}`)
   const kept = new Set<number>()
   let used = 0
-  for (const index of priority(replies.length, tagged)) {
+  for (const index of priority(replies.length, tagged, fresh)) {
     const length = (lines[index]?.length ?? 0) + 1
     if (used + length > MAX_THREAD_CHARS) continue
     kept.add(index)

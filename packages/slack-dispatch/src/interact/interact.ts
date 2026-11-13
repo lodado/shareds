@@ -31,7 +31,7 @@ import {
   moveToRepo,
   setRunChoice,
 } from '../store/store.ts'
-import { cardAt, getWorkspace, listRuns, spentOnItem } from '../store/work.ts'
+import { cardAt, getWorkspace, listRuns, retagsOf, spentOnItem } from '../store/work.ts'
 
 type InteractSlack = Pick<SlackClient, 'postMessage'>
 
@@ -84,6 +84,8 @@ function recordOrEmpty(value: unknown): Record<string, unknown> {
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const UNROUTED = 'unrouted'
+// The record of a plan asked for from the button of a retag notice. The first plan prompt says what the marks mean.
+const PLAN_WITH_TAGS = 'Plan with the later tags in the thread.'
 const SUMMARY_LENGTH = 200
 const QUEUE_LINES = 40
 
@@ -397,7 +399,14 @@ async function handleItemClick(deps: InteractDeps, payload: Record<string, unkno
       const applied = applyEvent(deps.store, item.key, { type: 'approve', owner: true, card: 'plan', fresh })
       // Where the work happens is said up front: the owner can open the folder and watch.
       const place = applied.outcome.kind === 'moved' ? workspaceLines(deps, item.key) : ''
-      await say(deps, where, `${approvePlanText(applied)}${place}`)
+      const replanning = applied.outcome.kind !== 'moved' && item.stage === 'planning'
+      await say(
+        deps,
+        where,
+        replanning
+          ? '플랜을 다시 짜는 중이에요. 새 플랜 카드에서 승인해 주세요.'
+          : `${approvePlanText(applied)}${place}`,
+      )
       return
     }
     case 'reject':
@@ -426,7 +435,29 @@ async function handleItemClick(deps: InteractDeps, payload: Record<string, unkno
     }
     case 'review':
       await reviewFromRetag(deps, item, where)
+      return
+    case 'plan':
+      await say(deps, where, planFromRetag(deps, item))
   }
+}
+
+// The button under a retag notice of an item that still waits in a digest: plan it from the thread as it is now.
+function planFromRetag(deps: InteractDeps, item: ItemRow): string {
+  if (item.stage !== 'notified') return '이미 처리 중이거나 끝난 항목이에요.'
+  if (item.repo === UNROUTED) return '어느 레포인지 정해지지 않았어요. 다이제스트에서 레포를 정해 주세요.'
+  const applied = applyEvent(deps.store, item.key, { type: 'approve', owner: true, card: 'assign', fresh: true })
+  if (applied.outcome.kind !== 'moved') return '이미 처리 중이거나 끝난 항목이에요.'
+  // The tags the notices told the owner about go with the plan, so it reads them even where a long thread is cut.
+  const tags = retagsOf(deps.store, item.key)
+  if (tags.length > 0) {
+    logEvent(deps.store, {
+      itemKey: item.key,
+      kind: 'inbound',
+      type: 'revise_text',
+      payload: { text: PLAN_WITH_TAGS, source: 'retag_button', tags },
+    })
+  }
+  return '새 태그까지 쓰레드를 다시 읽고 플랜을 짤게요. 플랜 카드가 오면 확인해 주세요.'
 }
 
 // A click payload from Slack. Anything but the owner is logged and nothing else happens.

@@ -4,7 +4,7 @@
 import type { ActionElement, Block, DigestMessage } from '../digest/digest.ts'
 import { clip, escapeMrkdwn, firstAction, fitText, matchAction, sourceLink } from '../slack/blocks.ts'
 
-type ItemAction = 'approve_plan' | 'reject' | 'merge' | 'retry' | 'cancel' | 'review'
+type ItemAction = 'approve_plan' | 'reject' | 'merge' | 'retry' | 'cancel' | 'review' | 'plan'
 
 // Slack limits: 3000 characters per section, 150 per button value.
 const SECTION_TEXT_LIMIT = 3000
@@ -17,9 +17,17 @@ const REPORT_LIMIT = 2500
 const REVISE_HINT =
   '*✏️ 플랜을 고치고 싶으면* 이 메시지의 *스레드에 답글*로 지시를 적어 주세요. 같은 세션이 플랜을 고쳐서 새 카드로 다시 보내요.'
 
-const ITEM_ACTIONS: ReadonlySet<string> = new Set(['approve_plan', 'reject', 'merge', 'retry', 'cancel', 'review'])
+const ITEM_ACTIONS: ReadonlySet<string> = new Set([
+  'approve_plan',
+  'reject',
+  'merge',
+  'retry',
+  'cancel',
+  'review',
+  'plan',
+])
 
-const ACTION_PATTERN = /^item\.(approve_plan|reject|merge|retry|cancel|review):(\d+)$/
+const ACTION_PATTERN = /^item\.(approve_plan|reject|merge|retry|cancel|review|plan):(\d+)$/
 
 const section = (text: string): Block => ({ type: 'section', text: { type: 'mrkdwn', text } })
 
@@ -196,22 +204,33 @@ export interface RetagCardInput {
   text: string
   // Whether the new tag carries a pull request link the owner could have reviewed.
   canReview: boolean
+  // Whether the item still waits for the owner's choice, so a plan can be made from the thread as it is now.
+  canPlan?: boolean
 }
 
 // The notice that the owner was tagged again in a thread whose item is under way. With a pull request link in the new
-// tag, it has a button that sends that pull request to the review flow.
+// tag, it has a button that sends that pull request to the review flow; for an item that still waits in a digest, one
+// that makes its plan from the whole thread, the new tags included.
 export function buildRetagCard(input: RetagCardInput): DigestMessage {
-  if (!input.canReview) return { text: input.text, blocks: [section(input.text)] }
+  const buttons = [
+    ...(input.canPlan === true ? [button('plan', 0, input.itemKey, '이 내용으로 플랜 짜기', 'primary')] : []),
+    ...(input.canReview
+      ? [button('review', 0, input.itemKey, 'PR 리뷰하고 머지', input.canPlan === true ? undefined : 'primary')]
+      : []),
+  ]
+  if (buttons.length === 0) return { text: input.text, blocks: [section(input.text)] }
+  const notes = [
+    ...(input.canPlan === true
+      ? ['플랜은 새 태그까지 쓰레드 전체를 읽고 짜요. 구현은 플랜 카드에서 승인해야 시작돼요.']
+      : []),
+    ...(input.canReview ? ['리뷰하고 지적한 점을 고쳐 올린 뒤, 조건이 맞으면 머지하고 결과를 DM으로 알려드려요.'] : []),
+  ]
   return {
     text: input.text,
     blocks: [
       section(input.text),
-      {
-        type: 'actions',
-        block_id: `retag:${input.itemKey}`.slice(0, 255),
-        elements: [button('review', 0, input.itemKey, 'PR 리뷰하고 머지', 'primary')],
-      },
-      context('리뷰하고 지적한 점을 고쳐 올린 뒤, 조건이 맞으면 머지하고 결과를 DM으로 알려드려요.'),
+      { type: 'actions', block_id: `retag:${input.itemKey}`.slice(0, 255), elements: buttons },
+      context(notes.join('\n')),
     ],
   }
 }

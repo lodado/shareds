@@ -180,8 +180,8 @@ export async function createApp(deps: AppDeps): Promise<App> {
 
   const tracker = deps.issueTracker
   // An item from the tracker is read from its issue; one from Slack, from its thread.
-  const loadThread = (item: Parameters<typeof loadThreadText>[1]): Promise<string> => {
-    if (tracker === undefined || parseIssueSourceKey(item.threadKey) === null) return loadThreadText(slack, item)
+  const loadThread = (item: Parameters<typeof loadThreadText>[1], focus?: readonly string[]): Promise<string> => {
+    if (tracker === undefined || parseIssueSourceKey(item.threadKey) === null) return loadThreadText(slack, item, focus)
     return loadIssueText(tracker, item.threadKey)
   }
   // The owner's GitHub login, asked once: reviews are refused for the owner's own pull requests and run under this account.
