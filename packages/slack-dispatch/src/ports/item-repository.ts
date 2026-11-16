@@ -3,14 +3,14 @@
 
 import type { ItemMeta } from '../store/store.ts'
 
-export interface NewIntakeItem {
+interface NewIntakeItem {
   // Where the work came from, such as `jira:PROJ-123`. One source may become several items, one per repo.
   sourceKey: string
   repo: string
   meta: ItemMeta
 }
 
-export interface IntakeLog {
+interface IntakeLog {
   itemKey?: string
   type: string
   payload: Record<string, unknown>

@@ -19,7 +19,7 @@ export interface JiraOptions {
   maxRetries?: number
 }
 
-export class JiraApiError extends Error {
+class JiraApiError extends Error {
   readonly status: number
 
   constructor(what: string, status: number) {
@@ -42,7 +42,7 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 // JQL takes "yyyy-MM-dd HH:mm" in the user's own time zone; this machine's zone is assumed to be the same.
-export const jqlDate = (d: Date): string =>
+const jqlDate = (d: Date): string =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 
 export function assignedJql(query: IssueQuery, extraJql = ''): string {
@@ -148,10 +148,4 @@ export function createJiraIssueTracker(credentials: JiraCredentials, options: Ji
       return parseIssue(await response.json(), baseUrl)
     },
   }
-}
-
-// Used when Jira is not configured: it never has anything, so the service behaves as before.
-export const noIssueTracker: IssueTrackerPort = {
-  assignedToMe: () => Promise.resolve([]),
-  findIssue: () => Promise.resolve(null),
 }

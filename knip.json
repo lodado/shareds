@@ -10,11 +10,14 @@
     ".gitnexus/**",
     "packages/game-interface-design/skills/threejs-game-wireframe/starter/**"
   ],
-  "ignoreDependencies": ["@eslint/css", "typescript-eslint"],
+  "ignoreDependencies": ["@eslint/css", "typescript-eslint", "claude-code"],
   "ignoreBinaries": ["rtk"],
   "workspaces": {
     "packages/*": {
-      "entry": ["**/scripts/*.{js,mjs}", "**/evals/*.{js,mjs}", "**/*.test.{js,mjs}"]
+      "entry": ["**/scripts/*.{js,mjs,ts}", "**/evals/*.{js,mjs}", "**/*.test.{js,mjs}"]
+    },
+    "packages/lint-guard": {
+      "entry": ["hooks/register.js", "**/*.test.{js,mjs,ts}"]
     },
     ".": {
       "entry": [".claude/hooks/*.mjs"]

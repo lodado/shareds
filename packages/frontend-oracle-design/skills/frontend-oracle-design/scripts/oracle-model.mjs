@@ -519,12 +519,7 @@ export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CO
   const cases = nodes
     .flatMap((node) => node.edges.map((edge) => ({ ...edge, depth: node.trace.length })))
     .filter(({ trace, depth }) => trace.length > space.bound && (coveredDepth === null || depth <= coveredDepth))
-    .map(({ trace, observations }) => ({
-      id: `C${sha256(stableStringify(trace)).slice(0, 12)}`,
-      label: trace.map(eventLabel).join(' · '),
-      trace,
-      observations,
-    }))
+    .map(traceCase('C'))
     .sort((left, right) => left.trace.length - right.trace.length || (left.label < right.label ? -1 : Number(left.label > right.label)))
   return {
     status: capped === null ? 'closed' : 'capped',
@@ -563,6 +558,16 @@ export function leaves(value, path, found = []) {
 function compareValues(left, right) {
   if (typeof left === 'number' && typeof right === 'number') return left - right
   return stableStringify(left) > stableStringify(right) ? 1 : -1
+}
+
+// A trace as a generated case: an id from the trace's hash under the cover's prefix (C, T), and its events as a label.
+function traceCase(prefix) {
+  return ({ trace, observations }) => ({
+    id: `${prefix}${sha256(stableStringify(trace)).slice(0, 12)}`,
+    label: trace.map(eventLabel).join(' · '),
+    trace,
+    observations,
+  })
 }
 
 /** 경로마다 관측한 값들로 동치류 이름 함수를 만든다 — 값 하나가 어느 류인지는 같은 경로의 다른 값에 달렸다. */
@@ -664,12 +669,7 @@ export function minimalCover(model, space, { maxConfigurations = MAX_COVER_CONFI
   const candidates = coverCandidates(required, itemsOf)
   const items = [...new Set(candidates.flatMap((candidate) => [...candidate.items]))].sort()
   const cases = dropPrefixes(greedyCover(candidates))
-    .map(({ trace, observations }) => ({
-      id: `T${sha256(stableStringify(trace)).slice(0, 12)}`,
-      label: trace.map(eventLabel).join(' · '),
-      trace,
-      observations,
-    }))
+    .map(traceCase('T'))
     .sort((left, right) => left.trace.length - right.trace.length || compareValues(left.label, right.label))
   return {
     status: capped === null ? 'closed' : 'capped',
