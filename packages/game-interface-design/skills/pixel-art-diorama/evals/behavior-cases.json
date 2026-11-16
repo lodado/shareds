@@ -44,6 +44,18 @@
       ]
     },
     {
+      "id": "D-06-one-shot-aesthetics",
+      "prompt": "풋살 5인제 경기를 떠 있는 작은 학교 운동장 섬 도트 3D 디오라마로, 한 번에 만들어줘. 코트 표면 4종, 낮·황혼·밤, 폰 폭까지.",
+      "must": [
+        "write the direction sheet first, including a value plan, one mood row, a hero rotation and quiet zones",
+        "build the palette from hue-shifted ramps with the recipe instead of copying the worked example's PALETTE or lighting rows",
+        "keep every team kit and court surface on its own palette entry and apart in grayscale",
+        "run the critique passes on the blockout shots and again on the dressed scene, applying each fix",
+        "draw wire, rails and ropes two pixels or more in the mode they are read in",
+        "report LOOK and FUNCTION separately, and NOT_RUN for phone GPU performance"
+      ]
+    },
+    {
       "id": "D-05-looks-empty",
       "prompt": "디오라마가 휑하고 밋밋해 보여. 뭐가 문제야?",
       "must": [

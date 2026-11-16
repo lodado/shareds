@@ -167,7 +167,7 @@ game-interface-design/
       evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
     pixel-art-diorama/
       SKILL.md
-      references/                           아트 디렉션·월드 드레싱 (코드 없음), 렌더 파이프라인, 카메라, 장면, 시뮬레이션, 드로 콜, 검증, 함정 (원본 코드 그대로 인용)
+      references/                           아트 디렉션·구도·색과 빛·도트 공예·월드 드레싱 (코드 없음), 렌더 파이프라인, 카메라, 장면, 시뮬레이션, 드로 콜, 검증, 함정 (원본 코드 그대로 인용)
       agents/openai.yaml
       evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
   scripts/                                  검사기, 스캐폴드, 테스트

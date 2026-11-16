@@ -68,6 +68,18 @@ walking the stalls, gulls, and a cat that waits by the fish crates.
 - Check each prop's size in pixels ([art direction](art-direction.md)): under two pixels in the mode
   it is read in, draw it larger than life or leave it out.
 
+## Rhythm and quiet
+
+- Density has a rhythm: a cluster, a gap, a cluster. An even spread of props reads as wallpaper. The
+  gaps are the sheet's quiet zones, and they stay empty ([composition](composition.md)).
+- Repeated modules come in three variants (a height, a hue step from the same ramp, a missing piece)
+  and never sit three in a row at the same height.
+- The world's edge gets a transition (soil, foam, kerb, overhanging grass), and each large mass gets a
+  contact shadow ([pixel craft](pixel-craft.md)). These cost no geometry and do more for the picture
+  than another prop.
+- When the blockout passes and the picture still looks bare, add ground wear and contact shadows
+  first, then a second tier-three group near the stage, and only then more tier-two structures.
+
 ## What dressing costs
 
 Count this before building, against the budget of [draw calls](draw-calls.md).
