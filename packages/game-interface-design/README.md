@@ -36,7 +36,7 @@ TARGET_DIR: ./my-game
 | `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다.                        |
 | `pixel-sprite-animation`       | 기준 프레임 + diff로 도트 스프라이트 애니메이션을 만들고, 타이밍·스미어·타격감 린트와 컨택트 시트로 검사한다.                  |
 | `lifelike-cat-motion`          | 실제 고양이 사진·영상을 근거로 몸짓·대기 동작·쓰다듬기·장난감·놀람 반응을 만들고, 행동 기록(trace)을 검사한다.                 |
-| `pixel-art-diorama`            | three.js 장면을 저해상도로 그려 깊이 외곽선·팔레트로 도트처럼 보이게 하고, 드로 콜을 줄이고, 헤드리스 스크린숏으로 검사한다.   |
+| `pixel-art-diorama`            | 방향 시트·블록아웃으로 그릴 것을 정하고, three.js 장면을 저해상도·외곽선·팔레트로 도트처럼 그려 드로 콜·스크린숏을 검사한다.   |
 
 `pixel-sprite-animation`의 하네스는 스킬 폴더(`skills/pixel-sprite-animation/`)에서 `node scripts/pixel-sprite.mjs build <spec.json>`으로 돈다.
 사용자가 파일을 주면 `attach`로 스펙에 베이스·프레임·파트로 합치고(팔레트 맞춤, 출처 기록, `.bak` 보관) diff로 이어서 작업한다.
@@ -167,7 +167,7 @@ game-interface-design/
       evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
     pixel-art-diorama/
       SKILL.md
-      references/                           렌더 파이프라인, 카메라, 장면, 시뮬레이션, 드로 콜, 검증, 함정 (원본 코드 그대로 인용)
+      references/                           아트 디렉션·월드 드레싱 (코드 없음), 렌더 파이프라인, 카메라, 장면, 시뮬레이션, 드로 콜, 검증, 함정 (원본 코드 그대로 인용)
       agents/openai.yaml
       evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
   scripts/                                  검사기, 스캐폴드, 테스트

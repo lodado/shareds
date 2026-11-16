@@ -24,6 +24,29 @@ jsdom has no WebGL: do not construct the renderer in unit tests; build scene obj
   error from the app is a finding (three.js warnings included; a `toNonIndexed()` on an already
   non-indexed geometry was one).
 
+## Two verdicts
+
+A scene can look right and do nothing, or work and look like a test fixture. Report both, each `PASS`,
+`FAIL` or `NOT_RUN` with its evidence; one never stands in for the other.
+
+`LOOK`: the [direction sheet](art-direction.md) read against the screenshots, row by row.
+
+- The reading order holds in the wide and follow modes: the first thing the sheet names is the first
+  thing found.
+- A person and the smallest thing that must read are the pixel sizes the sheet gives.
+- The accent appears only on what the sheet allows.
+- All four tiers of [world dressing](world-dressing.md) are present, densest round the stage, and the
+  stage floor is clear.
+- The stage is whole in every rotation, and nothing hangs in the air where a wall dropped.
+- No row shares its value with the worked example without a reason on the sheet.
+
+`FUNCTION`: every claim the page makes, checked against state.
+
+- Each control changes what its label says, and its pressed state follows.
+- Every number on the page equals the simulation's value at that moment.
+- The simulation reaches its end through the debug hook.
+- Each camera mode and rotation can be reached from the keyboard.
+
 ## Screenshot checklist
 
 Look at every image; a passing script only proves nothing crashed.

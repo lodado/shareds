@@ -148,6 +148,43 @@ test('pixel-art 3D diorama requests route to the diorama lane, which owns its re
   }
 })
 
+// Low risk: static instruction contract for the diorama lane's direction and dressing steps; no scene is built here.
+test('diorama lane decides the look before code, blocks out before dressing and reports look and function apart', () => {
+  const diorama = read('pixel-art-diorama/SKILL.md')
+  const direction = read('pixel-art-diorama/references/art-direction.md')
+  const dressing = read('pixel-art-diorama/references/world-dressing.md')
+  const verification = read('pixel-art-diorama/references/verification.md')
+  for (const ref of ['art-direction', 'world-dressing']) {
+    assert.match(diorama, new RegExp(`\\(references/${ref}\\.md\\)`), ref)
+  }
+  assert.match(diorama, /^## Stage 0 — Direction$/m)
+  assert.match(diorama, /`DIRECTION`/)
+  assert.match(diorama, /not\s+from\s+the\s+worked\s+example/)
+  assert.match(diorama, /`LOOK`\s+and\s+`FUNCTION`/)
+  // rows are numbers and rules, and a second subject sits beside the worked example so its values are not copied
+  for (const heading of ['Direction sheet', 'Size in pixels', 'Adjective to decision', 'Page around the canvas']) {
+    assert.match(direction, new RegExp(`^## ${heading}$`, 'm'), heading)
+  }
+  assert.match(direction, /not\s+built/)
+  assert.match(direction, /needs\s+a\s+reason/)
+  for (const heading of ['Block out', 'Four tiers', 'Placement', 'What dressing costs']) {
+    assert.match(dressing, new RegExp(`^## ${heading}$`, 'm'), heading)
+  }
+  assert.match(dressing, /all\s+four\s+rotations/)
+  assert.match(dressing, /blocked\s+cells/)
+  assert.match(verification, /^## Two verdicts$/m)
+  assert.match(verification, /one\s+never\s+stands\s+in\s+for\s+the\s+other/)
+  const rubric = JSON.parse(read('pixel-art-diorama/evals/behavior-cases.json'))
+  assert.equal(rubric.status, 'not_executed')
+  assert.equal(new Set(rubric.cases.map((c) => c.id)).size, rubric.cases.length)
+  for (const id of ['D-04-new-subject-direction', 'D-05-looks-empty']) {
+    assert.ok(
+      rubric.cases.some((c) => c.id === id),
+      id,
+    )
+  }
+})
+
 test('product copy rules ship byte-identical to the frontend-interface-design copy', () => {
   const copy = read('threejs-game-wireframe/references/product-copy.md')
   const source = path.join(SKILLS, '../../frontend-interface-design/skills/reference-driven-figma-design/references/product-copy.md')
