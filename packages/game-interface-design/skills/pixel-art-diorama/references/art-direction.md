@@ -13,10 +13,19 @@ One line per row. A row is a number, a named colour or a rule that a screenshot 
   frame, the accent, motion, light). Two things that use the same means compete.
 - **Frame**: per camera mode, the half-height in metres and what must be inside it.
 - **Scale**: a person and the smallest thing that must read, in low-res pixels per mode.
+- **Value plan**: the three to five grey masses of the wide shot, which one is lightest, which
+  darkest, and that the stage holds the widest range ([composition](composition.md)).
 - **Colour**: five to eight foundation colours (one per material family, plus ground and sky), then
   the accent and the only things allowed to wear it. Two sides that must be told apart, such as
   teams, take one accent each. The ramps and the must-stay-distinct entries of
-  [the palette](render-pipeline.md) grow from these.
+  [the palette](render-pipeline.md) grow from these, built with the recipe in
+  [colour and light](color-and-light.md), not copied from the worked example's palette.
+- **Mood**: one row of the harmony table (base hues, accent, shadow tint, light tint) and the colour
+  of each time of day.
+- **Hero rotation**: the one rotation polished first, and the lower bar the other three must pass
+  ([composition](composition.md)).
+- **Quiet zones**: two or more areas left empty or one-colour on purpose, so the busy area has
+  somewhere to rest.
 - **Modules**: the sizes every building repeats (storey height, bay width, door, rail).
 - **Detail levels**: mass, part and trim, the size range of each, and which levels a building far
   from the stage keeps.
@@ -80,7 +89,8 @@ Futsal on a floating school yard (built):
   frame, close 5.5 m on the ball.
 - **Scale**: the sizes computed above.
 - **Colour**: 46 entries in eight families; each club kit, each of the four court surfaces and each
-  sky keeps an entry of its own.
+  sky keeps an entry of its own. Its value plan, mood, hero rotation and quiet zones are not recorded
+  in the references, so those rows are left out.
 - **Cutaway**: cage sides facing the camera drop to a 0.6 m kickboard; the school hides its upper
   floors when it stands on the near side.
 - **Light**: day, dusk and night; after dark four floodlights, the lamp faces and the windows carry
@@ -102,8 +112,18 @@ A fishing harbour at dawn (derived, never run):
   aimed below the waterline so the quay wall and the water are in frame; close 5 m.
 - **Scale**: a 1.7 m person is 22 px in the follow mode and 7 px in the whole-harbour mode; a gull
   drawn at 1.5× (0.6 m) is 9 px and 2.9 px.
+- **Value plan**: the lighthouse is the lightest large mass against the darkest sky band; the quay
+  and the sheds sit in the middle; the stage, the boat and the crane, holds the near-black of the
+  hull and the near-white of the sails.
 - **Colour**: foundations of wet stone, timber, sea, dawn sky, net green and rust; the accent is buoy
-  orange, on the working boat, its crates and the buoys only.
+  orange, on the working boat, its crates and the buoys only. The 33-entry palette is in
+  [colour and light](color-and-light.md).
+- **Mood**: calm, cool morning (the first row of the harmony table): blue-grey and teal with pale
+  rose, shadows blue-violet, light peach; the lamps still glow warm.
+- **Hero rotation**: the lighthouse behind the stage with the sun low on the left; the other three
+  keep the boat whole and the lighthouse visible above the sheds.
+- **Quiet zones**: open water at the far corner of the whole-harbour mode, and the bare quay surface
+  between the stalls and the crane.
 - **Modules**: storey 2.6 m, bay 2.4 m, door 1 m by 2 m, quay rail 1 m; every shed and stall is a
   whole number of bays.
 - **Detail levels**: mass over 2 m, part 0.4–2 m (doors, shutters, crates), trim under 0.4 m (rails,

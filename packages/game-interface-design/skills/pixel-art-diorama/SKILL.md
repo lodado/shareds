@@ -1,6 +1,6 @@
 ---
 name: pixel-art-diorama
-description: 'Build, tune or review a three.js scene that renders as pixel art (도트 디오라마, 픽셀아트 3D): a direction sheet and a blockout before detail, a low-res render target with depth outlines, Bayer dither and palette quantization, a toon ramp, an orthographic camera at 31° snapped to the texel grid and turned in 90° steps, camera-side cutaways, optionally a headless agent simulation feeding it, then cut draw calls (static bake, instanced dolls, off-screen render skip) and verify with headless SwiftShader screenshots and a frame probe. Use for isometric dioramas, "3D that looks like pixel art", a diorama that looks empty or generic, pixel crawl, z-fighting, noisy outlines or a slow diorama; not sprite animation, game planning or a generic Three.js prototype.'
+description: 'Build, tune or review a three.js scene that renders as pixel art (도트 디오라마, 픽셀아트 3D): a direction sheet (composition, value plan, hue-shifted palette ramps, mood) and a blockout before detail, a low-res render target with depth outlines, Bayer dither and palette quantization, a toon ramp, an orthographic camera at 31° snapped to the texel grid and turned in 90° steps, camera-side cutaways, optionally a headless agent simulation feeding it, then cut draw calls (static bake, instanced dolls, off-screen render skip) and verify with headless SwiftShader screenshots and a frame probe. Use for isometric dioramas, "3D that looks like pixel art", a diorama that looks empty or generic, pixel crawl, z-fighting, noisy outlines or a slow diorama; not sprite animation, game planning or a generic Three.js prototype.'
 allowed-tools:
   - Bash
 metadata:
@@ -38,10 +38,15 @@ rule that a screenshot can confirm or refute. The rows are the concept in one se
 finds first, second and third and by which means, what each camera mode must hold, the size in
 low-res pixels of a person and of the smallest thing that must read, five to eight foundation colours
 with the accent and what alone may wear it, the module sizes every building repeats, what the
-cutaway drops, the hero time of day, what never stops moving, and the page around the canvas. An
-adjective is not a row: "cosy" becomes a time of day, a storey limit and windows that glow. A review
-reads the sheet back from the code and reports the rows with no value. The rows, the pixel-size
-formula, two filled sheets and the page rules: [art direction](references/art-direction.md).
+cutaway drops, the hero time of day, what never stops moving, and the page around the canvas. Add
+the picture rows: the value plan (three to five grey masses, the stage holding the widest range), one
+mood row of the harmony table, the hero rotation, and the quiet zones. An adjective is not a row:
+"cosy" becomes a time of day, a storey limit and windows that glow. A review reads the sheet back
+from the code and reports the rows with no value. The rows, the pixel-size formula, two filled sheets
+and the page rules: [art direction](references/art-direction.md). Where things go on the frame:
+[composition](references/composition.md). Ramps, the saturation budget, the time-of-day colours and a
+second palette: [colour and light](references/color-and-light.md). Build the palette with that recipe;
+the worked example's `PALETTE` and lighting rows are one answer for one subject, not defaults.
 
 ## Stage 1 — Pixel pipeline
 
@@ -68,7 +73,10 @@ colours, lit, and shot in the wide mode from all four rotations. Add detail only
 whole in every rotation and the landmark still names the place. Then fill four tiers in order
 (landmark, structures, props, life), densest round the stage, each prop with a user. The order, the
 questions to answer from the blockout shots, placement and what each prop costs in draw calls:
-[world dressing](references/world-dressing.md).
+[world dressing](references/world-dressing.md). The small-scale rules (clusters, one pixel density,
+materials, contact shadows, nothing under two pixels): [pixel craft](references/pixel-craft.md). Run
+the critique passes in [verification](references/verification.md) on the blockout shots and again on
+the dressed scene, and apply each fix before moving on.
 
 - Build from one shared unit box scaled per mesh and a material cache keyed by colour; give every
   surface that changes on its own (a swapped floor, emissive windows, a recoloured lamp) its own
@@ -119,8 +127,8 @@ Code, the measurements and the full list of live nodes: [draw calls](references/
    checklist: [verification](references/verification.md).
 3. Read every screenshot against the [pitfalls](references/pitfalls.md) table before calling it done.
 4. Give two verdicts, `LOOK` and `FUNCTION`, each with its evidence: the direction sheet read row by
-   row against the screenshots, and every control, displayed value and the simulation's end checked
-   against state. A pass on one says nothing about the other.
+   row against the screenshots and the six critique passes, and every control, displayed value and
+   the simulation's end checked against state. A pass on one says nothing about the other.
 5. Report each check with its status, the draw-call and frame numbers, and `NOT_RUN` for phone GPU
    performance (SwiftShader is a CPU rasterizer) and real touch input unless a phone was used.
 

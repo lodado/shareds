@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0 — 2026-11-16
+
+- `pixel-art-diorama` gains the picture rules a one-shot build was missing, as three references without code. `composition` (value plan, the empty corners of a 45° frame, silhouette and rhythm, depth without perspective, a hero rotation with a lower bar for the other three, the eye path, editorial and phone page layout), `color-and-light` (hue-shifted ramps, a saturation budget, a harmony table by mood, contrast pairs, colours for day, dusk and night, and a second 33-entry palette whose numbers the contract test recomputes) and `pixel-craft` (clusters and banding, one pixel density, material patterns, contact shadows and ground wear, nothing under two pixels). Every number is marked a starting value, not a measurement.
+- The Stage 0 sheet adds four rows (value plan, mood, hero rotation, quiet zones), `SKILL.md` says the worked example's palette and lighting are one answer rather than defaults, and `world-dressing` gains a rhythm-and-quiet section.
+- `verification` adds six critique passes (squint, grayscale, silhouette, accent and colour, rotation, pixel zoom), run on the blockout shots and again on the dressed scene; `LOOK` fails if one was skipped. One rubric case covers the futsal prompt as a single shot.
+
 ## 0.8.0 — 2026-11-16
 
 - `pixel-art-diorama` decides the look before it draws. A new Stage 0 writes a direction sheet whose rows are numbers, named colours or rules a screenshot can refute (reading order, what each camera mode holds, sizes in low-res pixels, foundation colours and the accent, module sizes, cutaway, hero time, motion, page), and the scene stage now blocks out ground, landmark, stage and supporting masses and shoots all four rotations before any detail.

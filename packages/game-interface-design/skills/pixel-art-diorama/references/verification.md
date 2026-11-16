@@ -40,6 +40,30 @@ A scene can look right and do nothing, or work and look like a test fixture. Rep
 - The stage is whole in every rotation, and nothing hangs in the air where a wall dropped.
 - No row shares its value with the worked example without a reason on the sheet.
 
+### Critique passes
+
+Run passes 1, 2, 3 and 5 on the blockout shots and all six on the dressed scene, shooting the wide
+and follow modes in the hero rotation and the other three. Each has a question and a smallest fix;
+apply the fix, shoot again, and write what changed on the report.
+
+1. **Squint**: shrink the wide shot to a quarter of its width. Are ground, stage and landmark three
+   shapes, and is the first thing seen the sheet's first row? Fix: raise the stage's contrast or lower
+   what competes with it.
+2. **Grayscale**: convert to grey. Does the stage hold the widest value range, and do the contrast
+   pairs still separate? Fix: move one entry of the pair by a ramp step in value.
+3. **Silhouette**: fill the landmark with one flat colour. Is it still recognisable? Fix: change its
+   outline, not its colour.
+4. **Accent and colour**: is the accent only on what the sheet allows, within about 3–10% of the stage
+   zone, and does each ramp show three distinct entries? Fix: mute the nearest competing ramp.
+5. **Rotation**: all four. Is the stage whole, the landmark naming the place, nothing hanging where a
+   wall dropped, and the hero rotation clearly the best? Fix: move, lower or add to the cutaway.
+6. **Pixel zoom**: view at 100%. Any lone pixels, parallel bands, pillow shading, outline stripes on
+   floors, or things under two pixels? Fix: the matching rule in [pixel craft](pixel-craft.md).
+
+`LOOK` fails if a pass was skipped or a fix was not applied. The passes are by eye; they catch the
+usual faults, not taste. A pixel count of one palette entry can be read from a screenshot in a
+throwaway script when a number is wanted; no script ships with this skill.
+
 `FUNCTION`: every claim the page makes, checked against state.
 
 - Each control changes what its label says, and its pressed state follows.

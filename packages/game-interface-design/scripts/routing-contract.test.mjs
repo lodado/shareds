@@ -185,6 +185,68 @@ test('diorama lane decides the look before code, blocks out before dressing and 
   }
 })
 
+// Low risk: static instruction contract for the diorama lane's picture rules; the second palette's numbers are
+// recomputed here so they cannot drift from the claims written beside them.
+test('diorama lane carries composition, colour and pixel-craft rules and a second palette that holds', () => {
+  const diorama = read('pixel-art-diorama/SKILL.md')
+  const direction = read('pixel-art-diorama/references/art-direction.md')
+  const composition = read('pixel-art-diorama/references/composition.md')
+  const colour = read('pixel-art-diorama/references/color-and-light.md')
+  const craft = read('pixel-art-diorama/references/pixel-craft.md')
+  const verification = read('pixel-art-diorama/references/verification.md')
+  for (const ref of ['composition', 'color-and-light', 'pixel-craft']) {
+    assert.match(diorama, new RegExp(`\\(references/${ref}\\.md\\)`), ref)
+  }
+  assert.match(diorama, /one\s+answer\s+for\s+one\s+subject/)
+  for (const row of ['Value plan', 'Mood', 'Hero rotation', 'Quiet zones']) {
+    assert.match(direction, new RegExp(`^- \\*\\*${row}\\*\\*`, 'm'), row)
+  }
+  const headings = {
+    composition: [composition, ['Value plan', 'Frame and corners', 'Silhouette and rhythm', 'Depth without perspective', 'Hero rotation', 'Eye path', 'Page layout']],
+    colour: [colour, ['Ramps', 'Saturation budget', 'Harmony', 'Contrast pairs', 'Time of day', 'A second palette']],
+    craft: [craft, ['Clusters and banding', 'One density', 'Materials', 'Grounding', 'Thin things']],
+  }
+  for (const [name, [text, list]] of Object.entries(headings)) {
+    for (const heading of list) assert.match(text, new RegExp(`^## ${heading}$`, 'm'), `${name}: ${heading}`)
+  }
+  assert.match(colour, /not\s+copy\s+theirs/)
+  assert.match(composition, /starting\s+value/)
+  assert.match(verification, /^### Critique passes$/m)
+  for (const pass of ['Squint', 'Grayscale', 'Silhouette', 'Accent and colour', 'Rotation', 'Pixel zoom']) {
+    assert.match(verification, new RegExp(`^\\d\\. \\*\\*${pass}\\*\\*`, 'm'), pass)
+  }
+  assert.match(verification, /`LOOK`\s+fails\s+if\s+a\s+pass\s+was\s+skipped/)
+
+  // second palette: 33 distinct entries, no two closer than 20 in RGB, every ramp of three or more rising in luminance
+  const section = colour.split(/^## A second palette$/m)[1].split(/^Read it against/m)[0]
+  const rows = section.split('\n').filter((line) => line.startsWith('|') && /`#[0-9a-f]{6}`/.test(line))
+  const ramps = rows.map((line) => [...line.matchAll(/`(#[0-9a-f]{6})`/g)].map((m) => m[1]))
+  const all = ramps.flat()
+  assert.equal(all.length, 33)
+  assert.equal(new Set(all).size, 33)
+  const rgb = (hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16))
+  const linear = (c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4)
+  const luminance = (hex) => {
+    const [r, g, b] = rgb(hex).map(linear)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  let closest = Infinity
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const [a, b] = [rgb(all[i]), rgb(all[j])]
+      closest = Math.min(closest, Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]))
+    }
+  }
+  assert.ok(closest >= 20, `closest pair is ${closest.toFixed(1)}`)
+  for (const ramp of ramps.filter((r) => r.length >= 3)) {
+    const lum = ramp.map(luminance)
+    assert.ok(lum.every((x, i) => i === 0 || x > lum[i - 1]), ramp.join(' '))
+  }
+
+  const rubric = JSON.parse(read('pixel-art-diorama/evals/behavior-cases.json'))
+  assert.ok(rubric.cases.some((c) => c.id === 'D-06-one-shot-aesthetics'))
+})
+
 test('product copy rules ship byte-identical to the frontend-interface-design copy', () => {
   const copy = read('threejs-game-wireframe/references/product-copy.md')
   const source = path.join(SKILLS, '../../frontend-interface-design/skills/reference-driven-figma-design/references/product-copy.md')
