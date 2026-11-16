@@ -578,6 +578,29 @@ setInterval(() => {}, 1000)
     })
   }
 
+  // Resolves with the pid written to `name` in `dir` once the file holds one. A file is there before its contents (the
+  // shell's `>` and writeFileSync create it first, and Linux reports the creation), and Number('') is 0:
+  // process.kill(0) signals this whole process group, the test runner and every package test beside it.
+  function pidIn(dir: string, name: string): Promise<number> {
+    const written = (): number | undefined => {
+      const pid = Number.parseInt(existsSync(join(dir, name)) ? read(dir, name) : '', 10)
+      return Number.isInteger(pid) && pid > 0 ? pid : undefined
+    }
+    return new Promise((resolve) => {
+      const watcher = watch(dir, () => {
+        const pid = written()
+        if (pid === undefined) return
+        watcher.close()
+        resolve(pid)
+      })
+      const pid = written()
+      if (pid !== undefined) {
+        watcher.close()
+        resolve(pid)
+      }
+    })
+  }
+
   function start(mode: 'hang' | 'finish', options: { viewer?: string; claim?: boolean } = {}) {
     const dir = folder()
     const bin = join(dir, 'bin')
@@ -636,7 +659,7 @@ setInterval(() => {}, 1000)
   it('to only stop claude, without opening the session, when the bot ends it', async () => {
     const { dir, exited } = start('hang')
     await appeared(dir, 'env')
-    process.kill(Number(read(dir, 'pid')), 'SIGTERM')
+    process.kill(await pidIn(dir, 'pid'), 'SIGTERM')
     await exited
     expect(read(dir, 'exit')).toBe('143 0\n')
     expect(existsSync(join(dir, 'resumed'))).toBe(false)
@@ -649,8 +672,7 @@ setInterval(() => {}, 1000)
     const { dir, exited } = start('finish', { viewer })
     await appeared(dir, 'exit')
     expect(read(dir, 'exit')).toBe('0 0\n')
-    await appeared(dir, 'stream.jsonl.viewer')
-    process.kill(Number(read(dir, 'stream.jsonl.viewer')), 'SIGTERM')
+    process.kill(await pidIn(dir, 'stream.jsonl.viewer'), 'SIGTERM')
     await exited
   })
 
