@@ -273,7 +273,20 @@ async function reviewFromRetag(deps: InteractDeps, item: ItemRow, where: Where):
     await say(deps, where, 'PR 링크를 찾지 못했어요.')
     return
   }
-  const detection = await detectFor(deps, link.url)
+  await reviewPullRequest(deps, where, link.url, () => ({ url: link.from, source: 'mention', at: String(deps.now()) }))
+}
+
+type ReviewOrigin = Pick<Parameters<typeof createReviewItem>[1], 'url' | 'source' | 'at'>
+
+// The pull request at prUrl gets a review item and the owner hears it started, or hears why it cannot be reviewed.
+// Where the request came from is read only once the pull request checks out, as the callers did before.
+async function reviewPullRequest(
+  deps: InteractDeps,
+  where: Where,
+  prUrl: string,
+  originOf: () => ReviewOrigin,
+): Promise<void> {
+  const detection = await detectFor(deps, prUrl)
   if (detection.kind !== 'review') {
     await say(deps, where, refusedText(detection))
     return
@@ -284,9 +297,7 @@ async function reviewFromRetag(deps: InteractDeps, item: ItemRow, where: Where):
       repo: detection.repo,
       review: detection.review,
       summary: clip(`PR 리뷰: ${detection.review.title}`, SUMMARY_LENGTH),
-      url: link.from,
-      source: 'mention',
-      at: String(deps.now()),
+      ...originOf(),
     },
     deps.retriesLeft,
   )
@@ -540,24 +551,7 @@ async function reviewFromCommand(deps: InteractDeps, where: Where, text: string)
     return
   }
   const from = links.find((link) => link !== prUrl && parsePrUrl(link) === null) ?? ''
-  const detection = await detectFor(deps, prUrl)
-  if (detection.kind !== 'review') {
-    await say(deps, where, refusedText(detection))
-    return
-  }
-  const started = createReviewItem(
-    deps.store,
-    {
-      repo: detection.repo,
-      review: detection.review,
-      summary: clip(`PR 리뷰: ${detection.review.title}`, SUMMARY_LENGTH),
-      url: from,
-      source: 'dm',
-      at: where.threadTs,
-    },
-    deps.retriesLeft,
-  )
-  await say(deps, where, startedText(started))
+  await reviewPullRequest(deps, where, prUrl, () => ({ url: from, source: 'dm', at: where.threadTs }))
 }
 
 const MAX_DAYS_AGO = 30

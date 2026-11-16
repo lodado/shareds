@@ -63,8 +63,7 @@ const SHELL_WRITE = /\bsed\s+-[A-Za-z]*i|\bperl\s+-[A-Za-z]*i|\btee\b|>>?\s*\S|\
 export const hookBypass = (command) => BYPASSES.find((entry) => entry.re.test(command ?? ''))?.id ?? null
 
 export const isCodeFile = (path) => CODE_FILE.test(path ?? '')
-export const isGateConfig = (path) => GATE_CONFIG.test(path ?? '')
-export const isTestFile = (path) => TEST_FILE.test(path ?? '')
+const isTestFile = (path) => TEST_FILE.test(path ?? '')
 
 // Lines of `next` that `previous` does not already contain, so an untouched
 // pre-existing match in a large edit is not blamed on the agent. Duplicates count.
@@ -80,7 +79,7 @@ export function addedLines(previous, next) {
   return added
 }
 
-export function findEvasions(lines, path = '') {
+function findEvasions(lines, path = '') {
   const hits = []
   const rules = isTestFile(path) ? [...EVASIONS, ...TEST_WAIT_DENIED] : EVASIONS
   lines.forEach((text, index) => {
@@ -102,7 +101,7 @@ export function findEvasions(lines, path = '') {
 }
 
 // Added lines per edit tool call; null when the call writes nothing this guard reads.
-export function addedByToolCall(e) {
+function addedByToolCall(e) {
   const path = e.file_path ?? e.notebook_path
   if (e.tool === 'Write') return { path, lines: addedLines('', e.content) }
   if (e.tool === 'Edit') return { path, lines: addedLines(e.old_string, e.new_string) }

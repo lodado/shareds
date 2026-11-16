@@ -1,12 +1,20 @@
 const RASTER = /\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/iu
 const IMAGE_URL = /url\s*\(|image-set\s*\(/iu
-const moduleName = (value) =>
+const SOURCE = /\.(?:[cm]?[jt]sx?)$/iu
+// A path as its segments, each lowercased with separators dropped ('app-image' and 'AppImage' agree), the source
+// extension and the alias segments ('@/', '~/') gone.
+const segments = (value) =>
   value
-    .split('/')
-    .pop()
-    .replace(/\.(?:[cm]?[jt]sx?)$/iu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/gu, '')
+    .replace(SOURCE, '')
+    .split(/[/\\]/u)
+    .map((part) => part.toLowerCase().replace(/[^a-z0-9]/gu, ''))
+    .filter(Boolean)
+// A file is a gateway when its path ends in the module's whole path: '@/shared/ui/Mark' is src/shared/ui/Mark.tsx,
+// not src/shared/ui/ProductMark.tsx or src/entities/logo/Mark.tsx.
+const endsWith = (file, module) =>
+  module.length > 0 &&
+  module.length <= file.length &&
+  module.every((part, i) => file[file.length - module.length + i] === part)
 
 const nameOf = (node) => (node?.type === 'JSXIdentifier' ? node.name : null)
 const literalText = (node) =>
@@ -37,16 +45,19 @@ module.exports = {
     },
   },
   create(context) {
-    const appImageNames = new Set((context.options[0]?.appImageModules ?? ['@/shared/ui/AppImage']).map(moduleName))
-    const filename = (context.filename ?? '').toLowerCase().replace(/[^a-z0-9]/gu, '')
-    const isAppImageModule = [...appImageNames].some((name) =>
-      ['js', 'jsx', 'ts', 'tsx'].some((extension) => filename.endsWith(name + extension)),
-    )
+    const modules = (context.options[0]?.appImageModules ?? ['@/shared/ui/AppImage']).map(segments)
+    const file = segments(context.filename ?? '')
+    // the gateway itself wraps next/image or renders the <img>; every other file goes through it
+    const isAppImageModule = SOURCE.test(context.filename ?? '') && modules.some((module) => endsWith(file, module))
     return {
       ImportDeclaration(node) {
         const source = node.source.value
         if (source === 'next/image' && !isAppImageModule) context.report({ node: node.source, messageId: 'nextImage' })
         else if (RASTER.test(source)) context.report({ node: node.source, messageId: 'rasterImport' })
+      },
+      ImportExpression(node) {
+        if (literalText(node.source) === 'next/image' && !isAppImageModule)
+          context.report({ node: node.source, messageId: 'nextImage' })
       },
       CallExpression(node) {
         if (
@@ -57,7 +68,8 @@ module.exports = {
           context.report({ node, messageId: 'require' })
       },
       JSXOpeningElement(node) {
-        if (nameOf(node.name)?.toLowerCase() === 'img') context.report({ node: node.name, messageId: 'element' })
+        // exactly 'img': JSX reads a capitalised name (<Img>) as a component, such as the gateway itself
+        if (nameOf(node.name) === 'img' && !isAppImageModule) context.report({ node: node.name, messageId: 'element' })
         for (const attribute of node.attributes) {
           const name = nameOf(attribute.name)
           const value = literalText(attribute.value)
