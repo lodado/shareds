@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 — 2026-11-16
+
+- `pixel-art-diorama` decides the look before it draws. A new Stage 0 writes a direction sheet whose rows are numbers, named colours or rules a screenshot can refute (reading order, what each camera mode holds, sizes in low-res pixels, foundation colours and the accent, module sizes, cutaway, hero time, motion, page), and the scene stage now blocks out ground, landmark, stage and supporting masses and shoots all four rotations before any detail.
+- Two references without code: `art-direction` (the sheet, the pixel-size formula for an orthographic camera, adjective-to-decision rewrites, the worked example's sheet beside one for a subject that was not built, and rules for the page around the canvas) and `world-dressing` (blockout questions, four tiers from landmark to life, placement rules tied to the nav grid and the cutaway, and what a prop costs in draw calls after baking).
+- The report gives two verdicts, `LOOK` and `FUNCTION`, each with its own evidence; `verification` lists the rows of both. Two rubric cases cover a new subject with no look given and a scene that looks empty.
+
 ## 0.7.0 — 2026-11-07
 
 - New skill `pixel-art-diorama`, a three.js scene rendered as pixel art: a low-res render target with depth outlines, dark-midtone Bayer dither and palette quantization, a toon ramp, an orthographic camera at 31° snapped to the texel grid with camera-side cutaways, an optional headless simulation (fixed step, generator coroutines, grid A\*, closed-form rolling and lobs), a draw-call budget (static bake with live nodes, one instanced mesh for every doll, off-screen render skip, shadow map sized to the frame) and headless SwiftShader verification. Its references carry the complete modules of a worked example, each code block opening with its module path.

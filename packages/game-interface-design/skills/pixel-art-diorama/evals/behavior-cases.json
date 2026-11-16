@@ -31,6 +31,26 @@
         "skip rendering while the canvas is off screen and keep the simulation running",
         "compare screenshots before and after so nothing that moved stands still"
       ]
+    },
+    {
+      "id": "D-04-new-subject-direction",
+      "prompt": "새벽 항구 마을을 도트 3D 디오라마로 만들어줘. 분위기는 알아서 잡아줘.",
+      "must": [
+        "write the direction sheet before scene code, every row a number, a named colour or a rule, and label the derived look a default",
+        "take sizes, colours and what stands where from the sheet, with a reason for any value shared with the worked example",
+        "block out ground, landmark, stage and supporting masses and shoot all four rotations before adding detail",
+        "fill landmark, structures, props and life in that order and give each prop a user",
+        "report LOOK and FUNCTION as separate verdicts, each with its evidence"
+      ]
+    },
+    {
+      "id": "D-05-looks-empty",
+      "prompt": "디오라마가 휑하고 밋밋해 보여. 뭐가 문제야?",
+      "must": [
+        "read the direction sheet back from the code and screenshots instead of restyling",
+        "name the rows with no value and the tier that is missing or thin",
+        "stay read-only until the user asks for the fix"
+      ]
     }
   ]
 }

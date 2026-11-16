@@ -1,6 +1,6 @@
 ---
 name: pixel-art-diorama
-description: 'Build, tune or review a three.js scene that renders as pixel art (도트 디오라마, 픽셀아트 3D): a low-res render target with depth outlines, Bayer dither and palette quantization, a toon ramp, an orthographic camera at 31° snapped to the texel grid and turned in 90° steps, camera-side cutaways, optionally a headless agent simulation feeding it, then cut draw calls (static bake, instanced dolls, off-screen render skip) and verify with headless SwiftShader screenshots and a frame probe. Use for isometric dioramas, "3D that looks like pixel art", pixel crawl, z-fighting, noisy outlines or a slow diorama; not sprite animation, game planning or a generic Three.js prototype.'
+description: 'Build, tune or review a three.js scene that renders as pixel art (도트 디오라마, 픽셀아트 3D): a direction sheet and a blockout before detail, a low-res render target with depth outlines, Bayer dither and palette quantization, a toon ramp, an orthographic camera at 31° snapped to the texel grid and turned in 90° steps, camera-side cutaways, optionally a headless agent simulation feeding it, then cut draw calls (static bake, instanced dolls, off-screen render skip) and verify with headless SwiftShader screenshots and a frame probe. Use for isometric dioramas, "3D that looks like pixel art", a diorama that looks empty or generic, pixel crawl, z-fighting, noisy outlines or a slow diorama; not sprite animation, game planning or a generic Three.js prototype.'
 allowed-tools:
   - Bash
 metadata:
@@ -12,14 +12,17 @@ metadata:
 A 3D scene of boxes drawn small, outlined from depth, snapped to a fixed palette and enlarged by
 whole pixels. The references hold the complete, unabridged source of a worked example (a futsal
 match on a floating school yard). Each code block starts with its module path (`// src/…`, or
-`// qa/…` for the headless scripts) so its relative imports resolve. Adapt names and values; keep
-the mechanics. Use the user's language for reports.
+`// qa/…` for the headless scripts) so its relative imports resolve. Keep the mechanics. Names, sizes,
+colours and what stands where come from the Stage 0 direction sheet, not from the worked example. Use
+the user's language for reports.
 
 ## Request
 
 Fill gaps with labeled defaults and record them in the report. Ask only when there is no subject.
 
 - `SUBJECT`: what the diorama shows and the one thing that moves in it (a match, a market, a farm).
+- `DIRECTION`: the Stage 0 sheet. A look the user gave is kept; without one, derive it from the
+  subject and label it a default.
 - `LOW_RES_HEIGHT`: 270 px default; 180 for a chunkier look, 360 for more detail.
 - `PALETTE`: 32–48 sRGB colours in ramps of 3–4 per material family, plus one entry for each colour
   that must stay distinct (team kits, each floor surface, each sky).
@@ -27,6 +30,18 @@ Fill gaps with labeled defaults and record them in the report. Ask only when the
   (wide, follow, close).
 - `TIMES`: day, dusk and night as lighting rows; lamps change intensity, never visibility.
 - `SIM`: none, or a fixed-step headless simulation the scene only reads (Stage 4).
+
+## Stage 0 — Direction
+
+Write the direction sheet before any scene code: one line per row, each a number, a named colour or a
+rule that a screenshot can confirm or refute. The rows are the concept in one sentence, what the eye
+finds first, second and third and by which means, what each camera mode must hold, the size in
+low-res pixels of a person and of the smallest thing that must read, five to eight foundation colours
+with the accent and what alone may wear it, the module sizes every building repeats, what the
+cutaway drops, the hero time of day, what never stops moving, and the page around the canvas. An
+adjective is not a row: "cosy" becomes a time of day, a storey limit and windows that glow. A review
+reads the sheet back from the code and reports the rows with no value. The rows, the pixel-size
+formula, two filled sheets and the page rules: [art direction](references/art-direction.md).
 
 ## Stage 1 — Pixel pipeline
 
@@ -47,6 +62,13 @@ kickboard, and a tall building on a near side hides its upper floors. Keep near 
 the scene; the outline and the floor offsets live on depth precision. Code: [camera](references/camera.md).
 
 ## Stage 3 — Scene
+
+Block out first: ground and edge, landmark, stage and supporting masses as plain boxes in flat palette
+colours, lit, and shot in the wide mode from all four rotations. Add detail only once the stage is
+whole in every rotation and the landmark still names the place. Then fill four tiers in order
+(landmark, structures, props, life), densest round the stage, each prop with a user. The order, the
+questions to answer from the blockout shots, placement and what each prop costs in draw calls:
+[world dressing](references/world-dressing.md).
 
 - Build from one shared unit box scaled per mesh and a material cache keyed by colour; give every
   surface that changes on its own (a swapped floor, emissive windows, a recoloured lamp) its own
@@ -96,7 +118,10 @@ Code, the measurements and the full list of live nodes: [draw calls](references/
    warnings, and the frame probe before and after any performance change. Scripts and the screenshot
    checklist: [verification](references/verification.md).
 3. Read every screenshot against the [pitfalls](references/pitfalls.md) table before calling it done.
-4. Report each check with its status, the draw-call and frame numbers, and `NOT_RUN` for phone GPU
+4. Give two verdicts, `LOOK` and `FUNCTION`, each with its evidence: the direction sheet read row by
+   row against the screenshots, and every control, displayed value and the simulation's end checked
+   against state. A pass on one says nothing about the other.
+5. Report each check with its status, the draw-call and frame numbers, and `NOT_RUN` for phone GPU
    performance (SwiftShader is a CPU rasterizer) and real touch input unless a phone was used.
 
 A review request reads the scene code and screenshots, runs the probe, and reports findings ordered
@@ -106,5 +131,7 @@ P0–P3 (symptom, cause, smallest fix) without editing until asked.
 
 - Original scenes only; do not rebuild a specific existing game's look, characters or levels.
 - A passing probe is not phone performance, and a screenshot set is not game feel.
+- A `LOOK` pass means the screenshots match the sheet. Whether the sheet is a good one is the user's
+  call.
 - Sprite frames belong to `pixel-sprite-animation`; turning the diorama into a playable game loop
   belongs to `threejs-game-wireframe`.
