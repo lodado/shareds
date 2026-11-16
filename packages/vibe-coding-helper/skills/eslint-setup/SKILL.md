@@ -85,17 +85,22 @@ The public import stays `@lodado/eslint-config/react` even though its source is 
 
 ### Images: one application image boundary
 
-The opt-in `images` preset reports raw `<img>`, direct `next/image`, raster imports/`require`,
-inline image URLs, Tailwind `bg-[url(...)]`, and CSS `url()`/`image-set()` references. CSS is parsed
-with ESLint's CSS language; `@font-face src` is allowed. SVG imports remain available for icons and
-favicon/OG generator files can opt out with a narrow file-scoped override. Configure only the actual
-shared boundary module:
+The opt-in `images` preset reports raw `<img>`, direct or dynamic `next/image` imports, raster
+imports/`require`, inline image URLs and Tailwind `bg-[url(...)]`. SVG imports remain available for
+icons and favicon/OG generator files can opt out with a narrow file-scoped override. List every
+shared boundary module: a file is one when its path ends in the module's whole path
+(`@/shared/ui/Mark` is `src/shared/ui/Mark.tsx`, not `ProductMark.tsx`), and a boundary may import
+`next/image` and render the `<img>` it wraps. A capitalised `<Img>` is a component, not the element.
 
 ```js
 import images from '@lodado/eslint-config/images'
 
-export default [...base, ...images({ appImageModules: ['@/shared/ui/AppImage'] })]
+export default [...base, ...images({ appImageModules: ['@/shared/ui/Img', '@/shared/ui/Mark'] })]
 ```
+
+`images({ css: true })` also parses stylesheets for `url()`/`image-set()` references (`@font-face src`
+is allowed). It is off by default: `base` applies its JavaScript rules to every linted file and they
+crash on a stylesheet, so turn it on only where the JavaScript rules are limited to code files.
 
 Keep generated exceptions explicit and narrow in the consumer config; do not disable the preset
 globally. This preset is opt-in so existing consumers are not broken on adoption.
