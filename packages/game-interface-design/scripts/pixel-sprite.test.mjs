@@ -1567,6 +1567,9 @@ describe('base candidates as the license-aware pick board', () => {
     writeFileSync(file, JSON.stringify(entries))
     return file
   }
+  // All rows download at once and each timer starts with its fetch. On a busy CI runner (cold fetch, test files
+  // running in parallel) 0.3 s timed out rows this server answers at once; 2 s still ends the hung ones.
+  const timeoutMs = 2000
 
   it('to be measured rows, local copies and a board for local and downloaded candidates, each failure kept as its row', async () => {
     const file = manifest('mixed.json', [
@@ -1579,7 +1582,7 @@ describe('base candidates as the license-aware pick board', () => {
       { id: 'slow', url: `${base}/slow.png`, license: 'generator plan terms' },
     ])
     const out = path.join(dir, 'out')
-    const { rows } = await collectCandidates(file, out, { maxBytes: 1000, timeoutMs: 300 })
+    const { rows } = await collectCandidates(file, out, { maxBytes: 1000, timeoutMs })
     const measured = { size: [8, 8], upscale: 2, nativeSize: [4, 4], colors: 2 }
     assert.deepEqual(rows.map(({ id, licenseClass: cls, error, size, upscale, nativeSize, colors }) => ({ id, cls, ...(error ? { error } : { size, upscale, nativeSize, colors }) })), [
       { id: 'local', cls: 'open', ...measured },
@@ -1588,7 +1591,7 @@ describe('base candidates as the license-aware pick board', () => {
       { id: 'big', cls: 'open', error: 'larger than 1 KB; pick a smaller sheet or crop it first' },
       { id: 'chunked', cls: 'open', error: 'larger than 1 KB; pick a smaller sheet or crop it first' },
       { id: 'gone', cls: 'unknown', error: 'HTTP 404' },
-      { id: 'slow', cls: 'generator', error: 'no response within 0.3 s' },
+      { id: 'slow', cls: 'generator', error: 'no response within 2 s' },
     ])
     assert.deepEqual(JSON.parse(readFileSync(path.join(out, 'candidates.json'), 'utf8')), rows)
     assert.deepEqual(readFileSync(path.join(out, 'remote.png')), artPng())
@@ -1633,10 +1636,10 @@ describe('base candidates as the license-aware pick board', () => {
       { id: 'zero', url: `${base}/zero.png` },
       { id: 'fine', path: 'art.png', license: 'CC0' },
     ])
-    const { rows } = await collectCandidates(file, path.join(dir, 'hostile-out'), { timeoutMs: 300 })
+    const { rows } = await collectCandidates(file, path.join(dir, 'hostile-out'), { timeoutMs })
     assert.match(rows[0].error, /^download failed: fetch failed \(URL scheme must be/)
     assert.match(rows[1].error, /^download failed: /)
-    assert.equal(rows[2].error, 'no response within 0.3 s')
+    assert.equal(rows[2].error, 'no response within 2 s')
     assert.match(rows[3].error, /images above 16777216 pixels are refused/)
     assert.match(rows[4].error, /PNG has no pixels/)
     assert.deepEqual([rows[5].error, rows[5].colors], [undefined, 2])
