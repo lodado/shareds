@@ -1,5 +1,27 @@
 # @lodado/eslint-config
 
+## 2.2.0
+
+### Minor Changes
+
+- e58385f: Lint the widget choices code can judge without rendering: a dialog opened inside another dialog, and a select that hides two or three fixed choices.
+
+  Local rules (all `recommended: false`):
+
+  - `no-nested-dialog` reports a dialog opened inside another dialog in the same file's JSX. `<dialog>`, a native element with a literal `role="dialog"`/`"alertdialog"`, `Dialog`, `AlertDialog`, `Modal`, `Drawer`, `Sheet` and their `.Root` count. A library part (`DialogContent`, `.Content`, `.Panel`) and the direct child surface of a `Modal` or `Drawer` (React Aria, Joy UI) belong to the same dialog. `{ dialogs }` replaces the component list.
+  - `prefer-radio-for-few-options` reports a `<select>` with two or three literal `<option>` choices. A mapped, conditional or grouped child, `multiple`, `size` above 1, a `hidden` option, or a placeholder first option (disabled, or empty in a `required` select) does not count. `{ components }` adds a design-system select that takes `<option>` children.
+
+  Presets:
+
+  - `interaction` turns on `no-nested-dialog` and `prefer-radio-for-few-options` as warnings.
+
+### Patch Changes
+
+- 78b409e: Fix the image boundary rule for projects with more than one gateway. `no-image-bypass` now lets a gateway module render the `<img>` it wraps, matches a gateway by its whole path (`@/shared/ui/Mark` no longer exempts `ProductMark.tsx`), reports a dynamic `import('next/image')`, and stops reading a capitalised `<Img>` component as the raw element. The `images` preset checks stylesheets only with `css: true`: alongside `base`, whose JavaScript rules run on every linted file, a stylesheet crashed the whole lint run.
+- Updated dependencies [78b409e]
+- Updated dependencies [e58385f]
+  - @lodado/eslint-plugin-local-rules@0.3.0
+
 ## 2.1.0
 
 ### Minor Changes
