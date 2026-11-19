@@ -1,6 +1,6 @@
 ---
 name: frontend-visual-qa
-description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA. Verifies rendered UI and browser journeys against approved spec rules or a user-approved visual source, records reproducible artifacts, and reports findings without changing product policy or production code. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
+description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA, or when a standing host rule makes browser QA a step after implementation. Verifies rendered UI and browser journeys against approved spec rules, a user-approved visual source, or the task's plan and passing tests, records reproducible artifacts, and reports findings without changing product policy or production code. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
 allowed-tools:
   - Bash
 ---
@@ -15,15 +15,18 @@ allowed-tools:
 - 사용자가 screenshot 비교 또는 직접 브라우저 QA를 명시적으로 요청했을 때만
   실행한다. 다른 스킬이 필요성을 추측해 자동 실행하지 않는다. 탐색 phase도 사용자가
   탐색(dogfood)을 명시적으로 요청했을 때만 실행한다.
+- 호스트 규칙이 구현 뒤 visual QA를 상시 단계로 정했으면 그 규칙이 사용자의 명시적 요청이다.
+  이때는 "구현 루프 QA"를 따른다. 상시 단계는 탐색 phase 요청이 아니다.
 - 승인된 명세 규칙(`frontend-oracle-design` run의 `SPEC.md` `R*`), Figma, 디자인 시스템,
-  baseline과 사용자의 명시적 답변만 기대 결과의 출처다. 현재 production 화면은 관찰 자료일 뿐
-  자동 baseline이 아니다.
+  baseline과 사용자의 명시적 답변만 기대 결과의 출처다. 구현 루프 QA에서만 그 작업의 기획과
+  통과한 테스트를 여기에 더한다. 현재 production 화면은 관찰 자료일 뿐 자동 baseline이 아니다.
 - 새 정책·baseline 선택·허용치 변경이 필요하면 `QUESTION`으로 멈추고 추천안과 함께 묻는다.
 - product source와 테스트 assertion을 수정하지 않는다. 제품 결함은 재현 증거와 함께
   보고하고, `frontend-oracle-design` run이 있으면 그 run의 RED 단계로 돌려보낸다.
 - 브라우저 조작은 **Playwright, agent-browser 또는 이미 연결된 browser MCP** 중 하나로 수행한다.
-  repo에 이미 설치된 쪽을 먼저 쓰고, 이 스킬만을 위해 dependency나 새 runner를
-  추가하지 않는다. 모두 없으면 `QUESTION`으로 멈추고 어느 쪽을 쓸지 묻는다.
+  repo에 이미 설치된 쪽을 먼저 쓴다. 구현 루프 QA만 그 절의 driver 순서를 따른다.
+  이 스킬만을 위해 dependency나 새 runner를 추가하지 않는다. 모두 없으면 `QUESTION`으로 멈추고
+  어느 쪽을 쓸지 묻는다.
   같은 journey를 여러 도구로 중복 실행하지 않는다. 공식 PASS가 필요하면 아래 trusted
   Playwright 경로를 선택하고, 관찰 도구에서 필요한 증거를 얻지 못하면 미검증으로 남긴다.
 - certifiable visual `PASS` producer는 `fod.mjs run green <id>`가 기록한 통과 run뿐이다. 그 run의
@@ -52,7 +55,7 @@ allowed-tools:
 2. `frontend-oracle-design` run이 있으면 `fod.mjs status <id>`로 단계를 확인하고 승인(`approval.json`)의
    spec digest를 기록한다. 승인 뒤 SPEC이 바뀌어 status가 앞 단계로 돌아갔으면 실행하지 않는다.
 3. 검증할 규칙(`R*`)·화면 항목, route, state, viewport와 baseline source를 사용자 요청 또는
-   승인된 SPEC에서 고정한다.
+   승인된 SPEC에서 고정한다. 구현 루프 QA면 기획의 완료 기준과 통과한 테스트에서 고정한다.
 4. baseline 권위나 기대 결과가 미결이면 현재 자료와 한 번에 묶은 질문을 제시하고
    `QUESTION`으로 멈춘다.
 5. local/test/staging 환경을 우선한다. production/live는 명시적으로 허용된 read-only
@@ -60,6 +63,41 @@ allowed-tools:
 
 기록된 green run이 없으면 exploratory observation은 가능하지만 `VERIFIED`를 발급하지 않는다.
 승인 source도 없으면 관찰 결과와 “정책 기준 없음”을 명시하고 `QUESTION`으로 끝낸다.
+
+## 구현 루프 QA
+
+호스트 규칙의 상시 단계로 불렸을 때의 경로다. 기획, 테스트, 구현, 리뷰를 마친 변경이 실제
+브라우저에서 기획대로 보이고 동작하는지 Direct browser 모드로 확인한다. 이 절이 정한 것 외에는
+불변 경계와 진입 게이트를 그대로 적용한다.
+
+- **기대 결과.** `frontend-oracle-design` run이 있으면 그 SPEC을 쓴다. 없으면 그 작업의 기획에
+  적힌 완료 기준과 통과한 테스트를 쓴다. 검증 항목은 완료 기준마다 뽑고, 브라우저 표면이 없는
+  기준은 N/A와 이유를 적는다. 기획과 테스트가 모두 없으면 승인 source가 없는 것이다.
+- **기획과 테스트가 말하지 않는 동작.** implicit oracle(§6) 위반만 결함으로 보고하고 나머지는
+  `남은 것`에 미검증으로 적는다. 기획과 테스트가 서로 어긋나면 `QUESTION`이다.
+- **driver.** 호스트에 agent-browser가 설치돼 있으면 그것을 먼저 쓴다. 없으면 불변 경계의
+  driver 규칙을 따른다.
+- **화면.** baseline이 없으므로 screenshot은 비교가 아니라 관찰 증거다. §3의 viewport와 theme
+  조건에서 찍는다. 기획이 정하지 않은 화면 결과는 겹침·가로 오버플로·조작 불가처럼 어떤
+  정책에서도 틀린 것만 결함으로 본다.
+- **화면 밖 결과물.** 변경이 내려받은 파일, 저장된 값, 보낸 요청처럼 화면 밖에 결과를 남기면
+  화면이 아니라 그 결과물을 확인한다. 화면에 보이는 것과 결과물은 다를 수 있다.
+- **증거.** PASS 항목마다 관찰을 뒷받침하는 artifact의 경로와 digest를 `report.md`에 적는다.
+  artifact가 없는 PASS 항목은 `EVIDENCE_GAP`이고 `LOOP_PASS`가 아니다. 보정 2회 안에서 다시
+  얻고, 그래도 없으면 `LOOP_BLOCKED`다.
+- **판정.** N/A가 아닌 항목이 전부 기대 결과와 일치하고 P0·P1 발견, uncaught exception,
+  console error, 실패한 network 응답이 없으면 `LOOP_PASS`다. 기대 결과와 어긋난 항목이나 그런
+  발견이 있으면 `LOOP_FAIL`이고, 재현 증거와 함께 테스트를 먼저 쓰는 단계로 돌려보낸다. 항목이
+  전부 N/A면 `루프: N/A`다. 판정은 `report.md`의 `루프:` 줄에 적는다.
+- **막힌 실행.** `ENVIRONMENT_DEFECT`, 2회 보정 뒤에도 남은 `HARNESS_DEFECT`, `QUESTION`,
+  driver 없음은 `LOOP_BLOCKED`다. `LOOP_BLOCKED`는 테스트 단계로 돌려보내지 않는다. 막힌 이유와
+  필요한 조치를 보고한다. `LOOP_FAIL`과 `LOOP_BLOCKED`에 둘 다 해당하면 `LOOP_FAIL`을 적고 막힌
+  항목은 `남은 것`에 적는다.
+- **변경 전부터 있던 오류.** 변경 전 commit에서 같은 오류를 재현했을 때만 판정에서 빼고, 그
+  commit과 관찰을 발견에 적는다.
+- `LOOP_PASS`는 `VERIFIED`가 아니다. agent-browser와 Browser MCP 관찰의 상태는 `pending`
+  그대로이고 `evidence.json`은 만들지 않는다. 최종 보고에는 관찰로 얻은 통과라고 적는다.
+- Screenshot 모드, baseline 생성, 탐색 phase는 이 경로에 없다. 따로 요청받았을 때만 실행한다.
 
 ## 레퍼런스 재현 인계
 
@@ -201,7 +239,8 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
 | server·browser·credential·tool 문제                       | `FAIL` + `ENVIRONMENT_DEFECT`                            |
 | 출처 없는 미적 선호                                       | advisory `UNSOURCED_OPINION`                             |
 
-결함을 발견해도 이 스킬 안에서 product를 고치고 재승인하지 않는다.
+결함을 발견해도 이 스킬 안에서 product를 고치고 재승인하지 않는다. 구현 루프 QA의
+`LOOP_PASS`·`LOOP_FAIL`·`LOOP_BLOCKED`는 이 표의 판정을 바꾸지 않고 따로 적는 루프 판정이다.
 
 ### 심각도
 
@@ -236,7 +275,8 @@ run 디렉터리를 만든다.
 ```text
 상태: VISUAL_VERIFIED | VISUAL_FAILED | BROWSER_VERIFIED | BROWSER_FAILED | QUESTION | FAIL | pending
 모드: screenshot | direct-browser
-명세: <id>와 승인 spec digest 또는 N/A
+루프: LOOP_PASS | LOOP_FAIL | LOOP_BLOCKED | N/A
+명세: <id>와 승인 spec digest, 구현 루프 QA면 기획·테스트 경로, 또는 N/A
 baseline: source·revision 또는 N/A
 환경: driver(playwright|agent-browser|mcp:<name>), tool/version, browser/version, viewport, theme, motion, locale/TZ, fixture
 항목: R1 또는 화면 항목 → PASS|FAIL|N/A + 실제 관찰
@@ -310,6 +350,7 @@ artifact 경로만 쓰지 말고 `report.md`에 spec digest, 항목, 판정과 �
 - screenshot 한 장으로 focus·network·console·부작용까지 통과 처리
 - 모든 viewport·theme·state의 불필요한 곱집합 생성
 - artifact 없이 `VERIFIED` 주장
+- `LOOP_PASS`를 `VERIFIED`나 baseline 승인으로 보고
 
 ## 도구 참고
 

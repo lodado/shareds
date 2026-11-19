@@ -181,3 +181,53 @@ test('is referenced as a separate responsibility by Oracle and behavior test ski
   assert.doesNotMatch(oracleSkill, /BROWSER_VERIFIED/)
   assert.doesNotMatch(testSkill, /headless.*`\*\.style\.(?:test|spec)/s)
 })
+
+test('serves as the standing QA step of an implementation loop without minting VERIFIED', async () => {
+  const skill = await read('SKILL.md')
+  const loop = skill.match(/## 구현 루프 QA\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(loop, 'missing ## 구현 루프 QA')
+
+  // A standing host rule is the request; it never widens into exploration.
+  assert.match(skill, /or\s+when\s+a\s+standing\s+host\s+rule\s+makes\s+browser\s+QA\s+a\s+step/)
+  assert.match(skill, /상시\s+단계로\s+정했으면\s+그\s+규칙이\s+사용자의\s+명시적\s+요청이다/)
+  assert.match(skill, /상시\s+단계는\s+탐색\s+phase\s+요청이\s+아니다/)
+  // The plan and the passing tests stand in for a spec on this path only.
+  assert.match(skill, /구현\s+루프\s+QA에서만\s+그\s+작업의\s+기획과\s+통과한\s+테스트를/)
+  assert.match(loop, /완료\s+기준과\s+통과한\s+테스트를\s+쓴다/)
+  assert.match(loop, /기획과\s+테스트가\s+모두\s+없으면\s+승인\s+source가\s+없는\s+것이다/)
+  assert.match(loop, /기획과\s+테스트가\s+서로\s+어긋나면\s+`QUESTION`이다/)
+  assert.match(loop, /agent-browser가\s+설치돼\s+있으면\s+그것을\s+먼저\s+쓴다/)
+  // What the change leaves outside the screen is checked on the output itself.
+  assert.match(loop, /화면이\s+아니라\s+그\s+결과물을\s+확인한다/)
+  // The loop verdict is separate from the trusted VERIFIED producers.
+  assert.match(loop, /P0·P1\s+발견,\s+uncaught\s+exception,\s+console\s+error,/)
+  assert.match(loop, /실패한\s+network\s+응답이\s+없으면\s+`LOOP_PASS`다/)
+  assert.match(loop, /`LOOP_FAIL`이고/)
+  assert.match(loop, /`LOOP_PASS`는\s+`VERIFIED`가\s+아니다/)
+  assert.match(loop, /`evidence\.json`은\s+만들지\s+않는다/)
+  assert.match(loop, /탐색\s+phase는\s+이\s+경로에\s+없다/)
+  assert.match(skill, /^루프: LOOP_PASS \| LOOP_FAIL \| LOOP_BLOCKED \| N\/A$/m)
+  assert.match(skill, /`LOOP_PASS`를\s+`VERIFIED`나\s+baseline\s+승인으로\s+보고/)
+})
+
+test('keeps the loop verdict honest: evidence per item, blocked runs apart, old errors proven', async () => {
+  const skill = await read('SKILL.md')
+  const loop = skill.match(/## 구현 루프 QA\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(loop, 'missing ## 구현 루프 QA')
+
+  // A pass needs an artifact per item, and a run with nothing to observe is not a pass.
+  assert.match(loop, /artifact가\s+없는\s+PASS\s+항목은\s+`EVIDENCE_GAP`이고\s+`LOOP_PASS`가\s+아니다/)
+  assert.match(loop, /그래도\s+없으면\s+`LOOP_BLOCKED`다/)
+  assert.match(loop, /N\/A가\s+아닌\s+항목이\s+전부\s+기대\s+결과와\s+일치하고/)
+  assert.match(loop, /항목이\s+전부\s+N\/A면\s+`루프:\s+N\/A`다/)
+  // Only a product mismatch goes back to the tests; a blocked run does not.
+  assert.match(loop, /driver\s+없음은\s+`LOOP_BLOCKED`다/)
+  assert.match(loop, /`LOOP_BLOCKED`는\s+테스트\s+단계로\s+돌려보내지\s+않는다/)
+  assert.match(loop, /둘\s+다\s+해당하면\s+`LOOP_FAIL`을\s+적고/)
+  assert.match(loop, /변경\s+전\s+commit에서\s+같은\s+오류를\s+재현했을\s+때만/)
+  // The path names its own exceptions to the invariants instead of contradicting them.
+  assert.match(loop, /이\s+절이\s+정한\s+것\s+외에는/)
+  assert.match(skill, /구현\s+루프\s+QA만\s+그\s+절의\s+driver\s+순서를\s+따른다/)
+  assert.match(skill, /구현\s+루프\s+QA면\s+기획의\s+완료\s+기준/)
+  assert.match(loop, /기획이\s+정하지\s+않은\s+화면\s+결과는/)
+})
