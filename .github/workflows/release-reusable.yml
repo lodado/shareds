@@ -40,7 +40,7 @@ jobs:
       # the version bumps + changelogs back to the repo (prevents local/npm drift).
       # Without pending changesets (version PR merged): builds and publishes to npm.
       - name: Create version PR or publish to npm
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           version: pnpm release
           publish: pnpm release:publish
