@@ -50,7 +50,7 @@
     "jscpd": "5.3.0",
     "knip": "6.37.0",
     "lint-staged": "^14.0.1",
-    "prettier": "^2.8.8",
+    "prettier": "^3.10.1",
     "turbo": "2.10.11"
   },
   "lint-staged": {
