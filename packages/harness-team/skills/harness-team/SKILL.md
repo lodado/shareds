@@ -30,8 +30,8 @@ Every call rereads the whole session.
 
 - When the user moves to an unrelated task in a session that already holds a long finished one, say in one line that a
   fresh session (in Claude Code, `/clear`) costs less, then continue unless the user stops you.
-- For a large request, write the plan to a file where repository rules put plans before building, and offer to build in
-  a fresh session that reads only that file.
+- For a large request, write the plan to a file where repository rules put plans before building, say in one line that
+  a fresh session reading only that file costs less, then keep building unless the user stops you.
 
 ## Execution
 
