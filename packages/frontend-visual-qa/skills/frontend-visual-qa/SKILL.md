@@ -1,6 +1,6 @@
 ---
 name: frontend-visual-qa
-description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA, or when a standing host rule makes browser QA a step after implementation. Verifies rendered UI and browser journeys against approved spec rules, a user-approved visual source, or the task's plan and passing tests, records reproducible artifacts, and reports findings without changing product policy or production code. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
+description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA, or when a standing host rule makes browser QA a step after implementation. Verifies rendered UI and browser journeys against approved spec rules, a user-approved visual source, or the task's plan and passing tests, records reproducible artifacts, and reports findings without changing product policy or production code, apart from container padding and inset alignment fixes in the implementation loop. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
 allowed-tools:
   - Bash
 ---
@@ -8,7 +8,7 @@ allowed-tools:
 # Frontend Visual QA
 
 실제 렌더 결과와 브라우저 journey를 검증하는 **독립 evidence skill**이다. 제품 정책,
-명세 작성, behavior TDD, production 수정은 소유하지 않는다.
+명세 작성, behavior TDD, production 수정은 소유하지 않는다. 구현 루프 QA의 정렬 수정만 예외다.
 
 ## 불변 경계
 
@@ -23,6 +23,7 @@ allowed-tools:
 - 새 정책·baseline 선택·허용치 변경이 필요하면 `QUESTION`으로 멈추고 추천안과 함께 묻는다.
 - product source와 테스트 assertion을 수정하지 않는다. 제품 결함은 재현 증거와 함께
   보고하고, `frontend-oracle-design` run이 있으면 그 run의 RED 단계로 돌려보낸다.
+  구현 루프 QA의 정렬 수정만 그 절이 정한 범위에서 product source를 고친다.
 - 브라우저 조작은 **Playwright, agent-browser 또는 이미 연결된 browser MCP** 중 하나로 수행한다.
   repo에 이미 설치된 쪽을 먼저 쓴다. 구현 루프 QA만 그 절의 driver 순서를 따른다.
   이 스킬만을 위해 dependency나 새 runner를 추가하지 않는다. 모두 없으면 `QUESTION`으로 멈추고
@@ -79,7 +80,39 @@ allowed-tools:
   driver 규칙을 따른다.
 - **화면.** baseline이 없으므로 screenshot은 비교가 아니라 관찰 증거다. §3의 viewport와 theme
   조건에서 찍는다. 기획이 정하지 않은 화면 결과는 겹침·가로 오버플로·조작 불가처럼 어떤
-  정책에서도 틀린 것만 결함으로 본다.
+  정책에서도 틀린 것만 결함으로 본다. 정렬은 다음 두 항목을 따른다.
+- **정렬.** 호스트에 `gridlines` 스킬이 설치돼 있으면 변경이 닿은 화면과 overlay에서 그 스킬의
+  Draw와 Read 단계로 정렬을 잰다. probe는 이미 쓰고 있는 driver의 evaluate로 넣고 측정용
+  Playwright를 따로 설치하지 않는다. viewport는 §3에서 고른 조건을 쓰고 theme는 하나만 측정한다.
+  probe가 화면에 가이드 선을 그리므로 그 상태의 다른 관찰과 screenshot을 마친 뒤 실행한다. 측정을
+  마치면 `[data-gridline]` 노드를 지우거나 화면을 다시 연 뒤 다음 관찰로 넘어가고, 가이드 선이
+  남은 화면을 다른 항목의 증거로 쓰지 않는다. capture와 측정 결과는 run 디렉터리에 저장하고
+  probe.js의 digest를 함께 적는다. 디자인 시스템이나 기획이 컨테이너의 선 값을 정했으면 그 값을
+  먼저 읽고 probe 결과의 `lines`와 각 행을 그 값에 비교한다. 그 값에서 1px 넘게 벗어난 행이
+  어긋난 행이다. 정하지 않았으면 probe 결과의 `outliers` 가운데 capture에서 직접 확인한 것이
+  어긋난 행이다. 스킬이 없으면 이 확인을 건너뛰고 `남은 것`에 정렬 미검증으로 적는다. `gridlines`
+  스킬을 자동 설치하지 않는다.
+- **정렬 수정.** 어긋난 행은 이 단계에서 `gridlines` 스킬의 Fix와 Re-draw 단계로 바로 고친다.
+  - 범위: 고치는 곳은 그 컨테이너의 padding과 그 컨테이너 안에서만 읽는 inset 변수뿐이다. 값은
+    프로젝트의 기존 spacing 단계에서 고른다. 디자인 시스템 token의 값, 행 높이, hit area, 색, 글자
+    크기, radius, margin 보정, 요소 순서, icon 크기, 동작, 테스트 assertion은 바꾸지 않고 디자인
+    정책에 새 선을 기록하지 않는다. 그런 변경이 있어야 닫히는 어긋남은 크기와 함께 `QUESTION`
+    후보로 남긴다.
+  - 횟수: 수정은 한 QA 실행에 2회까지 하고 되돌린 수정도 센다. 1회는 수정 한 묶음과 그 뒤의
+    확인이다.
+  - 확인: 수정할 때마다 고친 컨테이너나 변수가 닿는 화면 가운데 이미 잰 것을 전부 다시 재고,
+    그 작업의 테스트와 레포가 요구하는 lint·typecheck를 다시 실행한다. 하나라도 깨지거나 다른 행이
+    새로 어긋나면 그 수정을 되돌린다. 실행할 수 없으면 수정을 되돌리고 그 행을 발견으로 남긴다.
+  - `frontend-oracle-design` run이 있으면 테스트는 `fod.mjs run green <id>`로 다시 실행해 수정 뒤의
+    통과를 기록한다. 되돌렸으면 같은 명령을 한 번 더 실행한다.
+  - 다시 관찰: 남긴 수정이 있으면 마지막 수정 뒤에 고친 컨테이너나 변수가 닿는 화면의 항목을
+    §3의 viewport에서 가이드 선 없이 다시 관찰하고, 수정 전에 얻은 그 화면의 artifact를 PASS의
+    증거로 쓰지 않는다. 환경의 dirty state는 수정 뒤의 것을 적는다.
+  - 기록: 수정 전후 capture와 고친 파일을 `report.md`의 발견에 적는다. 최종 보고에는 QA 단계에서
+    고친 파일과 그 수정이 리뷰를 받지 않았다는 것을 적는다.
+  - 판정: 다시 잰 결과가 1px 안이면 그 행은 일치다. 2회 뒤에도 남은 어긋남은 선 값이 정해져
+    있었으면 기대 결과와 어긋난 항목이고, 아니면 P3를 넘지 않는 발견으로 적고 판정을 바꾸지 않는다.
+    `LOOP_FAIL`로 돌려보낼 때도 남긴 수정은 작업 트리에 그대로 두고 QA 수정으로 적는다.
 - **화면 밖 결과물.** 변경이 내려받은 파일, 저장된 값, 보낸 요청처럼 화면 밖에 결과를 남기면
   화면이 아니라 그 결과물을 확인한다. 화면에 보이는 것과 결과물은 다를 수 있다.
 - **증거.** PASS 항목마다 관찰을 뒷받침하는 artifact의 경로와 digest를 `report.md`에 적는다.
@@ -241,6 +274,7 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
 
 결함을 발견해도 이 스킬 안에서 product를 고치고 재승인하지 않는다. 구현 루프 QA의
 `LOOP_PASS`·`LOOP_FAIL`·`LOOP_BLOCKED`는 이 표의 판정을 바꾸지 않고 따로 적는 루프 판정이다.
+product를 고치는 일은 구현 루프 QA의 정렬 수정만 그 절이 정한 예외다.
 
 ### 심각도
 
@@ -346,7 +380,7 @@ artifact 경로만 쓰지 말고 `report.md`에 spec digest, 항목, 판정과 �
 - 현재 화면을 자동 golden baseline으로 승인
 - mismatch를 없애려고 tolerance 또는 baseline 자동 갱신
 - production/live에서 파괴적 journey 실행
-- visual QA 안에서 정책·명세·production 코드 수정
+- visual QA 안에서 정책·명세·production 코드 수정 (구현 루프 QA의 정렬 수정은 그 절이 정한 예외)
 - screenshot 한 장으로 focus·network·console·부작용까지 통과 처리
 - 모든 viewport·theme·state의 불필요한 곱집합 생성
 - artifact 없이 `VERIFIED` 주장

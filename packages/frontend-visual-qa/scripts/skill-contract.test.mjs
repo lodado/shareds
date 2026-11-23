@@ -231,3 +231,79 @@ test('keeps the loop verdict honest: evidence per item, blocked runs apart, old 
   assert.match(skill, /구현\s+루프\s+QA면\s+기획의\s+완료\s+기준/)
   assert.match(loop, /기획이\s+정하지\s+않은\s+화면\s+결과는/)
 })
+
+test('measures alignment in the loop with the gridlines skill and fixes only padding there', async () => {
+  const skill = await read('SKILL.md')
+  const loop = skill.match(/## 구현 루프 QA\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(loop, 'missing ## 구현 루프 QA')
+
+  // The check depends on what the host already has; this skill installs nothing for it.
+  assert.match(loop, /`gridlines`\s+스킬이\s+설치돼\s+있으면/)
+  assert.match(loop, /`gridlines`\s+스킬을\s+자동\s+설치하지\s+않는다/)
+  assert.match(loop, /측정용\s+Playwright를\s+따로\s+설치하지\s+않는다/)
+  assert.match(loop, /스킬이\s+없으면\s+이\s+확인을\s+건너뛰고\s+`남은\s+것`에\s+정렬\s+미검증으로\s+적는다/)
+  // It measures only what the change touched.
+  assert.match(loop, /변경이\s+닿은\s+화면과\s+overlay에서/)
+  assert.match(loop, /Draw와\s+Read\s+단계로\s+정렬을\s+잰다/)
+  // The guides stay in the page, so they are cleared before the next observation.
+  assert.match(loop, /`\[data-gridline\]`\s+노드를\s+지우거나\s+화면을\s+다시\s+연\s+뒤\s+다음\s+관찰로\s+넘어가고/)
+  assert.match(loop, /가이드\s+선이\s+남은\s+화면을\s+다른\s+항목의\s+증거로\s+쓰지\s+않는다/)
+  assert.match(loop, /capture와\s+측정\s+결과는\s+run\s+디렉터리에\s+저장하고\s+probe\.js의\s+digest를\s+함께\s+적는다/)
+  // An approved line is compared by its own value, not by the probe's majority line.
+  assert.match(loop, /그\s+값을\s+먼저\s+읽고\s+probe\s+결과의\s+`lines`와\s+각\s+행을\s+그\s+값에\s+비교한다/)
+  assert.match(loop, /그\s+값에서\s+1px\s+넘게\s+벗어난\s+행이\s+어긋난\s+행이다/)
+  assert.match(loop, /`outliers`\s+가운데\s+capture에서\s+직접\s+확인한\s+것이\s+어긋난\s+행이다/)
+  // The screen rule hands alignment to these items instead of contradicting them.
+  assert.match(loop, /정렬은\s+다음\s+두\s+항목을\s+따른다/)
+
+  // The fix happens in this step.
+  assert.match(loop, /이\s+단계에서\s+`gridlines`\s+스킬의\s+Fix와\s+Re-draw\s+단계로\s+바로\s+고친다/)
+  // The exception is narrow: the container's own padding and inset, nothing a policy or a test owns.
+  assert.match(
+    loop,
+    /고치는\s+곳은\s+그\s+컨테이너의\s+padding과\s+그\s+컨테이너\s+안에서만\s+읽는\s+inset\s+변수뿐이다/,
+  )
+  assert.match(loop, /값은\s+프로젝트의\s+기존\s+spacing\s+단계에서\s+고른다/)
+  assert.match(loop, /디자인\s+시스템\s+token의\s+값,\s+행\s+높이,\s+hit\s+area,\s+색,\s+글자\s+크기,\s+radius,/)
+  assert.match(loop, /margin\s+보정,\s+요소\s+순서,\s+icon\s+크기,\s+동작,\s+테스트\s+assertion은\s+바꾸지\s+않고/)
+  assert.match(loop, /디자인\s+정책에\s+새\s+선을\s+기록하지\s+않는다/)
+  assert.match(loop, /어긋남은\s+크기와\s+함께\s+`QUESTION`\s+후보로\s+남긴다/)
+  // Every fix is bounded, re-measured where it reaches, re-checked, and reverted when it breaks something.
+  assert.match(loop, /수정은\s+한\s+QA\s+실행에\s+2회까지\s+하고\s+되돌린\s+수정도\s+센다/)
+  assert.match(loop, /닿는\s+화면\s+가운데\s+이미\s+잰\s+것을\s+전부\s+다시\s+재고/)
+  assert.match(loop, /그\s+작업의\s+테스트와\s+레포가\s+요구하는\s+lint·typecheck를\s+다시\s+실행한다/)
+  assert.match(loop, /하나라도\s+깨지거나\s+다른\s+행이\s+새로\s+어긋나면\s+그\s+수정을\s+되돌린다/)
+  assert.match(loop, /실행할\s+수\s+없으면\s+수정을\s+되돌리고\s+그\s+행을\s+발견으로\s+남긴다/)
+  // An oracle run keeps an honest record: the pass after the fix is recorded by the run script.
+  assert.match(loop, /`fod\.mjs\s+run\s+green\s+<id>`로\s+다시\s+실행해\s+수정\s+뒤의\s+통과를\s+기록한다/)
+  assert.match(loop, /되돌렸으면\s+같은\s+명령을\s+한\s+번\s+더\s+실행한다/)
+  // Evidence taken before a kept fix no longer proves anything about the fixed code.
+  assert.match(loop, /가이드\s+선\s+없이\s+다시\s+관찰하고/)
+  assert.match(loop, /수정\s+전에\s+얻은\s+그\s+화면의\s+artifact를\s+PASS의\s+증거로\s+쓰지\s+않는다/)
+  assert.match(loop, /dirty\s+state는\s+수정\s+뒤의\s+것을\s+적는다/)
+  // The edit is on the record, and marked as made after the review.
+  assert.match(loop, /수정\s+전후\s+capture와\s+고친\s+파일을\s+`report\.md`의\s+발견에\s+적는다/)
+  assert.match(loop, /QA\s+단계에서\s+고친\s+파일과\s+그\s+수정이\s+리뷰를\s+받지\s+않았다는\s+것을\s+적는다/)
+  // What is left after the fixes is judged as before: only an approved line fails the loop.
+  assert.match(loop, /다시\s+잰\s+결과가\s+1px\s+안이면\s+그\s+행은\s+일치다/)
+  assert.match(loop, /선\s+값이\s+정해져\s+있었으면\s+기대\s+결과와\s+어긋난\s+항목이고/)
+  assert.match(loop, /아니면\s+P3를\s+넘지\s+않는\s+발견으로\s+적고\s+판정을\s+바꾸지\s+않는다/)
+  assert.match(loop, /남긴\s+수정은\s+작업\s+트리에\s+그대로\s+두고\s+QA\s+수정으로\s+적는다/)
+
+  // Every place that says the skill leaves product code alone names this one exception.
+  const section = (heading) => skill.match(new RegExp(`## ${heading}\\n[\\s\\S]*?(?=\\n## )`))?.[0] ?? ''
+  assert.match(
+    skill,
+    /apart\s+from\s+container\s+padding\s+and\s+inset\s+alignment\s+fixes\s+in\s+the\s+implementation\s+loop/,
+  )
+  assert.match(skill, /production\s+수정은\s+소유하지\s+않는다\.\s+구현\s+루프\s+QA의\s+정렬\s+수정만\s+예외다/)
+  assert.match(
+    section('불변 경계'),
+    /구현\s+루프\s+QA의\s+정렬\s+수정만\s+그\s+절이\s+정한\s+범위에서\s+product\s+source를\s+고친다/,
+  )
+  assert.match(section('7\\. 판정과 라우팅'), /구현\s+루프\s+QA의\s+정렬\s+수정만\s+그\s+절이\s+정한\s+예외다/)
+  assert.match(
+    section('금지'),
+    /production\s+코드\s+수정\s+\(구현\s+루프\s+QA의\s+정렬\s+수정은\s+그\s+절이\s+정한\s+예외\)/,
+  )
+})
