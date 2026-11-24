@@ -204,6 +204,16 @@
       "prompt": "디오라마 카메라가 따라갈 때 픽셀이 지글거리고 코트에 초록 무늬가 깜빡여. 뭐가 문제야?",
       "expect": { "skill": "pixel-art-diorama", "mode": "PIXEL_DIORAMA", "level": null, "ecs": "n/a" },
       "must_not": ["edit the scene before the user asks", "raise the render resolution to hide the crawl"]
+    },
+    {
+      "id": "sprite-stack-realistic-car",
+      "prompt": "람보르기니 무르시엘라고를 회전되는 도트로 사실적으로 만들어줘. 층 보이는 것도 없애고.",
+      "expect": { "skill": "sprite-stacking", "mode": "SPRITE_STACK", "level": null, "ecs": "n/a" },
+      "must_not": [
+        "draw the car from memory without opening reference images or a blueprint",
+        "route a single turning object to the three.js diorama",
+        "keep the badge or logo"
+      ]
     }
   ]
 }

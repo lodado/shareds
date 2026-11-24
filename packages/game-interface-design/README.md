@@ -27,16 +27,17 @@ TARGET_DIR: ./my-game
 
 사용자는 주요 단계마다 **결정 → 확인한 레퍼런스와 관찰 → 이 게임에 적용한 방식 → 대안/트레이드오프 → 검증 결과 또는 미검증 가정**을 받는다. 근거 없는 수치는 제안으로 표시하고, 출처를 못 읽었다면 확인한 것처럼 쓰지 않는다. 기록은 기존 Reference Log나 코드 블루프린트에 유지한다.
 
-## 스킬 여섯 개
+## 스킬 일곱 개
 
-| 스킬                           | 하는 일                                                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` · `PIXEL_SPRITE` · `CAT_MOTION` · `PIXEL_DIORAMA` 중 하나로 보낸다. |
-| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.                         |
-| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다.                        |
-| `pixel-sprite-animation`       | 기준 프레임 + diff로 도트 스프라이트 애니메이션을 만들고, 타이밍·스미어·타격감 린트와 컨택트 시트로 검사한다.                  |
-| `lifelike-cat-motion`          | 실제 고양이 사진·영상을 근거로 몸짓·대기 동작·쓰다듬기·장난감·놀람 반응을 만들고, 행동 기록(trace)을 검사한다.                 |
-| `pixel-art-diorama`            | 방향 시트·블록아웃으로 그릴 것을 정하고, three.js 장면을 저해상도·외곽선·팔레트로 도트처럼 그려 드로 콜·스크린숏을 검사한다.   |
+| 스킬                           | 하는 일                                                                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` · `PIXEL_SPRITE` · `CAT_MOTION` · `PIXEL_DIORAMA` · `SPRITE_STACK` 중 하나로 보낸다. |
+| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.                                          |
+| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다.                                         |
+| `pixel-sprite-animation`       | 기준 프레임 + diff로 도트 스프라이트 애니메이션을 만들고, 타이밍·스미어·타격감 린트와 컨택트 시트로 검사한다.                                   |
+| `lifelike-cat-motion`          | 실제 고양이 사진·영상을 근거로 몸짓·대기 동작·쓰다듬기·장난감·놀람 반응을 만들고, 행동 기록(trace)을 검사한다.                                  |
+| `pixel-art-diorama`            | 방향 시트·블록아웃으로 그릴 것을 정하고, three.js 장면을 저해상도·외곽선·팔레트로 도트처럼 그려 드로 콜·스크린숏을 검사한다.                    |
+| `sprite-stacking`              | 4면도를 슬라이스로 깎아 회전하는 도트 물체를 만든다. 레퍼런스·도면으로 사실감을 잡고, 층이 보이면 방향별 스프라이트로 굽는다.                   |
 
 `pixel-sprite-animation`의 하네스는 스킬 폴더(`skills/pixel-sprite-animation/`)에서 `node scripts/pixel-sprite.mjs build <spec.json>`으로 돈다.
 사용자가 파일을 주면 `attach`로 스펙에 베이스·프레임·파트로 합치고(팔레트 맞춤, 출처 기록, `.bak` 보관) diff로 이어서 작업한다.
@@ -170,5 +171,9 @@ game-interface-design/
       references/                           아트 디렉션·구도·색과 빛·도트 공예·월드 드레싱 (코드 없음), 렌더 파이프라인, 카메라, 장면, 시뮬레이션, 드로 콜, 검증, 함정 (원본 코드 그대로 인용)
       agents/openai.yaml
       evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
+    sprite-stacking/
+      SKILL.md
+      references/                           레퍼런스·도면, 복셀 조형, 굽기, 엔진 연결
+      scripts/                              views_to_slices.py(깎기·검사 시트), bake_sprites.py(방향 시트), viewer.html
   scripts/                                  검사기, 스캐폴드, 테스트
 ```
