@@ -27,6 +27,21 @@ uv run --with pillow --with numpy python scripts/bake_sprites.py slices.png \
 - For a model with material ids (paint, glass, trim...), relight per material ramp instead of
   multiplying colours: save the volume with a material id per voxel, map the baked shade onto that
   material's ramp, and keep the outline and palette snap.
+- The bake is a true projection: depth is scaled by `squash` and height by `cos(asin(squash))`. The
+  live stack lifts a whole pixel per slice, so at the same `squash` a baked frame is shorter than
+  the live stack. `--squash 0.6` gives the height-to-depth ratio of the live default (0.75 with
+  `spacing = 1`); go to 0.5 when a character's face has to read.
+- The baker and the live stack disagree on left and right: a baked frame is the mirror image of the
+  live stack at the same heading. Use one renderer per game. To match the live stack, mirror every
+  slice left to right before baking; the frames then run the other way round the circle, so check
+  which frame matches which heading before binding it.
+- The smoothing needs volume to work with. A 28-slice character lost its legs and face; the same
+  design at 46 slices kept them. Below about 40 slices, export the directions from the live stack
+  (the viewer's 16-direction export) instead.
+- `--relight` leaves bright specks on small faceted plates. Leave it off for armour and other
+  surfaces made of many short faces.
+- For an object built from swappable parts, compose the volume first and bake each loadout
+  ([modular-parts.md](modular-parts.md)).
 
 Trade-off: rotation snaps to `360 / dirs` degrees. 32 directions (11.25°) is enough for cars; use
 64 for the player's own vehicle or slow turns.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.0 — 2026-11-24
+
+- `sprite-stacking` gains `references/modular-parts.md`: a base with swappable parts (headwear, hair, weapons, turrets). Parts share one grid and an ordered list of slots, are stored as material volumes, authored complete so a cover can come off, and composed before shading; the file compares composing at build time with merging part strips at equip time and says why direction sprites are baked per loadout.
+- `baking` adds what a first character bake showed: the bake is a true projection (use `--squash 0.6` for the live stack's proportions), its frames mirror the live stack, stacks under about 40 slices lose limbs to the smoothing, and `--relight` specks small faceted plates. Three lessons record the mistakes.
+
 ## 0.10.0 — 2026-11-24
 
 - New skill `sprite-stacking`: fake-3D rotatable pixel art from a 4-view sheet (visual-hull carve, check sheet, web viewer, engine notes), now with references for reference research and blueprint-based realistic models (`references-and-likeness`), voxel sculpting past the carve with interior colour fill and material shading (`voxel-modeling`), and terrace-free direction sheets (`baking`, `scripts/bake_sprites.py`).
