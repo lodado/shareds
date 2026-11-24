@@ -9,7 +9,7 @@
     "test": "node --test --test-concurrency=4 skills/frontend-oracle-design/scripts/*.test.mjs"
   },
   "devDependencies": {
-    "fast-check": "4.10.2",
+    "fast-check": "4.10.3",
     "typescript": "5.9.3"
   }
 }
