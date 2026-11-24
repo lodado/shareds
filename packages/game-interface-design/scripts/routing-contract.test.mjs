@@ -15,7 +15,7 @@ const SKILLS = fileURLToPath(new URL('../skills/', import.meta.url))
 const read = (rel) => readFileSync(path.join(SKILLS, rel), 'utf8')
 const cases = JSON.parse(read('threejs-game-wireframe/evals/boundary-cases.json'))
 
-const MODES = new Set(['PLAN_ONLY', 'FIGMA', 'THREEJS_WIREFRAME', 'PIXEL_SPRITE', 'CAT_MOTION', 'PIXEL_DIORAMA'])
+const MODES = new Set(['PLAN_ONLY', 'FIGMA', 'THREEJS_WIREFRAME', 'PIXEL_SPRITE', 'CAT_MOTION', 'PIXEL_DIORAMA', 'SPRITE_STACK'])
 const LEVELS = new Set([null, 'LAYOUT_ONLY', 'FLOW_PROTOTYPE', 'PLAYABLE_GREYBOX'])
 const ECS = new Set(['n/a', 'optional', 'required'])
 const SKILL_FOR_MODE = {
@@ -25,6 +25,7 @@ const SKILL_FOR_MODE = {
   PIXEL_SPRITE: 'pixel-sprite-animation',
   CAT_MOTION: 'lifelike-cat-motion',
   PIXEL_DIORAMA: 'pixel-art-diorama',
+  SPRITE_STACK: 'sprite-stacking',
 }
 const ECS_FOR_LEVEL = { LAYOUT_ONLY: 'n/a', FLOW_PROTOTYPE: 'optional', PLAYABLE_GREYBOX: 'required' }
 

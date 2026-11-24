@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0 — 2026-11-24
+
+- New skill `sprite-stacking`: fake-3D rotatable pixel art from a 4-view sheet (visual-hull carve, check sheet, web viewer, engine notes), now with references for reference research and blueprint-based realistic models (`references-and-likeness`), voxel sculpting past the carve with interior colour fill and material shading (`voxel-modeling`), and terrace-free direction sheets (`baking`, `scripts/bake_sprites.py`).
+- The router sends a pixel-art object that turns (sprite stack, baked direction sprites) to the new `SPRITE_STACK` mode; one rubric case covers a realistic car request.
+
 ## 0.9.0 — 2026-11-16
 
 - `pixel-art-diorama` gains the picture rules a one-shot build was missing, as three references without code. `composition` (value plan, the empty corners of a 45° frame, silhouette and rhythm, depth without perspective, a hero rotation with a lower bar for the other three, the eye path, editorial and phone page layout), `color-and-light` (hue-shifted ramps, a saturation budget, a harmony table by mood, contrast pairs, colours for day, dusk and night, and a second 33-entry palette whose numbers the contract test recomputes) and `pixel-craft` (clusters and banding, one pixel density, material patterns, contact shadows and ground wear, nothing under two pixels). Every number is marked a starting value, not a measurement.
