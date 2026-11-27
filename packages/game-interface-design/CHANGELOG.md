@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1 — 2026-11-27
+
+- `voxel-character`: a spec's `head.neck` raises the painted head and draws a skin neck under it, so a beardless face no longer sits on the collar. The example spec uses 6 voxels; the default stays 0. A check case covers it.
+
 ## 0.12.0 — 2026-11-27
 
 - New skill `voxel-character`: a rigged voxel body (two-bone IK, eight directions, idle, walk and work actions) with painted head images per view. `scripts/heads.py` writes a layout reference for the image generator and imports a five-view sheet into an eight-view strip, finding heads and brim anchors itself; `scripts/bake.py` bakes a JSON spec into a self-contained workshop page that swaps faces, headwear, coats, tools and shields, with the crop computed from every frame. The painted head gets a stand-in depth volume, so every nearer body pixel covers it, and held tools are pushed out of it while posing. `scripts/check.py` holds a case for each mistake code can catch (a hat swap changing the face, a tool through the face, the head drawn over the near shoulder, a shallow torso, hand-read anchors, a crop that cuts frames, white keyed out of a head, a broken ramp override).

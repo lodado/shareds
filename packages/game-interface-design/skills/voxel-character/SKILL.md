@@ -29,6 +29,8 @@ Copy [scripts/example/character.json](scripts/example/character.json) into the w
 - `ramps`: recolour a body material for every variant, with as many tones as the built-in ramp (six; `iron` has seven): `coat` (torso and sleeves), `leather` (boots, belt, cuffs,
   gloves), `trouser`, `shirt` (collar), `bronze` (buckle, belt lantern), and `wood`, `steel`, `iron` for tools and shield.
 - `faces`, `hats`: imported head strips from step 3, each with a label.
+- `head.neck`: voxels of neck between collar and chin. 0 suits a stocky build or a beard that covers it; a
+  beardless face needs about 6, or it sits on the collar with no neck. Set `ramps.skin` to the faces' skin tone.
 
 A new body shape, tool or action is code: see [references/body-and-motion.md](references/body-and-motion.md).
 
@@ -87,6 +89,7 @@ were checked.
 
 | Setting           | Value                                        | Why                                                                                              |
 | ----------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Neck              | 6 voxels for a beardless face                | Below 6 the collar hides it; 0 leaves the chin on the collar.                                    |
 | Head scale        | 0.78                                         | 0.86 reads as a big head; 0.70 blurs eyes and mouth into a smear.                                |
 | Body zoom         | `[1.0, 1.25]` across, up                     | A taller body fixes a top-heavy look; a uniform zoom widens the shoulders into a bodybuilder.    |
 | Torso depth       | about the torso width                        | A shallow torso is narrower than the head in profile, so the head reads as nearer than the body. |
@@ -107,6 +110,7 @@ the fix, then add a row here. Delete a row once code makes the mistake impossibl
 | 2026-11-27 | A swung tool passed through the lower face                                             | Push the grip out of the head volume while posing                                        | `check.py` collision case    |
 | 2026-11-27 | Drawing the head over everything hid the near shoulder and a slung pick behind it      | Order every body pixel against the head depth; no part is exempt                         | `check.py` covering case     |
 | 2026-11-27 | Exempting tools from depth ordering to hide a tool crossing the face broke perspective | Fix crossings with collision or the pose, never by skipping ordering                     | `check.py` covering case     |
+| 2026-11-27 | A beardless face sat on the collar with no neck                                        | Raise the head on `head.neck` and draw a skin neck under it                              | `check.py` neck case         |
 | 2026-11-27 | A shallow torso made the head look nearer than the body in profile                     | Torso depth close to its width                                                           | `check.py` torso case        |
 | 2026-11-27 | A uniform 1.4x body zoom widened the shoulders                                         | Grow the body taller, not wider                                                          | Spec default                 |
 | 2026-11-27 | Armour-style plate bands on every limb read as an inflated tyre man                    | Cloth parts: one sleeve per arm, a cuff, no per-segment gradient bands                   | Parts in body-and-motion.md  |
