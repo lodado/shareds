@@ -214,6 +214,16 @@
         "route a single turning object to the three.js diorama",
         "keep the badge or logo"
       ]
+    },
+    {
+      "id": "voxel-character-workshop",
+      "prompt": "3D 픽셀 캐릭터 만들어줘. 얼굴·모자·옷 색·도구 바꿔 끼울 수 있게 하고 걷고 일하는 동작도 보여줘.",
+      "expect": { "skill": "voxel-character", "mode": "VOXEL_CHARACTER", "level": null, "ecs": "n/a" },
+      "must_not": [
+        "build the character as a rigid sprite stack that cannot walk",
+        "crop heads out of a full-body sprite instead of generating whole head sheets",
+        "draw the painted head over every body part regardless of depth"
+      ]
     }
   ]
 }

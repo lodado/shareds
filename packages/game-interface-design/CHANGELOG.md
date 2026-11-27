@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.0 — 2026-11-27
+
+- New skill `voxel-character`: a rigged voxel body (two-bone IK, eight directions, idle, walk and work actions) with painted head images per view. `scripts/heads.py` writes a layout reference for the image generator and imports a five-view sheet into an eight-view strip, finding heads and brim anchors itself; `scripts/bake.py` bakes a JSON spec into a self-contained workshop page that swaps faces, headwear, coats, tools and shields, with the crop computed from every frame. The painted head gets a stand-in depth volume, so every nearer body pixel covers it, and held tools are pushed out of it while posing. `scripts/check.py` holds a case for each mistake code can catch (a hat swap changing the face, a tool through the face, the head drawn over the near shoulder, a shallow torso, hand-read anchors, a crop that cuts frames, white keyed out of a head, a broken ramp override).
+- The router sends a 3D pixel character built from swappable parts to the new `VOXEL_CHARACTER` mode; one rubric case covers a character workshop with swappable faces, headwear and tools.
+
 ## 0.11.0 — 2026-11-24
 
 - `sprite-stacking` gains `references/modular-parts.md`: a base with swappable parts (headwear, hair, weapons, turrets). Parts share one grid and an ordered list of slots, are stored as material volumes, authored complete so a cover can come off, and composed before shading; the file compares composing at build time with merging part strips at equip time and says why direction sprites are baked per loadout.

@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__</title>
+<style>
+:root{--bg:#f2eee6;--panel:#e4ddd0;--ink:#25211d;--dim:#6a625a;--line:#cbc1b0;--on:#25211d;--onink:#f2eee6;--stage:#2b2321}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#171412;--panel:#221d1a;--ink:#eee6d8;--dim:#a2988a;--line:#3a322c;--on:#eee6d8;--onink:#171412}}
+:root[data-theme=dark]{--bg:#171412;--panel:#221d1a;--ink:#eee6d8;--dim:#a2988a;--line:#3a322c;--on:#eee6d8;--onink:#171412}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+main{max-width:920px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 12px}h2{font-size:15px;margin:22px 0 8px}
+.top{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:680px){.top{grid-template-columns:minmax(0,1fr)}}
+.stage{background:var(--stage);border-radius:12px;padding:6px}
+canvas{display:block;image-rendering:pixelated}
+#me{width:min(100%,300px);margin:0 auto}
+.turn{display:flex;justify-content:space-between;gap:8px;padding:4px}
+fieldset{border:0;padding:0;margin:0 0 12px;min-width:0}
+legend{color:var(--dim);font-size:13px;padding:0;margin-bottom:6px}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 12px;cursor:pointer;min-height:36px}
+button[aria-pressed=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.pic button{display:flex;flex-direction:column;align-items:center;padding:4px 6px;width:76px}
+.pic canvas{width:56px;height:56px}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.party{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:8px}
+.party button{padding:6px 0;overflow:hidden;background:var(--stage);border-color:var(--line)}
+.party canvas{margin:0 auto;max-width:100%}
+</style>
+<main>
+<h1 id="title"></h1>
+<div class="top">
+<div class="stage"><canvas id="me" role="img"></canvas>
+<div class="turn"><button id="left"></button><button id="rand"></button><button id="right"></button></div></div>
+<div id="parts">
+<fieldset data-k="face"><legend></legend><div class="row pic"></div></fieldset>
+<fieldset data-k="helm"><legend></legend><div class="row pic"></div></fieldset>
+<fieldset data-k="coat"><legend></legend><div class="row"></div></fieldset>
+<fieldset data-k="tool"><legend></legend><div class="row"></div></fieldset>
+<fieldset data-k="shield"><legend></legend><div class="row"></div></fieldset>
+<fieldset data-k="act"><legend></legend><div class="row"></div></fieldset>
+<fieldset data-k="play"><legend></legend><div class="row"></div></fieldset>
+</div>
+</div>
+<h2 id="partyTitle"></h2>
+<div class="party" id="party"></div>
+</main>
+<script>
+const D=__DATA__;
+const U=Object.assign({face:"Face",helm:"Headwear",coat:"Coat",tool:"Tool",shield:"Shield",act:"Action",play:"Playback",none:"None",shieldOn:"Shield",playOn:"Play",playOff:"Pause",left:"↺ Turn",right:"Turn ↻",rand:"Random",party:"Party (tap to edit above)"},D.ui);
+const NAMES={face:Object.fromEntries(Object.entries(D.faces).map(([k,v])=>[k,v.label])),helm:{none:U.none,...Object.fromEntries(Object.entries(D.hats).map(([k,v])=>[k,v.label]))},coat:Object.fromEntries(Object.entries(D.coats).map(([k,v])=>[k,v.label])),tool:D.tools,shield:D.shield?{off:U.none,on:U.shieldOn}:{off:U.none},act:Object.fromEntries(Object.entries(D.acts).map(([k,v])=>[k,v.label])),play:{on:U.playOn,off:U.playOff}};
+const keys=(k)=>Object.keys(NAMES[k]);
+const pickOf=(k,i)=>{const a=keys(k);return a[i%a.length]};
+const [CXO,CYO,CW,CH]=D.crop,C=D.cell;
+document.title=D.title;document.getElementById("title").textContent=D.title;document.getElementById("partyTitle").textContent=U.party;
+for(const id of ["left","right","rand"])document.getElementById(id).textContent=U[id];
+for(const f of document.querySelectorAll("fieldset"))f.querySelector("legend").textContent=U[f.dataset.k];
+if(!D.shield)document.querySelector('[data-k="shield"]').hidden=true;
+const me={face:pickOf("face",0),helm:pickOf("helm",1),coat:pickOf("coat",0),tool:pickOf("tool",0),shield:"off",act:keys("act").includes("walk")?"walk":pickOf("act",0),d:12,play:matchMedia("(prefers-reduced-motion: reduce)").matches?"off":"on"};
+const party=Array.from({length:8},(_,i)=>{const act=pickOf("act",i+1),dirs=D.acts[act].dirs;return{face:pickOf("face",i),helm:pickOf("helm",i+2),coat:pickOf("coat",i+1),tool:pickOf("tool",i),shield:pickOf("shield",i>>1),act,d:dirs[(i*3)%dirs.length],phase:i*137}});
+const cache=new Map();
+function img(src){let i=cache.get(src);if(!i){i=new Image();i.onload=()=>drawAll();i.src=src;cache.set(src,i)}return i.complete&&i.naturalWidth?i:null}
+// coat colours: the baked coat ramp is swapped tone for tone
+const tinted=new Map();
+function body(key,coat){const i=img(D.body[key].src),ramp=D.coats[coat]&&D.coats[coat].ramp;if(!i||!ramp)return i;const id=key+"|"+coat;let c=tinted.get(id);if(!c){c=document.createElement("canvas");c.width=i.width;c.height=i.height;const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(i,0,0);const p=x.getImageData(0,0,c.width,c.height),a=p.data,map=new Map(D.coat.map((v,n)=>[v.join(),ramp[n]]));for(let n=0;n<a.length;n+=4){if(!a[n+3])continue;const to=map.get(a[n]+","+a[n+1]+","+a[n+2]);if(to){a[n]=to[0];a[n+1]=to[1];a[n+2]=to[2]}}x.putImageData(p,0,0);tinted.set(id,c)}return c}
+// face and headwear are separate layers: a hat replaces the hair above its brim unless it sits on the hair
+const heads=new Map();
+function headOf(face,helm){const id=face+"|"+helm;let c=heads.get(id);if(c)return c;const f=img(D.faces[face].src),hat=D.hats[helm],h=hat?img(hat.src):null;if(!f||(hat&&!h))return null;c=document.createElement("canvas");c.width=C*8;c.height=C;const g=c.getContext("2d");g.drawImage(f,0,0);if(h){if(!hat.sitOnHair)g.clearRect(0,0,C*8,D.brimY+1);g.drawImage(h,0,0)}heads.set(id,c);return c}
+let t=0,last=0;
+function paint(cv,o){const key=[o.tool,o.shield,o.act,o.d].join("|"),sheet=body(key,o.coat),head=headOf(o.face,o.helm);if(!sheet||!head)return;const ms=D.ms[o.act];let x=(t+(o.phase||0))%ms.reduce((a,b)=>a+b,0);const f=Math.max(0,ms.findIndex((m)=>(x-=m)<0));const g=cv.getContext("2d");g.imageSmoothingEnabled=false;g.clearRect(0,0,cv.width,cv.height);const W=D.w,H=D.h,col=((o.d-8)/2+8)%8,[ax,ay]=D.body[key].at[f];g.drawImage(sheet,f*W,0,W,H,-CXO,-CYO,W,H);g.drawImage(head,col*C,0,C,C,Math.round(ax-D.cx)-CXO,Math.round(ay-D.brimY)-CYO,C,C);g.drawImage(sheet,f*W,H,W,H,-CXO,-CYO,W,H)}
+const meCanvas=document.getElementById("me");meCanvas.width=CW;meCanvas.height=CH;
+const partyBox=document.getElementById("party");
+party.forEach((o)=>{const b=document.createElement("button");b.setAttribute("aria-label",[NAMES.face[o.face],NAMES.helm[o.helm],NAMES.coat[o.coat],NAMES.tool[o.tool]].join(", "));const c=document.createElement("canvas");c.width=CW;c.height=CH;c.style.width=CW+"px";b.append(c);b.onclick=()=>{Object.assign(me,{face:o.face,helm:o.helm,coat:o.coat,tool:o.tool,shield:o.shield,act:o.act,d:o.d});sync();meCanvas.scrollIntoView({block:"nearest"})};partyBox.append(b)});
+function drawAll(){paint(meCanvas,me);party.forEach((o,i)=>paint(partyBox.children[i].firstChild,o));for(const c of document.querySelectorAll(".pic canvas")){const h=c.dataset.k==="face"?headOf(c.dataset.h,"none"):headOf(me.face,c.dataset.h);if(h){const g=c.getContext("2d");g.imageSmoothingEnabled=false;g.clearRect(0,0,34,34);g.drawImage(h,Math.round(D.cx)-13,D.brimY-12,27,27,0,0,34,34)}}}
+for(const f of document.querySelectorAll("fieldset")){const k=f.dataset.k;for(const v of keys(k)){const b=document.createElement("button");b.dataset.v=v;if(k==="helm"||k==="face"){const c=document.createElement("canvas");c.width=c.height=34;c.dataset.h=v;c.dataset.k=k;b.append(c)}if(k==="coat"){const s=document.createElement("span");s.className="swatch";const r=(D.coats[v]&&D.coats[v].ramp)||D.coat;s.style.background=`rgb(${r[3]})`;b.append(s)}b.append(NAMES[k][v]);f.querySelector(".row").append(b)}}
+function sync(){const dirs=D.acts[me.act].dirs;if(!dirs.includes(me.d))me.d=dirs.reduce((a,b)=>Math.abs(b-me.d)<Math.abs(a-me.d)?b:a);meCanvas.setAttribute("aria-label",[NAMES.face[me.face],NAMES.helm[me.helm],NAMES.coat[me.coat],NAMES.tool[me.tool],NAMES.act[me.act]].join(", "));for(const f of document.querySelectorAll("fieldset"))for(const b of f.querySelectorAll("button"))b.setAttribute("aria-pressed",String(me[f.dataset.k]===b.dataset.v));drawAll()}
+document.getElementById("parts").addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;const k=b.closest("fieldset").dataset.k;me[k]=b.dataset.v;if(k==="act")t=0;sync()});
+function turn(n){const r=D.acts[me.act].dirs;me.d=r[(r.indexOf(me.d)+n+r.length)%r.length];sync()}
+document.getElementById("left").onclick=()=>turn(-1);document.getElementById("right").onclick=()=>turn(1);
+document.getElementById("rand").onclick=()=>{for(const k of ["face","helm","coat","tool","shield"]){const a=keys(k);me[k]=a[Math.random()*a.length|0]}sync()};
+(function loop(now){if(me.play==="on"&&last){t+=Math.min(100,now-last);drawAll()}last=now||0;requestAnimationFrame(loop)})();
+sync();
+</script>
