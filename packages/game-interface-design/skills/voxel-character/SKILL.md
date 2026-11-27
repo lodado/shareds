@@ -30,7 +30,7 @@ Copy [scripts/example/character.json](scripts/example/character.json) into the w
   gloves), `trouser`, `shirt` (collar), `bronze` (buckle, belt lantern), and `wood`, `steel`, `iron` for tools and shield.
 - `faces`, `hats`: imported head strips from step 3, each with a label.
 - `head.neck`: voxels of neck between collar and chin. 0 suits a stocky build or a beard that covers it; a
-  beardless face needs about 6, or it sits on the collar with no neck. Set `ramps.skin` to the faces' skin tone.
+  beardless face needs about 4, or it sits on the collar with no neck. Set `ramps.skin` to the faces' skin tone.
 
 A new body shape, tool or action is code: see [references/body-and-motion.md](references/body-and-motion.md).
 
@@ -75,6 +75,7 @@ crop is the union of every frame and every head, so nothing touches the edge.
 Run `python scripts/check.py` after changing any script. Then open the page in a real browser and look at enlarged
 renders, not the page thumbnail:
 
+- The page as it opens: it plays the walk facing direction 12, so that is the first thing anyone sees.
 - The exact combination the user named or screenshotted, in the pose and direction they showed.
 - Both profiles (directions 4 and 12) and both back diagonals: near shoulder and a pick on the near shoulder cover
   the head, the torso is wider than the head, no tool crosses a face.
@@ -110,6 +111,8 @@ the fix, then add a row here. Delete a row once code makes the mistake impossibl
 | 2026-11-27 | A swung tool passed through the lower face                                             | Push the grip out of the head volume while posing                                        | `check.py` collision case    |
 | 2026-11-27 | Drawing the head over everything hid the near shoulder and a slung pick behind it      | Order every body pixel against the head depth; no part is exempt                         | `check.py` covering case     |
 | 2026-11-27 | Exempting tools from depth ordering to hide a tool crossing the face broke perspective | Fix crossings with collision or the pose, never by skipping ordering                     | `check.py` covering case     |
+| 2026-11-28 | The walk carried the haft at neck height, so in profile it lay across the throat       | Carry a tool on the shoulder below the neck                                              | `check.py` shoulder case     |
+| 2026-11-28 | A swing wind-up and smear ran the haft across the eyes                                 | Keep hands in arm reach; clear the face by tilting the haft, not by raising the hand     | `check.py` face, reach cases |
 | 2026-11-27 | A beardless face sat on the collar with no neck                                        | Raise the head on `head.neck` and draw a skin neck under it                              | `check.py` neck case         |
 | 2026-11-27 | A shallow torso made the head look nearer than the body in profile                     | Torso depth close to its width                                                           | `check.py` torso case        |
 | 2026-11-27 | A uniform 1.4x body zoom widened the shoulders                                         | Grow the body taller, not wider                                                          | Spec default                 |

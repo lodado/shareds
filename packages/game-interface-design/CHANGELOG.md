@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.2 — 2026-11-28
+
+- `voxel-character`: the walk carries the tool on the shoulder below the neck instead of across the throat, and the swing and mine wind-up and smear frames keep the haft off the face with every hand in arm reach. The neck part is 4 voxels wide and deep, and the example spec uses a 4-voxel neck. Check cases cover the shoulder carry and the face at short, example and longest necks, and bound arm stretch. Step 5 now starts from the page as it opens (walk, facing 12).
+
 ## 0.12.1 — 2026-11-27
 
 - `voxel-character`: a spec's `head.neck` raises the painted head and draws a skin neck under it, so a beardless face no longer sits on the collar. The example spec uses 6 voxels; the default stays 0. A check case covers it.
