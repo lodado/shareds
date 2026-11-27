@@ -206,6 +206,49 @@ class Body(unittest.TestCase):
             raw, 0.0, "the poses no longer reach the head, so this check proves nothing"
         )
 
+    def poses_at_every_neck(self, acts):
+        # hands sit in body space but the head rides up its neck, so check short, example and longest necks
+        keep = bake.rig.NECK_LEN
+        try:
+            for neck in (0.0, 4.0, float(bake.rig.N - bake.rig.NECK[2] - 4)):
+                bake.rig.NECK_LEN = neck
+                for act in acts:
+                    for k, (q, *_) in enumerate(bake.ACTIONS[act]["build"](self.lo)):
+                        inst, info = bake.solved(self.lo, q)
+                        yield f"{act} frame {k} neck {neck:g}", q, inst, info
+        finally:
+            bake.rig.NECK_LEN = keep
+
+    def test_a_tool_carried_on_the_shoulder_passes_below_the_neck(self):
+        # the walk held the haft at neck height, so in profile it lay across the throat
+        for name, _, inst, _ in self.poses_at_every_neck(("idle", "walk")):
+            chest = next(i for i in inst if i.name == "chest")
+            weapon = next(i for i in inst if i.name == "weapon")
+            base = chest.point(bake.rig.NECK)
+            local = [chest.M.T @ (weapon.point((19.0, 0.0, z)) - base) for z in np.arange(0, 45, 0.5)]
+            crossing = [v[2] for v in local if abs(v[1]) < 0.5 and abs(v[0]) < 14]
+            self.assertTrue(crossing, f"{name}: the haft never passes the neck")
+            self.assertLessEqual(min(crossing), 0.0, name)
+
+    def test_no_haft_passes_in_front_of_the_face(self):
+        # the swing wind-up and smear ran the haft across the eyes, which a profile view draws over the face;
+        # a guard (block) holds the tool there on purpose
+        for name, q, inst, _ in self.poses_at_every_neck([a for a in bake.ACTIONS if a != "block"]):
+            if q["weapon"][0] not in ("hand", "two"):
+                continue
+            head = next(i for i in inst if i.name == "head")
+            weapon = next(i for i in inst if i.name == "weapon")
+            for z in np.arange(0, 45, 0.5):
+                v = head.M.T @ (weapon.point((19.0, 0.0, z)) - head.pos) + bake.rig.NECK
+                self.assertFalse(3 <= v[1] <= 10 and 29 <= v[2] <= 38, f"{name}: haft at {v.round(1)}")
+
+    def test_arms_reach_their_targets(self):
+        # hands raised out of reach to clear the face stretched the arms half again in profile;
+        # two-handed grips already stretch a little, so the bound sits just above them
+        for name, _, _, info in self.poses_at_every_neck(bake.ACTIONS):
+            arms = max(s for a, s in info["stretch"].items() if a.startswith("arm"))
+            self.assertLessEqual(arms, 1.32, name)
+
     def test_whatever_is_nearer_than_the_head_covers_it(self):
         # the head image was drawn over everything, so the near shoulder and a slung pick sat behind it
         for d in (4, 12):
