@@ -1,0 +1,53 @@
+{
+  "title": "Character workshop",
+  "body": { "zoom": [1.0, 1.25] },
+  "head": {
+    "blobs": [
+      [[0.0, 0.0, 34.5], 8.0],
+      [[0.0, 8.5, 27.0], 6.0]
+    ]
+  },
+  "tools": {
+    "pick": { "part": "weapon_pick", "label": "Pick" },
+    "axe": { "part": "weapon_axe", "label": "Axe" },
+    "hammer": { "part": "weapon_mattock", "label": "Hammer" }
+  },
+  "shield": true,
+  "actions": {
+    "idle": { "source": "idle", "dirs": [0, 2, 4, 6, 8, 10, 12, 14], "label": "Idle" },
+    "walk": { "source": "walk", "dirs": [0, 2, 4, 6, 8, 10, 12, 14], "label": "Walk" },
+    "swing": { "source": "mine", "dirs": [12, 10, 4, 6], "label": "Swing" },
+    "strike": { "source": "attack", "dirs": [12, 10, 4, 6], "label": "Strike down" }
+  },
+  "coats": {
+    "blue": { "label": "Blue", "ramp": null },
+    "red": {
+      "label": "Red",
+      "ramp": [
+        [40, 16, 18],
+        [70, 24, 24],
+        [104, 34, 30],
+        [140, 50, 38],
+        [176, 74, 50],
+        [212, 110, 72]
+      ]
+    },
+    "green": {
+      "label": "Green",
+      "ramp": [
+        [16, 30, 20],
+        [28, 50, 30],
+        [42, 72, 40],
+        [60, 96, 50],
+        [86, 124, 62],
+        [122, 156, 82]
+      ]
+    }
+  },
+  "faces": {
+    "face-a": { "strip": "heads/face-a.png", "label": "Face A" }
+  },
+  "hats": {
+    "helmet": { "strip": "heads/helmet.png", "label": "Helmet" }
+  }
+}
