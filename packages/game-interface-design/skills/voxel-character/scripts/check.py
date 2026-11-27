@@ -267,6 +267,21 @@ class Page(unittest.TestCase):
         # spec ramps were applied before the built-in ramps and crashed or were overwritten
         self.assertEqual(self.data["coat"], self.ramp)
 
+    def test_a_neck_lifts_the_head_off_the_collar(self):
+        # a beardless face sat on the collar with no neck
+        spec = dict(SPEC, head={"neck": 6})
+        (TMP / "neck.json").write_text(json.dumps(spec))
+        r = subprocess.run(
+            [sys.executable, "-B", str(HERE / "bake.py"), str(TMP / "neck.json"), str(TMP / "neck.html")],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        s = (TMP / "neck.html").read_text()
+        lifted = json.loads(s[s.index("const D=") + 8 : s.index(";\nconst U=")])
+        for key in ("pick|off|idle|8", "pick|off|idle|12"):
+            self.assertGreaterEqual(self.data["body"][key]["at"][0][1] - lifted["body"][key]["at"][0][1], 3, key)
+
     def test_labels_cannot_break_the_page(self):
         self.assertIn('<meta charset="utf-8">', self.page)
         self.assertIn("<title>a &lt;/script&gt; title</title>", self.page)

@@ -7,6 +7,7 @@ import numpy as np
 
 import parts as mp
 from render import Inst, Part, rx, ry, rz
+from spec import SPEC
 
 N = 54
 mp.N = N
@@ -85,6 +86,9 @@ PELVIS = np.array([0.0, 0.0, 16.0])
 WAIST = np.array([0.0, 0.0, 19.0])
 NECK = np.array([0.0, 0.0, 31.0])
 CHIN = np.array([0.0, 5.0, 33.0])
+NECK_LEN = float(SPEC.get("head", {}).get("neck", 0.0))  # voxels of visible neck between collar and head
+if not 0 <= NECK_LEN <= N - NECK[2] - 4:
+    raise SystemExit(f"head.neck: 0 to {int(N - NECK[2] - 4)} voxels, got {NECK_LEN}")
 SIDE = {"lo": -1.0, "hi": 1.0}
 LEG_X, ARM_X = 5.5, 11.5
 LIFT = 3.0  # the animated rig stands on longer legs than the standing model
@@ -186,6 +190,8 @@ def _item():
 
 
 SHARED["item"] = _item()
+# the neck runs from inside the collar up into the head, where the painted head covers its top
+SHARED["neck"] = part(boxes(("skin", 21, 26, 17, 22, 28, int(NECK[2] + NECK_LEN + 3), 1)), NECK)
 
 
 class Loadout:
@@ -391,6 +397,9 @@ def pose(lo, q):
 
     Mh = Mc @ rz(q["head_yaw"]) @ rx(-q["head_pitch"])
     neck = chest_point(NECK)
+    if NECK_LEN:
+        add("neck", "neck", Mh, neck, 0.3)
+        neck = neck + Mh @ np.array([0.0, 0.0, NECK_LEN])
     add("head", lo.head, Mh, neck, 0.35)
     add("chin", lo.chin, Mh @ rx(q["chin"]), neck + Mh @ (CHIN - NECK), 0.5)
     if q["item"]:
