@@ -275,6 +275,21 @@ class Body(unittest.TestCase):
             xs = np.nonzero((ident > 0).any(0))[0]
             self.assertGreaterEqual(xs.max() - xs.min() + 1, 20, f"profile view {d}")
 
+    def test_a_side_on_torso_has_a_lit_and_a_shaded_side(self):
+        # colours baked in the rest pose left the torso one flat tone from the side: no volume
+        inst, _ = bake.solved(self.lo, bake.ACTIONS["idle"]["build"](self.lo)[0][0])
+        chest = [i for i in inst if i.name == "chest"]
+        tone = np.zeros(len(bake.rig.PAL))
+        for codes in bake.rig.CODE.values():
+            tone[codes] = np.arange(len(codes))
+        for d in (4, 12):
+            code, _, _ = bake.R.render(chest, d, bake.rig.DARK, 16)
+            xs = np.nonzero((code > 0).any(0))[0]
+            third = (xs.max() - xs.min() + 1) // 3
+            left, right = code[:, xs.min() : xs.min() + third], code[:, xs.max() + 1 - third : xs.max() + 1]
+            lit, shaded = tone[left[left > 0]].mean(), tone[right[right > 0]].mean()
+            self.assertGreater(lit - shaded, 0.3, f"profile view {d}: the light comes from the upper left")
+
 
 class Page(unittest.TestCase):
     @classmethod

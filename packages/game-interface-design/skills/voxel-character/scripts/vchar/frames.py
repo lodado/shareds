@@ -73,6 +73,8 @@ def frame_image(lname, action, k, d, extra=()):
             ]
             if mine_ - theirs > 5:  # the far limb drops down its ramp, so both legs read from the side
                 i.dim = 2 if base in ("thigh", "shin") else 1
+            elif theirs - mine_ > 5 and base in ("upper", "fore"):
+                i.dim = -1  # the near sleeve goes one tone up, so it reads in front of a torso of the same cloth
     inst = inst + list(extra)
     code, ident, _ = R.render(inst, d, rig.DARK, DIRS)
     stats = {"components": components(code > 0)}

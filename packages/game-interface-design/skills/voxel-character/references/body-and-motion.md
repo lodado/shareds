@@ -19,6 +19,8 @@ Change the body in `body_heavy()` and `body_cloth()` in `parts.py` (torso, skirt
 - One cloth sleeve per arm from shoulder to a leather cuff, then a smaller glove. Separate plates per segment with a
   dark band at each seam read as an inflated tyre man.
 - Shading per piece is a gentle gradient (0.4 to 0.8 steps); stronger per-piece gradients make every limb a ring.
+- The renderer adds the light on top: upper left of the screen in every view (`LIGHT`, `LIT`, `SHADED`, `DEEP` in
+  `vchar/render.py`). Do not paint a lit side into a body part; it would turn with the body.
 - Grow the body taller with the spec's `body.zoom`, not wider.
 
 Run `python scripts/check.py` after a shape change: the torso case fails when the profile gets too thin.
