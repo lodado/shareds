@@ -96,6 +96,7 @@ LEG_X, ARM_X = 5.5, 11.5
 LIFT = 3.0  # the animated rig stands on longer legs than the standing model
 THIGH, SHIN = 8.8, 8.2
 UPPER, FORE = 8.0, 8.5
+SHOULDER_REST = 4.0  # depth a haft resting on the shoulder is drawn above what it rests on
 HEEL, TOE = np.array([0.0, -5.0, -3.0]), np.array([0.0, 8.0, -3.0])
 WEAPON_PIVOT = np.array([19.0, 0.0, 12.0])
 WEAPON_HEAD = np.array([19.0, 0.0, 39.0])
@@ -267,7 +268,7 @@ def basis_zx(z, x):
 
 def pose(lo, q):
     """Build the instances of one frame from pose parameters; also return measurements for checks."""
-    inst, info = [], {"stretch": {}, "sole": {}, "joint": {}}
+    inst, info = [], {"stretch": {}, "sole": {}, "joint": {}, "elbow": {}}
     Mp = rz(q["pyaw"])
     pelvis = PELVIS + np.asarray(q["pelvis"], float) + (0, 0, LIFT)
     waist = pelvis + Mp @ (WAIST - PELVIS)
@@ -344,10 +345,13 @@ def pose(lo, q):
     for s, sx in SIDE.items():
         shoulder = chest_point((sx * ARM_X, 0, 27))
         hand = hands[s]
-        pole = Mc @ np.array([sx * 0.9, -0.8, -0.4])
+        pole = q[f"elbow_{s}"]
+        pole = Mc @ np.asarray([sx * 0.9, -0.8, -0.4] if pole is None else pole, float)
+        assert np.linalg.norm(pole) > 1e-6, f"elbow_{s} must point somewhere"
         elbow, st = ik(shoulder, hand, UPPER, FORE, pole)
         info["stretch"][f"arm_{s}"] = st
         info["joint"][f"arm_{s}"] = shoulder
+        info["elbow"][s] = Mc.T @ (elbow - shoulder)
         rs = np.array([sx * ARM_X, 0, 27.0])
         re = np.array([sx * ARM_X, 0, 20.0])
         rh = np.array([sx * ARM_X, 0, 12.5])
@@ -371,7 +375,11 @@ def pose(lo, q):
         )
 
     if mode in ("hand", "two"):
-        w = add("weapon", weapon_name, basis_zx(d, face), hands["hi"] + d * (q["choke"] if mode == "hand" else 0), 0.05)
+        # resting on the shoulder, the haft lies on the shoulder plate instead of sinking into it
+        rest = SHOULDER_REST if mode == "hand" and q["rest"] else 0.05
+        w = add("weapon", weapon_name, basis_zx(d, face), hands["hi"] + d * (q["choke"] if mode == "hand" else 0), rest)
+        if rest > 1:  # the gripping hand still closes over the haft
+            next(i for i in inst if i.name == "hand_hi").bias += rest
     else:  # slung on the back, haft diagonal
         centre = chest_point((-3, -16 if lo.shield else -13.5, 22))
         w = add(

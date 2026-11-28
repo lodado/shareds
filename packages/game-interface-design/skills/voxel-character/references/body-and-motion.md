@@ -37,7 +37,7 @@ A tool longer than the pick needs a longer head point in the collision sample (`
 ## A new action
 
 Write a function in `anims.py` that returns frames from `P(...)`, the base pose with changes: pelvis offset, lean,
-twist, foot targets `(x, y, lift, pitch)`, hand targets, and the weapon mode (`hand` in one hand, `two` in both, anything else slung on the back). Add it to
+twist, foot targets `(x, y, lift, pitch)`, hand targets, where each elbow points (`elbow_lo`, `elbow_hi`; unset = out to the side and back), `rest=True` when a one-handed tool rests on the shoulder, and the weapon mode (`hand` in one hand, `two` in both, anything else slung on the back). Add it to
 `ACTIONS`, then to the spec's `actions` with its directions. Check every frame uncropped from both side diagonals:
 feet stay planted while they carry weight, and the far arm does not pass through the torso.
 
