@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.4 — 2026-11-28
+
+- `voxel-character`: the renderer lights every view from the upper left of the screen, using smooth normals from each part's voxels: lit faces go one tone up, faces turned away one or two down, and a nearer part drops a short shadow. The near sleeve goes one tone up so it reads in front of a torso of the same cloth. The lantern glow keeps its tones. A pixel now goes to the part with most samples, whatever its tones. A side-on torso no longer comes out as one flat tone; a check case covers it.
+
 ## 0.12.3 — 2026-11-28
 
 - `voxel-character`: the neck part is 6 voxels wide and 7 deep, and the example spec uses a 2-voxel neck, so a bald or short-haired head no longer sits on a thin stalk in profile. A check case covers the thickness. The mine smear grips lower, so the haft also clears the face at a 2-voxel neck; the haft and reach cases now run at necks 0 to 4, 6 and the longest. The head prompt asks for a mouth that survives the shrink to about 20 px, step 2 says to reject a sheet whose mouth is a hairline, and step 3 says to zoom the imported strip and repaint a mouth that came out under 3 px wide.

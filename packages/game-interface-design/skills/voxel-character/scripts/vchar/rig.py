@@ -38,11 +38,13 @@ for _name, _ramp in RAMPS.items():
         CODE[_name].append(len(PAL))
         PAL.append(_rgb)
 PAL = np.array(PAL, np.uint8)
-DARK = {n: np.arange(len(PAL)) for n in (1, 2)}
-for _codes in CODE.values():
+DARK = {n: np.arange(len(PAL)) for n in (1, 2, -1)}  # -1 is one tone up, for lit faces
+for _name, _codes in CODE.items():
+    if _name == "lamp":  # a light source keeps its tones: no shade, no far-side dimming
+        continue
     for _t, _c in enumerate(_codes):
-        for _n in (1, 2):
-            DARK[_n][_c] = _codes[max(0, _t - _n)]
+        for _n in (1, 2, -1):
+            DARK[_n][_c] = _codes[min(len(_codes) - 1, max(0, _t - _n))]
 _BY_RGB = {}
 for _name, _ramp in mp.RAMP.items():
     for _t, _rgb in enumerate(_ramp):

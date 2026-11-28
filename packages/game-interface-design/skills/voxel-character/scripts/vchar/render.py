@@ -21,6 +21,13 @@ RIGHT = np.array([1.0, 0.0, 0.0])
 UP = np.array([0.0, math.sin(ELEV), math.cos(ELEV)])
 VIEW = np.array([0.0, math.cos(ELEV), -math.sin(ELEV)])
 BACK = 200.0
+# Light from the upper left, a little toward the viewer, fixed on screen: every view gets a lit side and a
+# shaded side, where colours baked in the rest pose leave a side-on torso as one flat tone.
+LIGHT = -0.5 * RIGHT + 0.62 * UP - 0.6 * VIEW
+LIGHT = LIGHT / np.linalg.norm(LIGHT)
+# a face turned toward the light goes one tone up, one turned away goes one or two down;
+# a flat face square to the viewer (0.6) keeps its tone
+LIT, SHADED, DEEP = 0.78, 0.34, -0.05
 
 
 def rx(deg):
@@ -50,6 +57,19 @@ class Part:
         self.corner = np.asarray(corner, float) + lo
         self.pivot = np.asarray(pivot, float)
         self.size = np.array(self.vol.shape[::-1], float)  # x, y, z
+        self.normal = smooth_normals(self.vol > 0)
+
+
+def smooth_normals(solid, pad=4):
+    """Outward unit normals [z, y, x, (x, y, z)] from the blurred occupancy, so a box shades like a rounded form."""
+    occ = np.pad(solid.astype(float), pad)
+    for _ in range(2):
+        for axis in range(3):
+            occ = (np.roll(occ, 1, axis) + occ + np.roll(occ, -1, axis)) / 3
+    gz, gy, gx = np.gradient(occ)
+    n = -np.stack([gx, gy, gz], -1)[pad:-pad, pad:-pad, pad:-pad]
+    length = np.linalg.norm(n, axis=-1, keepdims=True)
+    return np.where(length > 1e-6, n / np.maximum(length, 1e-6), 0.0)
 
 
 class Inst:
@@ -131,7 +151,17 @@ def render(instances, direction, dark, dirs=16):
                 a, b = a[win], b[win]
                 zbuf[a, b] = key[win]
                 depth[a, b] = t[hit][win]
-                code[a, b] = dark[inst.dim][c[hit][win]] if inst.dim else c[hit][win]
+                tone = dark[inst.dim][c[hit][win]] if inst.dim else c[hit][win]
+                if -1 in dark:
+                    at = idx[hit][win]
+                    out = p.normal[at[:, 2], at[:, 1], at[:, 0]] @ inv  # part normal -> character space
+                    facing = (out @ C.T) @ LIGHT / np.maximum(np.linalg.norm(out, axis=1), 1e-6)
+                    tone = np.where(
+                        facing > LIT,
+                        dark[-1][tone],
+                        np.where(facing < DEEP, dark[2][tone], np.where(facing < SHADED, dark[1][tone], tone)),
+                    )
+                code[a, b] = tone
                 ident[a, b] = n
             t = t + 0.34
             keep = ~hit & (t < far[live])
@@ -142,8 +172,8 @@ def render(instances, direction, dark, dirs=16):
 
     c, i, d = blocks(code), blocks(ident), blocks(depth)
     opaque = c > 0
-    key = c * 64 + i
-    score = (key[..., :, None] == key[..., None, :]).sum(-1) * opaque
+    # the part with most samples wins the pixel; voting on colour too would let lit tones split a part's vote
+    score = (i[..., :, None] == i[..., None, :]).sum(-1) * opaque
     pick = score.argmax(-1)[..., None]
     body = opaque.sum(-1) >= SS * SS // 2
     c = np.where(body, np.take_along_axis(c, pick, -1)[..., 0], 0)
@@ -158,6 +188,15 @@ def render(instances, direction, dark, dirs=16):
         with np.errstate(invalid="ignore"):
             seam |= body & (ni > 0) & (ni != i) & (d - nd > 3.0)
     c = np.where(seam, dark[2][c], c)
+    if -1 in dark:
+        # a nearer part also drops a short shadow down and to the right, away from the light
+        cast = np.zeros_like(body)
+        for k in (1, 2):
+            dq, iq = np.pad(d, k, constant_values=np.inf), np.pad(i, k)
+            nd, ni = dq[:CH, :CW], iq[:CH, :CW]
+            with np.errstate(invalid="ignore"):
+                cast |= body & (ni > 0) & (ni != i) & (d - nd > 3.0)
+        c = np.where(cast & ~seam, dark[1][c], c)
     return c, i, d
 
 
