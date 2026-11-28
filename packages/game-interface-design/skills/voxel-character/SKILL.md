@@ -30,7 +30,8 @@ Copy [scripts/example/character.json](scripts/example/character.json) into the w
   gloves), `trouser`, `shirt` (collar), `bronze` (buckle, belt lantern), and `wood`, `steel`, `iron` for tools and shield.
 - `faces`, `hats`: imported head strips from step 3, each with a label.
 - `head.neck`: voxels of neck between collar and chin. 0 suits a stocky build or a beard that covers it; a
-  beardless face needs about 4, or it sits on the collar with no neck. Set `ramps.skin` to the faces' skin tone.
+  beardless face needs about 2, or it sits on the collar with no neck. Longer reads as a stalk in profile under a
+  bald or short-haired head. Set `ramps.skin` to the faces' skin tone.
 
 A new body shape, tool or action is code: see [references/body-and-motion.md](references/body-and-motion.md).
 
@@ -46,7 +47,8 @@ composition reference with one sheet per face or hat. The prompts, the style lin
 are in [references/heads.md](references/heads.md). Generate one sheet at a time and look at every sheet before
 importing it: five whole heads in a row with gaps, the same person in all five, nothing cropped.
 
-Faces are bare heads (hair, no hat). A hat sheet shows the hat on a flat magenta head, which the import deletes.
+Faces are bare heads (hair, no hat). A face lands about 20 px wide on the page, so features drawn thinner than a
+tenth of the head vanish: reject a sheet whose mouth is a hairline. A hat sheet shows the hat on a flat magenta head, which the import deletes.
 
 ## 3. Import
 
@@ -60,6 +62,9 @@ The import finds the five heads, pins each one by its centre and a brim line hal
 crown, scales a fifth of the sheet to 40.2 game px times `--scale` (0.78), quantizes to the body palette plus the
 sheet's own 24 colours, and mirrors the right-facing views into the left ones. Pass `--brim` when a tall topknot or
 spiky hair puts the crown far above the skull.
+
+Look at each imported strip at 10x before baking. The eyes and mouth must still read in the front, three-quarter and
+profile cells; repaint a mouth that came out under 3 px wide on the strip, or regenerate the sheet.
 
 ## 4. Bake
 
@@ -90,7 +95,7 @@ were checked.
 
 | Setting           | Value                                        | Why                                                                                              |
 | ----------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Neck              | 6 voxels for a beardless face                | Below 6 the collar hides it; 0 leaves the chin on the collar.                                    |
+| Neck              | 2 voxels for a beardless face                | Longer reads as a stalk under a bald head in profile; 0 leaves the chin on the collar.           |
 | Head scale        | 0.78                                         | 0.86 reads as a big head; 0.70 blurs eyes and mouth into a smear.                                |
 | Body zoom         | `[1.0, 1.25]` across, up                     | A taller body fixes a top-heavy look; a uniform zoom widens the shoulders into a bodybuilder.    |
 | Torso depth       | about the torso width                        | A shallow torso is narrower than the head in profile, so the head reads as nearer than the body. |
@@ -113,6 +118,8 @@ the fix, then add a row here. Delete a row once code makes the mistake impossibl
 | 2026-11-27 | Exempting tools from depth ordering to hide a tool crossing the face broke perspective | Fix crossings with collision or the pose, never by skipping ordering                     | `check.py` covering case     |
 | 2026-11-28 | The walk carried the haft at neck height, so in profile it lay across the throat       | Carry a tool on the shoulder below the neck                                              | `check.py` shoulder case     |
 | 2026-11-28 | A swing wind-up and smear ran the haft across the eyes                                 | Keep hands in arm reach; clear the face by tilting the haft, not by raising the hand     | `check.py` face, reach cases |
+| 2026-11-28 | A neck 4 long and 4 thick read as a stalk in profile under a bald head                 | A short neck as thick as the jaw: about 2 long, 6 wide, 7 deep                           | `check.py` stalk case        |
+| 2026-11-28 | The import shrank a face to about 20 px and its mouth to one pixel                     | Ask for a bold mouth; zoom the imported strip and repaint a mouth under 3 px wide        | Prompt in heads.md, step 3   |
 | 2026-11-27 | A beardless face sat on the collar with no neck                                        | Raise the head on `head.neck` and draw a skin neck under it                              | `check.py` neck case         |
 | 2026-11-27 | A shallow torso made the head look nearer than the body in profile                     | Torso depth close to its width                                                           | `check.py` torso case        |
 | 2026-11-27 | A uniform 1.4x body zoom widened the shoulders                                         | Grow the body taller, not wider                                                          | Spec default                 |

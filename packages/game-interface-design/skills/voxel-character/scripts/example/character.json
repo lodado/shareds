@@ -2,7 +2,7 @@
   "title": "Character workshop",
   "body": { "zoom": [1.0, 1.25] },
   "head": {
-    "neck": 4,
+    "neck": 2,
     "blobs": [
       [[0.0, 0.0, 34.5], 8.0],
       [[0.0, 8.5, 27.0], 6.0]

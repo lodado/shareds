@@ -13,7 +13,8 @@ Pixel art head sheet for a game: exactly five complete bare heads of ONE charact
 no body, no shoulders, no weapons, no text. Views in this order: front, front three-quarter facing right, right
 profile, back three-quarter facing right, back. Copy the reference's layout exactly: same five positions, same head
 size, same height on the canvas. Every head is whole and round, with the full hair outline visible, never
-cropped or cut diagonally, and the same face in all five views. Clear empty space between the heads.
+cropped or cut diagonally, and the same face in all five views. Eyes and mouth are bold, dark and large enough to
+read when the head is shrunk to 20 pixels wide. Clear empty space between the heads.
 [STYLE] [CHARACTER] Transparent or flat white background.
 ```
 

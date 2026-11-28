@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.3 — 2026-11-28
+
+- `voxel-character`: the neck part is 6 voxels wide and 7 deep, and the example spec uses a 2-voxel neck, so a bald or short-haired head no longer sits on a thin stalk in profile. A check case covers the thickness. The mine smear grips lower, so the haft also clears the face at a 2-voxel neck; the haft and reach cases now run at necks 0 to 4, 6 and the longest. The head prompt asks for a mouth that survives the shrink to about 20 px, step 2 says to reject a sheet whose mouth is a hairline, and step 3 says to zoom the imported strip and repaint a mouth that came out under 3 px wide.
+
 ## 0.12.2 — 2026-11-28
 
 - `voxel-character`: the walk carries the tool on the shoulder below the neck instead of across the throat, and the swing and mine wind-up and smear frames keep the haft off the face with every hand in arm reach. The neck part is 4 voxels wide and deep, and the example spec uses a 4-voxel neck. Check cases cover the shoulder carry and the face at short, example and longest necks, and bound arm stretch. Step 5 now starts from the page as it opens (walk, facing 12).

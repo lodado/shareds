@@ -190,8 +190,9 @@ def _item():
 
 
 SHARED["item"] = _item()
-# the neck runs from inside the collar up into the head, where the painted head covers its top
-SHARED["neck"] = part(boxes(("skin", 22, 25, 18, 21, 28, int(NECK[2] + NECK_LEN + 3), 1)), NECK)
+# the neck runs from inside the collar up into the head, where the painted head covers its top;
+# it is as thick as the jaw and sits half a voxel forward of the axis, under the chin
+SHARED["neck"] = part(boxes(("skin", 21, 26, 17, 23, 28, int(NECK[2] + NECK_LEN + 3), 1)), NECK)
 
 
 class Loadout:
