@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.5 — 2026-11-28
+
+- `voxel-character`: a tool carried back over the shoulder is drawn on top of the shoulder cap, with the hand closed over it (`rest=True`, a new pose value), and the carrying elbow hangs down (`elbow_hi`, also new) in the idle and the walk. Seen from the tool side the cap used to swallow the middle of the haft, so the tool stuck into the chest and the hand held nothing. Two check cases cover it.
+
 ## 0.12.4 — 2026-11-28
 
 - `voxel-character`: the renderer lights every view from the upper left of the screen, using smooth normals from each part's voxels: lit faces go one tone up, faces turned away one or two down, and a nearer part drops a short shadow. The near sleeve goes one tone up so it reads in front of a torso of the same cloth. The lantern glow keeps its tones. A pixel now goes to the part with most samples, whatever its tones. A side-on torso no longer comes out as one flat tone; a check case covers it.

@@ -5,6 +5,7 @@ import math
 
 WALK_STEP = 2.6  # voxels travelled per walk frame
 CARRY = ("hand", -48.0, -4.0, 0.0)  # weapon resting back over the shoulder
+TUCKED = (0.15, -0.5, -1.0)  # elbow down beside the body: out to the side it hides the torso and the haft in profile
 
 BASE = dict(
     pelvis=(0, 0, 0),
@@ -20,6 +21,9 @@ BASE = dict(
     hand_lo=(-15, 6, 21),
     hand_hi=(14.5, 8, 21),
     grip=(0, 12, 20),
+    elbow_lo=None,  # where the elbow points (chest space); None = out to the side and back
+    elbow_hi=None,
+    rest=False,  # the one-handed tool rests on the shoulder: drawn on the shoulder plate, not inside it
     weapon=CARRY,
     shield=("arm", 22),
     space="body",
@@ -54,6 +58,8 @@ def idle(_):
                 head_pitch=-z,
                 hand_lo=(-15, 6, 21 + z * 0.5),
                 hand_hi=(14.5, 8, 21 + z * 0.5),
+                elbow_hi=TUCKED,
+                rest=True,
                 weapon=("hand", -52 - z * 2, -4, 0),
             ),
             ms,
@@ -86,8 +92,10 @@ def walk(_):
             foot_lo=(-6, WALK_Y[a], WALK_LIFT[a], WALK_PITCH[a]),
             foot_hi=(6, WALK_Y[b], WALK_LIFT[b], WALK_PITCH[b]), choke=6,
             hand_lo=(-14.5, 6.5 - 5.0 * c, 23.5 + 1.5 * max(0, -c)),
-            hand_hi=(12.5, 8.5 + 2.0 * c, 22.5 + 0.7 * math.cos(2 * late)),  # the haft rests on the shoulder, below the neck
-            weapon=("hand", -57 + 4 * math.cos(2 * late), -4, 0),
+            hand_hi=(14.0, 8.0 + 1.5 * c, 22.6 + 0.7 * math.cos(2 * late)),  # the haft rests on the shoulder, below the neck
+            elbow_hi=TUCKED,
+            rest=True,
+            weapon=("hand", -56 + 3 * math.cos(2 * late), -4, 0),
             shield=("arm", 18 - 8 * c),
         ), 80, "cycle"))
     return frames

@@ -242,6 +242,31 @@ class Body(unittest.TestCase):
                 v = head.M.T @ (weapon.point((19.0, 0.0, z)) - head.pos) + bake.rig.NECK
                 self.assertFalse(3 <= v[1] <= 10 and 29 <= v[2] <= 38, f"{name}: haft at {v.round(1)}")
 
+    def test_a_carried_haft_shows_unbroken_on_the_tool_side(self):
+        # seen from the tool-arm side the shoulder cap swallowed the middle of the haft, so the tool stuck into
+        # the chest and the gripping hand read as holding nothing
+        for act in ("idle", "walk"):
+            for k, (q, *_) in enumerate(bake.ACTIONS[act]["build"](self.lo)):
+                if q["weapon"][0] != "hand":
+                    continue
+                inst, _ = bake.solved(self.lo, q)
+                names = [None] + [i.name for i in inst]
+                weapon = next(i for i in inst if i.name == "weapon")
+                for d in (10, 12):
+                    _, ident, _ = bake.R.render(inst, d, bake.rig.DARK, 16)
+                    C = bake.R.camera(d, 16)
+                    for z in range(8, 40, 2):
+                        col, row, _ = bake.R.project([weapon.point((19.0, 0.0, z))], C)[0]
+                        self.assertIn(names[ident[int(row), int(col)]], ("weapon", "hand_hi"), f"{act} {k} dir {d} haft z {z}")
+
+    def test_the_carrying_elbow_hangs_beside_the_body(self):
+        # an elbow out to the side pointed at the camera in the tool-side profile and covered the torso
+        for act in ("idle", "walk"):
+            for k, (q, *_) in enumerate(bake.ACTIONS[act]["build"](self.lo)):
+                side, _, down = bake.solved(self.lo, q)[1]["elbow"]["hi"]
+                self.assertLessEqual(side, 2.5, f"{act} {k}: elbow out to the side")
+                self.assertLess(down, -4.0, f"{act} {k}: elbow not below the shoulder")
+
     def test_arms_reach_their_targets(self):
         # hands raised out of reach to clear the face stretched the arms half again in profile;
         # two-handed grips already stretch a little, so the bound sits just above them
