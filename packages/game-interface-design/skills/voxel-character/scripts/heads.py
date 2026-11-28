@@ -23,7 +23,7 @@ CX = 41.5  # head centre column in a cell; a mirrored view lands on the same col
 BRIM_Y = (
     26  # brim row in a cell: a hat keeps what is above it, the face strip what is below
 )
-CELL_PX = 40.2  # game pixels per fifth of the sheet at scale 1: one generated head about 19 px wide at 0.78
+CELL_PX = 40.2  # game pixels per fifth of the sheet at scale 1: one generated head about 20 px wide at 0.78
 SCALE = 0.78  # smaller heads blur the face, larger ones read as a big head on the body
 VIEWS = 5
 MIRROR = {1: 7, 2: 6, 3: 5}

@@ -207,10 +207,10 @@ class Body(unittest.TestCase):
         )
 
     def poses_at_every_neck(self, acts):
-        # hands sit in body space but the head rides up its neck, so check short, example and longest necks
+        # hands sit in body space but the head rides up its neck, so check every short neck and the longest
         keep = bake.rig.NECK_LEN
         try:
-            for neck in (0.0, 4.0, float(bake.rig.N - bake.rig.NECK[2] - 4)):
+            for neck in (0.0, 1.0, 2.0, 3.0, 4.0, 6.0, float(bake.rig.N - bake.rig.NECK[2] - 4)):
                 bake.rig.NECK_LEN = neck
                 for act in acts:
                     for k, (q, *_) in enumerate(bake.ACTIONS[act]["build"](self.lo)):
@@ -248,6 +248,12 @@ class Body(unittest.TestCase):
         for name, _, _, info in self.poses_at_every_neck(bake.ACTIONS):
             arms = max(s for a, s in info["stretch"].items() if a.startswith("arm"))
             self.assertLessEqual(arms, 1.32, name)
+
+    def test_the_neck_is_a_column_not_a_stalk(self):
+        # a neck 4 voxels thick showed as a thin stalk under a bald head in profile
+        width, depth, _ = bake.rig.SHARED["neck"].size
+        self.assertGreaterEqual(width, 6)
+        self.assertGreaterEqual(depth, 7)
 
     def test_whatever_is_nearer_than_the_head_covers_it(self):
         # the head image was drawn over everything, so the near shoulder and a slung pick sat behind it
